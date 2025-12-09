@@ -1,9 +1,9 @@
 package org.example.nabat.application.service;
 
-import org.example.nabat.adapter.in.security.JwtTokenProvider;
 import org.example.nabat.application.port.in.LoginUserUseCase;
 import org.example.nabat.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.application.port.in.RegisterUserUseCase;
+import org.example.nabat.application.port.out.TokenProvider;
 import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.domain.model.Role;
 import org.example.nabat.domain.model.User;
@@ -33,7 +33,7 @@ class AuthenticationServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private JwtTokenProvider jwtTokenProvider;
+    private TokenProvider tokenProvider;
 
     private PasswordEncoder passwordEncoder;
     private AuthenticationService authenticationService;
@@ -41,7 +41,7 @@ class AuthenticationServiceTest {
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        authenticationService = new AuthenticationService(userRepository, passwordEncoder, jwtTokenProvider);
+        authenticationService = new AuthenticationService(userRepository, passwordEncoder, tokenProvider);
     }
 
     @Test
@@ -93,9 +93,9 @@ class AuthenticationServiceTest {
             new LoginUserUseCase.LoginCommand("test@example.com", rawPassword);
 
         when(userRepository.findByEmail(command.email())).thenReturn(Optional.of(user));
-        when(jwtTokenProvider.generateAccessToken(user)).thenReturn("access-token");
-        when(jwtTokenProvider.generateRefreshToken(user)).thenReturn("refresh-token");
-        when(jwtTokenProvider.getJwtExpiration()).thenReturn(3600000L);
+        when(tokenProvider.generateAccessToken(user)).thenReturn("access-token");
+        when(tokenProvider.generateRefreshToken(user)).thenReturn("refresh-token");
+        when(tokenProvider.getJwtExpiration()).thenReturn(3600000L);
 
         LoginUserUseCase.LoginResult result = authenticationService.login(command);
 
@@ -103,8 +103,8 @@ class AuthenticationServiceTest {
         assertEquals("access-token", result.accessToken());
         assertEquals("refresh-token", result.refreshToken());
         assertEquals(user, result.user());
-        verify(jwtTokenProvider).generateAccessToken(user);
-        verify(jwtTokenProvider).generateRefreshToken(user);
+        verify(tokenProvider).generateAccessToken(user);
+        verify(tokenProvider).generateRefreshToken(user);
     }
 
     @Test
@@ -179,13 +179,13 @@ class AuthenticationServiceTest {
             Instant.now()
         );
 
-        when(jwtTokenProvider.validateToken(refreshToken)).thenReturn(true);
-        when(jwtTokenProvider.isRefreshToken(refreshToken)).thenReturn(true);
-        when(jwtTokenProvider.getEmailFromToken(refreshToken)).thenReturn(user.email());
+        when(tokenProvider.validateToken(refreshToken)).thenReturn(true);
+        when(tokenProvider.isRefreshToken(refreshToken)).thenReturn(true);
+        when(tokenProvider.getEmailFromToken(refreshToken)).thenReturn(user.email());
         when(userRepository.findByEmail(user.email())).thenReturn(Optional.of(user));
-        when(jwtTokenProvider.generateAccessToken(user)).thenReturn("new-access-token");
-        when(jwtTokenProvider.generateRefreshToken(user)).thenReturn("new-refresh-token");
-        when(jwtTokenProvider.getJwtExpiration()).thenReturn(3600000L);
+        when(tokenProvider.generateAccessToken(user)).thenReturn("new-access-token");
+        when(tokenProvider.generateRefreshToken(user)).thenReturn("new-refresh-token");
+        when(tokenProvider.getJwtExpiration()).thenReturn(3600000L);
 
         RefreshTokenUseCase.AuthTokens result = authenticationService.refresh(refreshToken);
 
@@ -198,7 +198,7 @@ class AuthenticationServiceTest {
     void shouldNotRefreshInvalidToken() {
         String invalidToken = "invalid-token";
 
-        when(jwtTokenProvider.validateToken(invalidToken)).thenReturn(false);
+        when(tokenProvider.validateToken(invalidToken)).thenReturn(false);
 
         assertThrows(BadCredentialsException.class, () -> authenticationService.refresh(invalidToken));
     }
@@ -207,8 +207,8 @@ class AuthenticationServiceTest {
     void shouldNotRefreshAccessTokenAsRefreshToken() {
         String accessToken = "access-token";
 
-        when(jwtTokenProvider.validateToken(accessToken)).thenReturn(true);
-        when(jwtTokenProvider.isRefreshToken(accessToken)).thenReturn(false);
+        when(tokenProvider.validateToken(accessToken)).thenReturn(true);
+        when(tokenProvider.isRefreshToken(accessToken)).thenReturn(false);
 
         assertThrows(BadCredentialsException.class, () -> authenticationService.refresh(accessToken));
     }

@@ -1,10 +1,10 @@
 package org.example.nabat.application.service;
 
-import org.example.nabat.adapter.in.security.JwtTokenProvider;
 import org.example.nabat.application.UseCase;
 import org.example.nabat.application.port.in.LoginUserUseCase;
 import org.example.nabat.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.application.port.in.RegisterUserUseCase;
+import org.example.nabat.application.port.out.TokenProvider;
 import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.domain.model.User;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -15,16 +15,16 @@ public class AuthenticationService implements RegisterUserUseCase, LoginUserUseC
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final TokenProvider tokenProvider;
 
     public AuthenticationService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
-        JwtTokenProvider jwtTokenProvider
+        TokenProvider tokenProvider
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenProvider = tokenProvider;
     }
 
     @Override
@@ -52,28 +52,28 @@ public class AuthenticationService implements RegisterUserUseCase, LoginUserUseC
             throw new BadCredentialsException("User account is disabled");
         }
 
-        String accessToken = jwtTokenProvider.generateAccessToken(user);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user);
+        String accessToken = tokenProvider.generateAccessToken(user);
+        String refreshToken = tokenProvider.generateRefreshToken(user);
 
         return new LoginUserUseCase.LoginResult(
             accessToken,
             refreshToken,
-            jwtTokenProvider.getJwtExpiration(),
+            tokenProvider.getJwtExpiration(),
             user
         );
     }
 
     @Override
     public RefreshTokenUseCase.AuthTokens refresh(String refreshToken) {
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
+        if (!tokenProvider.validateToken(refreshToken)) {
             throw new BadCredentialsException("Invalid refresh token");
         }
 
-        if (!jwtTokenProvider.isRefreshToken(refreshToken)) {
+        if (!tokenProvider.isRefreshToken(refreshToken)) {
             throw new BadCredentialsException("Token is not a refresh token");
         }
 
-        String email = jwtTokenProvider.getEmailFromToken(refreshToken);
+        String email = tokenProvider.getEmailFromToken(refreshToken);
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new BadCredentialsException("User not found"));
 
@@ -81,13 +81,13 @@ public class AuthenticationService implements RegisterUserUseCase, LoginUserUseC
             throw new BadCredentialsException("User account is disabled");
         }
 
-        String newAccessToken = jwtTokenProvider.generateAccessToken(user);
-        String newRefreshToken = jwtTokenProvider.generateRefreshToken(user);
+        String newAccessToken = tokenProvider.generateAccessToken(user);
+        String newRefreshToken = tokenProvider.generateRefreshToken(user);
 
         return new RefreshTokenUseCase.AuthTokens(
             newAccessToken,
             newRefreshToken,
-            jwtTokenProvider.getJwtExpiration()
+            tokenProvider.getJwtExpiration()
         );
     }
 }
