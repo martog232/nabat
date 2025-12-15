@@ -57,3 +57,20 @@ CREATE INDEX idx_user_subscriptions_user_id ON user_subscriptions(user_id);
 CREATE INDEX idx_user_subscriptions_alert_type ON user_subscriptions(alert_type);
 CREATE INDEX idx_user_subscriptions_location ON user_subscriptions(latitude, longitude);
 CREATE INDEX idx_user_subscriptions_active ON user_subscriptions(is_active);
+
+--Alert votes table
+CREATE TABLE IF NOT EXISTS alert_votes (
+                                           id UUID PRIMARY KEY,
+                                           alert_id UUID NOT NULL,
+                                           user_id UUID NOT NULL,
+                                           vote_type VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT fk_alert_votes_alert FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_alert_votes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT uk_alert_votes_alert_user UNIQUE (alert_id, user_id)
+    );
+
+-- Добави колони към alerts (ако не съществуват)
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS upvote_count INTEGER DEFAULT 0;
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS downvote_count INTEGER DEFAULT 0;
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS confirmation_count INTEGER DEFAULT 0;

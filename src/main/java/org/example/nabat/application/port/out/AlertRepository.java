@@ -17,4 +17,6 @@ public interface AlertRepository {
     List<Alert> findActiveAlertsWithinRadius(Location center, double radiusKm);
 
     List<Alert> findByStatus(AlertStatus status);
+
+    void updateVoteCounts(AlertId alertId, int upvotes, int downvotes, int confirmations);
 }
