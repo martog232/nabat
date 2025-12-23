@@ -11,7 +11,7 @@ public record AlertId(UUID value) {
         return new AlertId(value);
     }
 
-    public static AlertId of(String value) {
-        return new AlertId(UUID.fromString(value));
-    }
+//    public static AlertId of(String value) {
+//        return new AlertId(UUID.fromString(value));
+//    }
 }
