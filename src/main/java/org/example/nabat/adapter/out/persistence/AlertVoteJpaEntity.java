@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "alert_votes",
+@Table(name = "alert_votes", schema = "PUBLIC",
         uniqueConstraints = @UniqueConstraint(
                 columnNames = {"alert_id", "user_id"},
                 name = "uk_alert_votes_alert_user"

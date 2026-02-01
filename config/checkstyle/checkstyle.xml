@@ -1,0 +1,44 @@
+<!--<?xml version="1.0"?>-->
+<!--<!DOCTYPE module PUBLIC-->
+<!--    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"-->
+<!--    "https://checkstyle.org/dtds/configuration_1_3.dtd">-->
+
+<!--<module name="Checker">-->
+<!--    <property name="severity" value="warning"/>-->
+<!--    <property name="fileExtensions" value="java"/>-->
+
+<!--    &lt;!&ndash; File length &ndash;&gt;-->
+<!--    <module name="FileLength">-->
+<!--        <property name="max" value="500"/>-->
+<!--    </module>-->
+
+<!--    <module name="TreeWalker">-->
+<!--        &lt;!&ndash; Naming conventions &ndash;&gt;-->
+<!--        <module name="ConstantName"/>-->
+<!--        <module name="LocalVariableName"/>-->
+<!--        <module name="MemberName"/>-->
+<!--        <module name="MethodName"/>-->
+<!--        <module name="PackageName"/>-->
+<!--        <module name="ParameterName"/>-->
+<!--        <module name="TypeName"/>-->
+
+<!--        &lt;!&ndash; Import checks &ndash;&gt;-->
+<!--        <module name="AvoidStarImport"/>-->
+<!--        <module name="UnusedImports"/>-->
+
+<!--        &lt;!&ndash; Whitespace &ndash;&gt;-->
+<!--        <module name="WhitespaceAround"/>-->
+
+<!--        &lt;!&ndash; Blocks &ndash;&gt;-->
+<!--        <module name="NeedBraces"/>-->
+<!--        <module name="LeftCurly"/>-->
+<!--        <module name="RightCurly"/>-->
+
+<!--        &lt;!&ndash; Coding &ndash;&gt;-->
+<!--        <module name="EmptyStatement"/>-->
+<!--        <module name="EqualsHashCode"/>-->
+<!--        <module name="SimplifyBooleanExpression"/>-->
+<!--        <module name="SimplifyBooleanReturn"/>-->
+<!--    </module>-->
+<!--</module>-->
+

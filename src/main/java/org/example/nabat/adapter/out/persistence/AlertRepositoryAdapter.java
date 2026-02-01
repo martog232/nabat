@@ -50,5 +50,10 @@ public class AlertRepositoryAdapter implements AlertRepository {
             .map(AlertJpaEntity::toDomain)
             .toList();
     }
+
+    @Override
+    public void updateVoteCounts(AlertId alertId, int upvotes, int downvotes, int confirmations) {
+        //todo
+    }
 }
 

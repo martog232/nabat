@@ -2,34 +2,54 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: nabat-postgres
     environment:
       POSTGRES_DB: nabat_db
       POSTGRES_USER: nabat_user
-      POSTGRES_PASSWORD: nabat_password
+      POSTGRES_PASSWORD:  nabat_password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nabat_user -d nabat_db"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout:  5s
+      retries:  5
+    networks:
+      - nabat-network
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: nabat-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@nabat.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
+  nabat-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nabat-app
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL:  jdbc:postgresql://postgres:5432/nabat_db
+      SPRING_DATASOURCE_USERNAME:  nabat_user
+      SPRING_DATASOURCE_PASSWORD: nabat_password
+      JWT_SECRET: ${JWT_SECRET:-nabat-jwt-secret-key-min-256-bits-change-in-production}
+    ports:
+      - "8080:8080"
+    networks:
+      - nabat-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
+    driver: local
 
+networks:
+  nabat-network:
+    driver: bridge

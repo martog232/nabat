@@ -1,19 +1,9 @@
 package org.example.nabat.adapter.out.persistence;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.example.nabat.domain.model.Alert;
-import org.example.nabat.domain.model.AlertId;
-import org.example.nabat.domain.model.AlertSeverity;
-import org.example.nabat.domain.model.AlertStatus;
-import org.example.nabat.domain.model.AlertType;
-import org.example.nabat.domain.model.Location;
+import org.example.nabat.domain.model.*;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -25,7 +15,8 @@ import java.util.UUID;
 public class AlertJpaEntity {
 
     // Getters за query projections
-    @Getter @Id
+    @Getter
+    @Id
     private UUID id;
 
     @Column(nullable = false)
@@ -79,15 +70,18 @@ public class AlertJpaEntity {
 
     public Alert toDomain() {
         return new Alert(
-            AlertId.of(id),
-            title,
-            description,
-            type,
-            severity,
-            Location.of(latitude, longitude),
-            createdAt,
-            status,
-            reportedBy
+                AlertId.of(id),
+                title,
+                description,
+                type,
+                severity,
+                Location.of(latitude, longitude),
+                createdAt,
+                status,
+                reportedBy,
+                0,
+                0,
+                0
         );
     }
 }
