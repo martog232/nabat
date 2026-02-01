@@ -5,15 +5,15 @@ services:
     image: postgres:16-alpine
     container_name: nabat-postgres
     environment:
-      POSTGRES_DB: nabat_db
-      POSTGRES_USER: nabat_user
-      POSTGRES_PASSWORD:  nabat_password
+      POSTGRES_DB: ${POSTGRES_DB:-nabat_db}
+      POSTGRES_USER: ${POSTGRES_USER:-nabat_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nabat_user -d nabat_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nabat_user} -d ${POSTGRES_DB:-nabat_db}"]
       interval: 10s
       timeout:  5s
       retries:  5
@@ -29,11 +29,11 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL:  jdbc:postgresql://postgres:5432/nabat_db
-      SPRING_DATASOURCE_USERNAME:  nabat_user
-      SPRING_DATASOURCE_PASSWORD: nabat_password
-      JWT_SECRET: ${JWT_SECRET:-nabat-jwt-secret-key-min-256-bits-change-in-production}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-nabat_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-nabat_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      JWT_SECRET: ${JWT_SECRET:?JWT secret required}
     ports:
       - "8080:8080"
     networks:

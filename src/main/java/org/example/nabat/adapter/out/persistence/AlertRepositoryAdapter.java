@@ -53,7 +53,12 @@ public class AlertRepositoryAdapter implements AlertRepository {
 
     @Override
     public void updateVoteCounts(AlertId alertId, int upvotes, int downvotes, int confirmations) {
-        //todo
+        jpaRepository.updateVoteCounts(
+            alertId.value(),
+            upvotes,
+            downvotes,
+            confirmations
+        );
     }
 }
 

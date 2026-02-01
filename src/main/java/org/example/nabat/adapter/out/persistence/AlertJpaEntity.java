@@ -49,6 +49,15 @@ public class AlertJpaEntity {
     @Column(nullable = false)
     private UUID reportedBy;
 
+    @Column(name = "upvote_count", nullable = false)
+    private int upvoteCount = 0;
+
+    @Column(name = "downvote_count", nullable = false)
+    private int downvoteCount = 0;
+
+    @Column(name = "confirmation_count", nullable = false)
+    private int confirmationCount = 0;
+
     // JPA requires default constructor
     protected AlertJpaEntity() {
     }
@@ -65,6 +74,9 @@ public class AlertJpaEntity {
         entity.createdAt = alert.createdAt();
         entity.status = alert.status();
         entity.reportedBy = alert.reportedBy();
+        entity.upvoteCount = alert.upvoteCount();
+        entity.downvoteCount = alert.downvoteCount();
+        entity.confirmationCount = alert.confirmationCount();
         return entity;
     }
 
@@ -79,9 +91,9 @@ public class AlertJpaEntity {
                 createdAt,
                 status,
                 reportedBy,
-                0,
-                0,
-                0
+                upvoteCount,
+                downvoteCount,
+                confirmationCount
         );
     }
 }

@@ -6,9 +6,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: nabat_db_dev
-      POSTGRES_USER: dev_user
-      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: ${DEV_POSTGRES_DB:-nabat_db_dev}
+      POSTGRES_USER: ${DEV_POSTGRES_USER:-dev_user}
+      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:-dev_password}
 
   nabat-app:
     build:
@@ -20,10 +20,11 @@ services:
       - maven-cache:/root/.m2
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nabat_db_dev
-      SPRING_DATASOURCE_USERNAME: dev_user
-      SPRING_DATASOURCE_PASSWORD: dev_password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DEV_POSTGRES_DB:-nabat_db_dev}
+      SPRING_DATASOURCE_USERNAME: ${DEV_POSTGRES_USER:-dev_user}
+      SPRING_DATASOURCE_PASSWORD: ${DEV_POSTGRES_PASSWORD:-dev_password}
       SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-key-for-local-development-only}
     command: ./mvnw spring-boot:run
 
 volumes:

@@ -1,6 +1,5 @@
 package org.example.nabat.application.service;
 
-import org.example.nabat.application.port.in.VoteAlertUseCase;
 import org.example.nabat.application.port.in.VoteAlertUseCase.VoteCommand;
 import org.example.nabat.application.port.in.VoteAlertUseCase.VoteStats;
 import org.example.nabat.application.port.out.AlertRepository;
@@ -90,6 +89,7 @@ public class AlertVoteServiceTest {
 
         verify(alertVoteRepository).deleteByAlertIdAndUserId(testAlertId, testUserId);
         verify(alertVoteRepository).save(any(AlertVote.class));
+        verify(alertRepository).updateVoteCounts(eq(testAlertId), anyInt(), anyInt(), anyInt());
     }
 
     @Test
@@ -102,7 +102,7 @@ public class AlertVoteServiceTest {
         alertVoteService.removeVote(testAlertId, testUserId);
 
         verify(alertVoteRepository).deleteByAlertIdAndUserId(testAlertId, testUserId);
-        verify(alertRepository).updateVoteCounts(eq(testAlertId), anyInt(), anyInt(),anyInt());
+        verify(alertRepository).updateVoteCounts(eq(testAlertId), anyInt(), anyInt(), anyInt());
     }
 
     @Test

@@ -35,7 +35,11 @@ public class AlertVoteService implements VoteAlertUseCase {
                 command.alertId(),
                 command.userId(),
                 command.voteType());
-        return alertVoteRepository.save(newVote);
+        AlertVote savedVote = alertVoteRepository.save(newVote);
+
+        updateAlertVoteCounts(command.alertId());
+
+        return savedVote;
     }
 
     @Override

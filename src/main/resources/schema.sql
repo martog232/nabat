@@ -1,6 +1,8 @@
 -- Database schema for Nabat safety alert platform
 
 -- Drop tables if they exist (for clean setup)
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS alert_votes CASCADE;
 DROP TABLE IF EXISTS user_subscriptions CASCADE;
 DROP TABLE IF EXISTS alerts CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -8,12 +10,13 @@ DROP TABLE IF EXISTS users CASCADE;
 -- Users table
 CREATE TABLE users (
     id UUID PRIMARY KEY,
-    username VARCHAR(100) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
-    phone VARCHAR(20),
+    password VARCHAR(255) NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'USER',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_seen TIMESTAMP,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Alerts table
@@ -28,6 +31,9 @@ CREATE TABLE alerts (
     created_at TIMESTAMP NOT NULL,
     status VARCHAR(50) NOT NULL,
     reported_by UUID NOT NULL,
+    upvote_count INTEGER NOT NULL DEFAULT 0,
+    downvote_count INTEGER NOT NULL DEFAULT 0,
+    confirmation_count INTEGER NOT NULL DEFAULT 0,
     resolved_at TIMESTAMP,
     CONSTRAINT fk_reported_by FOREIGN KEY (reported_by) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -58,49 +64,40 @@ CREATE INDEX idx_user_subscriptions_alert_type ON user_subscriptions(alert_type)
 CREATE INDEX idx_user_subscriptions_location ON user_subscriptions(latitude, longitude);
 CREATE INDEX idx_user_subscriptions_active ON user_subscriptions(is_active);
 
---Alert votes table
-CREATE TABLE IF NOT EXISTS alert_votes (
-                                           id UUID PRIMARY KEY,
-                                           alert_id UUID NOT NULL,
-                                           user_id UUID NOT NULL,
-                                           vote_type VARCHAR(20) NOT NULL,
+-- Alert votes table
+CREATE TABLE alert_votes (
+    id UUID PRIMARY KEY,
+    alert_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    vote_type VARCHAR(20) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     CONSTRAINT fk_alert_votes_alert FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
     CONSTRAINT fk_alert_votes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uk_alert_votes_alert_user UNIQUE (alert_id, user_id)
-    );
-
--- Добави колони към alerts (ако не съществуват)
-ALTER TABLE alerts ADD COLUMN IF NOT EXISTS upvote_count INTEGER DEFAULT 0;
-ALTER TABLE alerts ADD COLUMN IF NOT EXISTS downvote_count INTEGER DEFAULT 0;
-ALTER TABLE alerts ADD COLUMN IF NOT EXISTS confirmation_count INTEGER DEFAULT 0;
-
-
-
-CREATE TABLE alert_votes (
-                             id UUID PRIMARY KEY,
-                             alert_id UUID NOT NULL,
-                             user_id UUID NOT NULL,
-                             vote_type VARCHAR(20) NOT NULL,  -- UPVOTE, DOWNVOTE, CONFIRM
-                             created_at TIMESTAMP NOT NULL,
-
-    -- Foreign keys
-                             CONSTRAINT fk_alert_votes_alert FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
-                             CONSTRAINT fk_alert_votes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-
-    -- Един потребител може да гласува веднъж за alert
-                             CONSTRAINT uk_alert_votes_alert_user UNIQUE (alert_id, user_id)
 );
 
--- Индекси за бързо търсене
+-- Index for alert_votes
 CREATE INDEX idx_alert_votes_alert_id ON alert_votes(alert_id);
 CREATE INDEX idx_alert_votes_user_id ON alert_votes(user_id);
-CREATE INDEX idx_alert_votes_type ON alert_votes(alert_id, vote_type);
 
--- ═══════════════════════════════════════════════════════════
--- Добавяне на vote counts към alerts таблицата
--- ═══════════════════════════════════════════════════════════
+-- Notifications table
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY,
+    recipient_id UUID NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message VARCHAR(1000),
+    related_alert_id UUID,
+    triggered_by_user_id UUID,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_notifications_alert FOREIGN KEY (related_alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_notifications_triggered_by FOREIGN KEY (triggered_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
 
-ALTER TABLE alerts ADD COLUMN upvote_count INTEGER DEFAULT 0;
-ALTER TABLE alerts ADD COLUMN downvote_count INTEGER DEFAULT 0;
-ALTER TABLE alerts ADD COLUMN confirmation_count INTEGER DEFAULT 0;
+-- Indexes for notifications
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+
