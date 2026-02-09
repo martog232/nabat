@@ -57,4 +57,3 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
         jpaRepository.markAllAsReadByRecipientId(recipientId.value());
     }
 }
-

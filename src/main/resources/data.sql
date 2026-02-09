@@ -1,8 +1,8 @@
 
 -- Insert sample data for testing
 INSERT INTO users (id, email, password, display_name, role, enabled, created_at, updated_at) VALUES
-    ('550e8400-e29b-41d4-a716-446655440000', 'test@example.com', '$2a$10$dummyHashedPassword123456789', 'Test User', 'USER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('550e8400-e29b-41d4-a716-446655440001', 'admin@example.com', '$2a$10$dummyHashedPassword123456789', 'Admin User', 'ADMIN', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    ('550e8400-e29b-41d4-a716-446655440000', 'test@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGf6YZqEOnqM.TzBEmgFzz35O2Bq', 'Test User', 'USER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('550e8400-e29b-41d4-a716-446655440001', 'admin@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGf6YZqEOnqM.TzBEmgFzz35O2Bq', 'Admin User', 'ADMIN', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Sample alert
 INSERT INTO alerts (id, title, description, type, severity, latitude, longitude, created_at, status, reported_by, upvote_count, downvote_count, confirmation_count) VALUES

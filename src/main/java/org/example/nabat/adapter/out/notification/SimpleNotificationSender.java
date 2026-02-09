@@ -1,20 +1,18 @@
 package org.example.nabat.adapter.out.notification;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.nabat.application.port.out.NotificationSender;
 import org.example.nabat.domain.model.Notification;
 import org.example.nabat.domain.model.UserId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
  * Simple notification sender implementation.
  * In a production system, this would integrate with WebSocket, push notifications, etc.
  */
+@Slf4j
 @Component
 public class SimpleNotificationSender implements NotificationSender {
-
-    private static final Logger log = LoggerFactory.getLogger(SimpleNotificationSender.class);
 
     @Override
     public void sendToUser(UserId userId, Notification notification) {
@@ -33,4 +31,3 @@ public class SimpleNotificationSender implements NotificationSender {
         return false;
     }
 }
-

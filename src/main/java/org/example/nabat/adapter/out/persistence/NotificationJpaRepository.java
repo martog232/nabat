@@ -22,4 +22,3 @@ public interface NotificationJpaRepository extends JpaRepository<NotificationJpa
     @Query("UPDATE NotificationJpaEntity n SET n.isRead = true WHERE n.recipientId = :recipientId")
     void markAllAsReadByRecipientId(@Param("recipientId") UUID recipientId);
 }
-
