@@ -22,6 +22,9 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Make mvnw executable
+        run: chmod +x ./mvnw
+
       - name: Run tests
         run: ./mvnw test -B
 
@@ -29,7 +32,7 @@ jobs:
         run: ./mvnw package -DskipTests -B
 
       - name: Comment PR with results
-        if: always()
+        if: success()
         uses: actions/github-script@v7
         with:
           script: |
