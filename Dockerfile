@@ -1,5 +1,5 @@
 # Dockerfile
-FROM eclipse-temurin:21-jdk-slim AS build
+FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /workspace/app
 
 # Install Maven
@@ -18,7 +18,7 @@ RUN mvn package -DskipTests -B
 # Extract the built JAR layers
 RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../nabat-0.0.1-SNAPSHOT.jar)
 
-FROM eclipse-temurin:21-jre-slim
+FROM eclipse-temurin:21-jre-alpine
 VOLUME /tmp
 WORKDIR /app
 
