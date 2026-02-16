@@ -3,7 +3,7 @@ FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /workspace/app
 
 # Install Maven
-RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache maven
 
 # Copy pom.xml and download dependencies (cached layer)
 COPY pom.xml .
@@ -29,11 +29,10 @@ COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
 COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
 
 # Install wget for HEALTHCHECK
-RUN apt-get update && apt-get install -y --no-install-recommends wget \
-  && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache wget
 
 # Create non-root user and give ownership of /app
-RUN addgroup --system spring && adduser --system --ingroup spring spring \
+RUN addgroup -S spring && adduser -S spring -G spring \
   && chown -R spring:spring /app
 
 USER spring:spring
