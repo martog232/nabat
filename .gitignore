@@ -7,7 +7,6 @@ build/
 target/
 
 .env
-.env.example
 
 ### IDEs ###
 # IntelliJ IDEA
@@ -54,7 +53,6 @@ application-*.properties
 ### Environment files ###
 .env.local
 .env.*.local
-!.env.example
 
 ### Logs ###
 logs/
@@ -80,6 +78,9 @@ logs/
 *.zip
 *.tar.gz
 *.rar
+
+### SSL certificates ###
+nginx/ssl/
 
 ### JVM crash logs ###
 hs_err_pid*

@@ -1,14 +1,7 @@
--- Database schema for Nabat safety alert platform
-
--- Drop tables if they exist (for clean setup)
-DROP TABLE IF EXISTS notifications CASCADE;
-DROP TABLE IF EXISTS alert_votes CASCADE;
-DROP TABLE IF EXISTS user_subscriptions CASCADE;
-DROP TABLE IF EXISTS alerts CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
+-- Initial database schema for Nabat safety alert platform
 
 -- Users table
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
@@ -20,7 +13,7 @@ CREATE TABLE users (
 );
 
 -- Alerts table
-CREATE TABLE alerts (
+CREATE TABLE IF NOT EXISTS alerts (
     id UUID PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
     description VARCHAR(2000),
@@ -39,7 +32,7 @@ CREATE TABLE alerts (
 );
 
 -- User subscriptions table
-CREATE TABLE user_subscriptions (
+CREATE TABLE IF NOT EXISTS user_subscriptions (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
     alert_type VARCHAR(50) NOT NULL,
@@ -52,20 +45,8 @@ CREATE TABLE user_subscriptions (
     CONSTRAINT unique_user_alert_subscription UNIQUE (user_id, alert_type, latitude, longitude)
 );
 
--- Indexes for performance
-CREATE INDEX idx_alerts_status ON alerts(status);
-CREATE INDEX idx_alerts_type ON alerts(type);
-CREATE INDEX idx_alerts_created_at ON alerts(created_at DESC);
-CREATE INDEX idx_alerts_location ON alerts(latitude, longitude);
-CREATE INDEX idx_alerts_reported_by ON alerts(reported_by);
-
-CREATE INDEX idx_user_subscriptions_user_id ON user_subscriptions(user_id);
-CREATE INDEX idx_user_subscriptions_alert_type ON user_subscriptions(alert_type);
-CREATE INDEX idx_user_subscriptions_location ON user_subscriptions(latitude, longitude);
-CREATE INDEX idx_user_subscriptions_active ON user_subscriptions(is_active);
-
 -- Alert votes table
-CREATE TABLE alert_votes (
+CREATE TABLE IF NOT EXISTS alert_votes (
     id UUID PRIMARY KEY,
     alert_id UUID NOT NULL,
     user_id UUID NOT NULL,
@@ -76,12 +57,8 @@ CREATE TABLE alert_votes (
     CONSTRAINT uk_alert_votes_alert_user UNIQUE (alert_id, user_id)
 );
 
--- Index for alert_votes
-CREATE INDEX idx_alert_votes_alert_id ON alert_votes(alert_id);
-CREATE INDEX idx_alert_votes_user_id ON alert_votes(user_id);
-
 -- Notifications table
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY,
     recipient_id UUID NOT NULL,
     type VARCHAR(50) NOT NULL,
@@ -95,6 +72,23 @@ CREATE TABLE notifications (
     CONSTRAINT fk_notifications_alert FOREIGN KEY (related_alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
     CONSTRAINT fk_notifications_triggered_by FOREIGN KEY (triggered_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Indexes for alerts
+CREATE INDEX idx_alerts_status ON alerts(status);
+CREATE INDEX idx_alerts_type ON alerts(type);
+CREATE INDEX idx_alerts_created_at ON alerts(created_at DESC);
+CREATE INDEX idx_alerts_location ON alerts(latitude, longitude);
+CREATE INDEX idx_alerts_reported_by ON alerts(reported_by);
+
+-- Indexes for user_subscriptions
+CREATE INDEX idx_user_subscriptions_user_id ON user_subscriptions(user_id);
+CREATE INDEX idx_user_subscriptions_alert_type ON user_subscriptions(alert_type);
+CREATE INDEX idx_user_subscriptions_location ON user_subscriptions(latitude, longitude);
+CREATE INDEX idx_user_subscriptions_active ON user_subscriptions(is_active);
+
+-- Indexes for alert_votes
+CREATE INDEX idx_alert_votes_alert_id ON alert_votes(alert_id);
+CREATE INDEX idx_alert_votes_user_id ON alert_votes(user_id);
 
 -- Indexes for notifications
 CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
