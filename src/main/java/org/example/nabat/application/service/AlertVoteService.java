@@ -9,6 +9,7 @@ import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.AlertVote;
 import org.example.nabat.domain.model.UserId;
 import org.example.nabat.domain.model.VoteType;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -20,6 +21,7 @@ public class AlertVoteService implements VoteAlertUseCase {
     private final AlertRepository alertRepository;
 
     @Override
+    @Transactional
     public AlertVote vote(VoteCommand command) {
         Optional<AlertVote> existingVote = alertVoteRepository.findByAlertIdAndUserId(command.alertId(), command.userId());
 
@@ -43,6 +45,7 @@ public class AlertVoteService implements VoteAlertUseCase {
     }
 
     @Override
+    @Transactional
     public void removeVote(AlertId alertId, UserId userId) {
         if (!alertVoteRepository.existsByAlertIdAndUserId(alertId, userId)) {
             throw new IllegalStateException("No existing vote to remove.");
@@ -53,11 +56,13 @@ public class AlertVoteService implements VoteAlertUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean hasUserVoted(AlertId alertId, UserId userId) {
         return alertVoteRepository.existsByAlertIdAndUserId(alertId, userId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public VoteStats getVoteStats(AlertId alertId) {
         int upvotes = alertVoteRepository.countByAlertIdAndVoteType(alertId, VoteType.UPVOTE);
         int downvotes = alertVoteRepository.countByAlertIdAndVoteType(alertId, VoteType.DOWNVOTE);

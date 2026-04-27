@@ -32,12 +32,9 @@ public record CreateAlertRequest(
 
     @NotNull(message = "Longitude is required")
     @DecimalMin(value = "-180.0") @DecimalMax(value = "180.0")
-    Double longitude,
-
-    @NotNull(message = "Reporter ID is required")
-    UUID reportedBy
+    Double longitude
 ) {
-    public CreateAlertUseCase.CreateAlertCommand toCommand() {
+    public CreateAlertUseCase.CreateAlertCommand toCommand(UUID reportedBy) {
         return new CreateAlertUseCase.CreateAlertCommand(
             title, description, type, severity, latitude, longitude, reportedBy
         );

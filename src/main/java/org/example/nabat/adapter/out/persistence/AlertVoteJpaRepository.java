@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface AlertVoteJpaRepository extends JpaRepository<AlertVoteJpaEntity, Long> {
+public interface AlertVoteJpaRepository extends JpaRepository<AlertVoteJpaEntity, UUID> {
     Optional<AlertVoteJpaEntity> findByAlertIdAndUserId(UUID alertId, UUID userId);
 
     void deleteByAlertIdAndUserId(UUID alertId, UUID userId);

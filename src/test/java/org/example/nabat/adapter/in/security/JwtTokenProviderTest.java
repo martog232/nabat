@@ -112,4 +112,34 @@ class JwtTokenProviderTest {
         
         assertEquals(3600000L, expiration);
     }
+
+    @Test
+    void shouldRejectShortSecret() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+            () -> new JwtTokenProvider("too-short-secret", 1000L, 2000L));
+        assertTrue(ex.getMessage().contains("too short"));
+    }
+
+    @Test
+    void shouldRejectBlankSecret() {
+        assertThrows(IllegalStateException.class,
+            () -> new JwtTokenProvider("   ", 1000L, 2000L));
+        assertThrows(IllegalStateException.class,
+            () -> new JwtTokenProvider(null, 1000L, 2000L));
+    }
+
+    @Test
+    void shouldRejectPlaceholderSecret() {
+        String placeholder = "nabat-local-jwt-secret-key-min-256-bits-change-me-before-production-123456";
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+            () -> new JwtTokenProvider(placeholder, 1000L, 2000L));
+        assertTrue(ex.getMessage().contains("placeholder"));
+    }
+
+    @Test
+    void shouldIdentifyAccessToken() {
+        String accessToken = jwtTokenProvider.generateAccessToken(testUser);
+        assertTrue(jwtTokenProvider.isAccessToken(accessToken));
+        assertFalse(jwtTokenProvider.isAccessToken(jwtTokenProvider.generateRefreshToken(testUser)));
+    }
 }

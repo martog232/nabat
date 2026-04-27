@@ -19,7 +19,7 @@ public class GetNearbyAlertsService implements GetNearbyAlertsUseCase {
 
     @Override
     public List<Alert> getNearbyAlerts(NearbyAlertsQuery query) {
-        Location userLocation = Location.of(query. latitude(), query.longitude());
+        Location userLocation = Location.of(query.latitude(), query.longitude());
         return alertRepository.findActiveAlertsWithinRadius(userLocation, query.radiusKm());
     }
 }

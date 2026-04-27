@@ -11,18 +11,15 @@ public interface NotificationRepository {
 
     Notification save(Notification notification);
 
-    // Търсене по ID
     Optional<Notification> findById(NotificationId id);
 
-    // Всички известия за потребител (сортирани по дата, най-новите първи)
+    /** All notifications for a user, newest first. */
     List<Notification> findByRecipientIdOrderByCreatedAtDesc(UserId recipientId);
 
-    // Само непрочетени
+    /** Unread notifications only, newest first. */
     List<Notification> findByRecipientIdAndIsReadFalseOrderByCreatedAtDesc(UserId recipientId);
 
-    // Броене на непрочетени
     int countByRecipientIdAndIsReadFalse(UserId recipientId);
 
-    // Маркиране на всички като прочетени
     void markAllAsReadByRecipientId(UserId recipientId);
 }

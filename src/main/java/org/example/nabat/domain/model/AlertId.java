@@ -10,8 +10,4 @@ public record AlertId(UUID value) {
     public static AlertId of(UUID value) {
         return new AlertId(value);
     }
-
-//    public static AlertId of(String value) {
-//        return new AlertId(UUID.fromString(value));
-//    }
 }

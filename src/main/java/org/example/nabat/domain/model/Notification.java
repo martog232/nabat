@@ -4,13 +4,13 @@ import java.time.Instant;
 
 public record Notification(
     NotificationId id,
-    UserId recipientId,       // Кой получава известието
-    NotificationType type,    // Тип на известието
-    String title,             // "Твоят alert беше потвърден"
-    String message,           // "User123 потвърди 'Пожар на ул. Витоша'"
-    AlertId relatedAlertId,   // Към кой alert е свързано (nullable)
-    UserId triggeredByUserId, // Кой предизвика известието (nullable)
-    boolean isRead,           // Прочетено ли е
+    UserId recipientId,       // recipient user
+    NotificationType type,
+    String title,
+    String message,
+    AlertId relatedAlertId,   // related alert (nullable)
+    UserId triggeredByUserId, // user that triggered the notification (nullable)
+    boolean isRead,
     Instant createdAt
 ){
 
@@ -22,13 +22,13 @@ public record Notification(
             String alertTitle
     ) {
         String title = switch (type) {
-            case ALERT_UPVOTED -> "Tвоят alert получи одобрение";
-            case ALERT_DOWNVOTED -> "Tвоят alert получи неодобрение";
-            case ALERT_CONFIRMED -> "Tвоят alert беше потвърден";
-            default -> "Ново известие";
+            case ALERT_UPVOTED -> "Your alert was upvoted";
+            case ALERT_DOWNVOTED -> "Your alert was downvoted";
+            case ALERT_CONFIRMED -> "Your alert was confirmed";
+            default -> "New notification";
         };
 
-        String message = String.format("Някой гласува за '%s'", alertTitle);
+        String message = String.format("Someone voted on '%s'", alertTitle);
 
         return new Notification(
                 NotificationId.generate(),
@@ -53,15 +53,16 @@ public record Notification(
                 NotificationId.generate(),
                 recipientId,
                 NotificationType.ALERT_MILESTONE,
-                "🎉 Milestone достигнат!",
-                String.format("'%s' има вече %d потвърждения!", alertTitle, confirmationCount),
+                "🎉 Milestone reached!",
+                String.format("'%s' now has %d confirmations!", alertTitle, confirmationCount),
                 alertId,
-                null,  // Няма конкретен voter
+                null,
                 false,
                 Instant.now()
         );
     }
 
+    /** Returns a copy of this notification with isRead = true. Notification is immutable. */
     public Notification markAsRead() {
         return new Notification(
                 this.id,
@@ -71,7 +72,7 @@ public record Notification(
                 this.message,
                 this.relatedAlertId,
                 this.triggeredByUserId,
-                true,  // Маркирано като прочетено
+                true,
                 this.createdAt
         );
     }

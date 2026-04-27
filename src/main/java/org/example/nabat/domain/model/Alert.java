@@ -40,7 +40,7 @@ public record Alert(
     }
 
     public int getCredibilityScore() {
+        // Confirmations weigh double because they imply the reporter is on-site.
         return upvoteCount - downvoteCount + (confirmationCount * 2);
-        // Потвържденията тежат двойно, защото човекът е на място
     }
 }

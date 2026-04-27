@@ -27,7 +27,7 @@ public class AlertVoteController {
     public ResponseEntity<VoteResponse> vote(
             @PathVariable UUID alertId,
             @Valid @RequestBody VoteRequest request,
-            @AuthenticationPrincipal User currentUser  // Взима логнатия потребител
+            @AuthenticationPrincipal User currentUser
     ) {
         VoteCommand command = new VoteCommand(
                 AlertId.of(alertId),
@@ -42,9 +42,7 @@ public class AlertVoteController {
                 .body(VoteResponse.from(vote));
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // DELETE /api/v1/alerts/{alertId}/votes - Премахване на глас
-    // ═══════════════════════════════════════════════════════════
+    // DELETE /api/v1/alerts/{alertId}/votes — remove the current user's vote.
     @DeleteMapping
     public ResponseEntity<Void> removeVote(
             @PathVariable UUID alertId,
@@ -58,18 +56,14 @@ public class AlertVoteController {
         return ResponseEntity.noContent().build();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // GET /api/v1/alerts/{alertId}/votes/stats - Статистика
-    // ═══════════════════════════════════════════════════════════
+    // GET /api/v1/alerts/{alertId}/votes/stats — aggregate vote counts.
     @GetMapping("/stats")
     public ResponseEntity<VoteStatsResponse> getStats(@PathVariable UUID alertId) {
         VoteAlertUseCase.VoteStats stats = voteAlertUseCase.getVoteStats(AlertId.of(alertId));
         return ResponseEntity.ok(VoteStatsResponse.from(stats));
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // GET /api/v1/alerts/{alertId}/votes/me - Моят глас
-    // ═══════════════════════════════════════════════════════════
+    // GET /api/v1/alerts/{alertId}/votes/me — has the current user voted?
     @GetMapping("/me")
     public ResponseEntity<UserVoteResponse> getMyVote(
             @PathVariable UUID alertId,
@@ -77,10 +71,10 @@ public class AlertVoteController {
     ) {
         boolean hasVoted = voteAlertUseCase.hasUserVoted(
                 AlertId.of(alertId),
-                currentUser. id()
+                currentUser.id()
         );
 
-        return ResponseEntity. ok(new UserVoteResponse(hasVoted));
+        return ResponseEntity.ok(new UserVoteResponse(hasVoted));
     }
 
     public record VoteRequest(@NotNull VoteType voteType) {
@@ -91,7 +85,7 @@ public class AlertVoteController {
             return new VoteResponse(
                     vote.id().value(),
                     vote.alertId().value(),
-                    vote. voteType(),
+                    vote.voteType(),
                     vote.createdAt().toString()
             );
         }

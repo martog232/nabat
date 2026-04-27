@@ -11,6 +11,9 @@ import org.example.nabat.domain.model.AlertSeverity;
 import org.example.nabat.domain.model.AlertStatus;
 import org.example.nabat.domain.model.AlertType;
 import org.example.nabat.domain.model.Location;
+import org.example.nabat.domain.model.Role;
+import org.example.nabat.domain.model.User;
+import org.example.nabat.domain.model.UserId;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -26,6 +29,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -72,17 +76,38 @@ class AlertControllerTest {
         Alert alert = buildAlert();
         when(createAlertUseCase.createAlert(any())).thenReturn(alert);
 
+        // Create a mock user principal
+        Instant now = Instant.now();
+        User mockUser = new User(
+                UserId.of(UUID.fromString("00000000-0000-0000-0000-000000000002")),
+                "test@example.com",
+                "hashedpass",
+                "Test User",
+                Role.USER,
+                true,
+                now,
+                now
+        );
+
         CreateAlertRequest request = new CreateAlertRequest(
                 "Test Alert",
                 "Test description",
                 AlertType.FIRE,
                 AlertSeverity.HIGH,
                 42.0,
-                23.0,
-                UUID.fromString("00000000-0000-0000-0000-000000000002")
+                23.0
         );
 
         mockMvc.perform(post("/api/v1/alerts")
+                        .with(user("test@example.com").password("pass").roles("USER"))
+                        .with(request1 -> {
+                            // Inject our domain User as the principal for @AuthenticationPrincipal
+                            var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                                mockUser, "pass", java.util.Collections.emptyList()
+                            );
+                            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+                            return request1;
+                        })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -125,8 +150,7 @@ class AlertControllerTest {
                     "type": "FIRE",
                     "severity": "HIGH",
                     "latitude": 42.0,
-                    "longitude": 23.0,
-                    "reportedBy": "00000000-0000-0000-0000-000000000002"
+                    "longitude": 23.0
                 }
                 """;
 

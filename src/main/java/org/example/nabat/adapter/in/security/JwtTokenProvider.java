@@ -18,6 +18,10 @@ import java.util.Map;
 @Component
 public class JwtTokenProvider implements TokenProvider {
 
+    private static final int MIN_SECRET_LENGTH = 32;
+    /** Substring that flags the documented dev placeholder in application.properties. */
+    private static final String PLACEHOLDER_MARKER = "change-me-before-production";
+
     private final SecretKey secretKey;
     private final long jwtExpiration;
     private final long refreshExpiration;
@@ -27,9 +31,31 @@ public class JwtTokenProvider implements TokenProvider {
         @Value("${jwt.expiration}") long jwtExpiration,
         @Value("${jwt.refresh-expiration}") long refreshExpiration
     ) {
+        validateSecret(secret);
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.jwtExpiration = jwtExpiration;
         this.refreshExpiration = refreshExpiration;
+    }
+
+    private static void validateSecret(String secret) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                "jwt.secret is not set. Refusing to start. " +
+                "Provide JWT_SECRET environment variable with a strong secret (>= " + MIN_SECRET_LENGTH + " chars)."
+            );
+        }
+        if (secret.length() < MIN_SECRET_LENGTH) {
+            throw new IllegalStateException(
+                "jwt.secret is too short (" + secret.length() + " chars). " +
+                "Refusing to start. Minimum length is " + MIN_SECRET_LENGTH + " characters."
+            );
+        }
+        if (secret.contains(PLACEHOLDER_MARKER)) {
+            throw new IllegalStateException(
+                "jwt.secret still contains the dev placeholder marker '" + PLACEHOLDER_MARKER + "'. " +
+                "Refusing to start. Set JWT_SECRET to a real secret before deploying."
+            );
+        }
     }
 
     public String generateAccessToken(User user) {
@@ -83,6 +109,16 @@ public class JwtTokenProvider implements TokenProvider {
             Claims claims = parseToken(token);
             String tokenType = claims.get("tokenType", String.class);
             return "refresh".equals(tokenType);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public boolean isAccessToken(String token) {
+        try {
+            Claims claims = parseToken(token);
+            String tokenType = claims.get("tokenType", String.class);
+            return "access".equals(tokenType);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }

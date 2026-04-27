@@ -9,6 +9,7 @@ import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.domain.model.User;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 @UseCase
 public class AuthenticationService implements RegisterUserUseCase, LoginUserUseCase, RefreshTokenUseCase {
@@ -28,6 +29,7 @@ public class AuthenticationService implements RegisterUserUseCase, LoginUserUseC
     }
 
     @Override
+    @Transactional
     public User register(RegisterCommand command) {
         if (userRepository.existsByEmail(command.email())) {
             throw new IllegalArgumentException("Email already exists");
@@ -40,6 +42,7 @@ public class AuthenticationService implements RegisterUserUseCase, LoginUserUseC
     }
 
     @Override
+    @Transactional(readOnly = true)
     public LoginUserUseCase.LoginResult login(LoginCommand command) {
         User user = userRepository.findByEmail(command.email())
             .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
@@ -64,6 +67,7 @@ public class AuthenticationService implements RegisterUserUseCase, LoginUserUseC
     }
 
     @Override
+    @Transactional(readOnly = true)
     public RefreshTokenUseCase.AuthTokens refresh(String refreshToken) {
         if (!tokenProvider.validateToken(refreshToken)) {
             throw new BadCredentialsException("Invalid refresh token");

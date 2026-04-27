@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,7 +32,6 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     );
 
     @Modifying
-    @Transactional
     @Query("UPDATE AlertJpaEntity a SET a.upvoteCount = :upvotes, a.downvoteCount = :downvotes, a.confirmationCount = :confirmations WHERE a.id = :id")
     void updateVoteCounts(@Param("id") UUID id, @Param("upvotes") int upvotes, @Param("downvotes") int downvotes, @Param("confirmations") int confirmations);
 

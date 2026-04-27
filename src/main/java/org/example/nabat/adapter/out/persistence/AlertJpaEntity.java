@@ -14,8 +14,6 @@ import java.util.UUID;
 @Table(name = "alerts")
 public class AlertJpaEntity {
 
-    // Getters за query projections
-    @Getter
     @Id
     private UUID id;
 

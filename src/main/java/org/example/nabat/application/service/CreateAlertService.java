@@ -44,7 +44,7 @@ public class CreateAlertService implements CreateAlertUseCase {
 
         Alert savedAlert = alertRepository.save(alert);
 
-        // Намери всички потребители, абонирани за този тип alert в радиуса
+        // Find users subscribed to this alert type within the notification radius.
         List<UUID> subscribedUsers = subscriptionRepository
             .findUsersSubscribedToAlertType(command.type(), location, getNotificationRadius(command.severity()));
 

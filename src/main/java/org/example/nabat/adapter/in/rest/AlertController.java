@@ -4,8 +4,10 @@ import jakarta.validation.Valid;
 import org.example.nabat.application.port.in.CreateAlertUseCase;
 import org.example.nabat.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.domain.model.Alert;
+import org.example.nabat.domain.model.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,8 +33,11 @@ public class AlertController {
     }
 
     @PostMapping
-    public ResponseEntity<AlertResponse> createAlert(@Valid @RequestBody CreateAlertRequest request) {
-        var command = request.toCommand();
+    public ResponseEntity<AlertResponse> createAlert(
+            @Valid @RequestBody CreateAlertRequest request,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        var command = request.toCommand(currentUser.id().value());
         Alert alert = createAlertUseCase.createAlert(command);
         return ResponseEntity
             .status(HttpStatus.CREATED)

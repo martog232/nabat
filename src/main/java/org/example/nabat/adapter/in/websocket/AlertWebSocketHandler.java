@@ -2,6 +2,8 @@ package org.example.nabat.adapter.in.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.nabat.domain.model.Alert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -15,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class AlertWebSocketHandler extends TextWebSocketHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(AlertWebSocketHandler.class);
 
     private final Map<UUID, WebSocketSession> userSessions = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
@@ -40,7 +44,7 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
     }
 
     public void sendAlertToUser(UUID userId, Alert alert) {
-        WebSocketSession session = userSessions. get(userId);
+        WebSocketSession session = userSessions.get(userId);
         if (session != null && session.isOpen()) {
             try {
                 String payload = objectMapper.writeValueAsString(
@@ -48,17 +52,18 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
                 );
                 session.sendMessage(new TextMessage(payload));
             } catch (IOException e) {
-                // Log error
+                log.warn("Failed to deliver alert {} to user {}: {}", alert.id(), userId, e.getMessage());
             }
         }
     }
 
     private UUID extractUserId(WebSocketSession session) {
-        String userIdParam = session.getUri().getQuery();
-        // Parse userId from query params
-        if (userIdParam != null && userIdParam.startsWith("userId=")) {
-            return UUID. fromString(userIdParam.substring(7));
+        // Populated by JwtHandshakeInterceptor after JWT validation.
+        Object attr = session.getAttributes().get(JwtHandshakeInterceptor.USER_ID_ATTR);
+        if (attr instanceof UUID uuid) {
+            return uuid;
         }
+        log.warn("WebSocket session {} has no authenticated userId attribute", session.getId());
         return null;
     }
 
