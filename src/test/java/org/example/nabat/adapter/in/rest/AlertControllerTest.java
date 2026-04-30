@@ -3,7 +3,10 @@ package org.example.nabat.adapter.in.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.nabat.adapter.in.security.JwtTokenProvider;
 import org.example.nabat.application.port.in.CreateAlertUseCase;
+import org.example.nabat.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.application.port.in.GetNearbyAlertsUseCase;
+import org.example.nabat.application.port.in.ResolveAlertUseCase;
+import org.example.nabat.application.port.out.AlertRepository;
 import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.AlertId;
@@ -51,6 +54,15 @@ class AlertControllerTest {
     private GetNearbyAlertsUseCase getNearbyAlertsUseCase;
 
     @MockitoBean
+    private GetAlertByIdUseCase getAlertByIdUseCase;
+
+    @MockitoBean
+    private ResolveAlertUseCase resolveAlertUseCase;
+
+    @MockitoBean
+    private AlertRepository alertRepository;
+
+    @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
     @MockitoBean
@@ -67,7 +79,8 @@ class AlertControllerTest {
                 Instant.parse("2024-01-01T00:00:00Z"),
                 AlertStatus.ACTIVE,
                 UUID.fromString("00000000-0000-0000-0000-000000000002"),
-                0, 0, 0
+                0, 0, 0,
+                null
         );
     }
 
@@ -158,5 +171,43 @@ class AlertControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidRequest))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getById_returnsAlert() throws Exception {
+        Alert alert = buildAlert();
+        when(getAlertByIdUseCase.getById(any())).thenReturn(alert);
+
+        mockMvc.perform(get("/api/v1/alerts/{id}", alert.id().value()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(alert.id().value().toString()));
+    }
+
+    @Test
+    void getById_missing_returns404() throws Exception {
+        when(getAlertByIdUseCase.getById(any()))
+                .thenThrow(new org.example.nabat.domain.exception.AlertNotFoundException(
+                        org.example.nabat.domain.model.AlertId.generate()));
+
+        mockMvc.perform(get("/api/v1/alerts/{id}", UUID.randomUUID()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void resolve_returns200() throws Exception {
+        Alert resolved = buildAlert();
+        when(resolveAlertUseCase.resolve(any(), any())).thenReturn(resolved);
+
+        Instant now = Instant.now();
+        User mockUser = new User(
+                UserId.of(UUID.randomUUID()),
+                "test@example.com", "p", "n",
+                Role.USER, true, now, now);
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                mockUser, null, java.util.List.of());
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+
+        mockMvc.perform(post("/api/v1/alerts/{id}/resolve", resolved.id().value()))
+                .andExpect(status().isOk());
     }
 }

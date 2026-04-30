@@ -56,6 +56,9 @@ public class AlertJpaEntity {
     @Column(name = "confirmation_count", nullable = false)
     private int confirmationCount = 0;
 
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
     // JPA requires default constructor
     protected AlertJpaEntity() {
     }
@@ -75,6 +78,7 @@ public class AlertJpaEntity {
         entity.upvoteCount = alert.upvoteCount();
         entity.downvoteCount = alert.downvoteCount();
         entity.confirmationCount = alert.confirmationCount();
+        entity.resolvedAt = alert.resolvedAt();
         return entity;
     }
 
@@ -91,7 +95,8 @@ public class AlertJpaEntity {
                 reportedBy,
                 upvoteCount,
                 downvoteCount,
-                confirmationCount
+                confirmationCount,
+                resolvedAt
         );
     }
 }

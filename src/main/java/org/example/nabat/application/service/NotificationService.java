@@ -5,8 +5,10 @@ import org.example.nabat.application.UseCase;
 import org.example.nabat.application.port.in.GetNotificationUseCase;
 import org.example.nabat.application.port.in.SendNotificationUseCase;
 import org.example.nabat.application.port.out.NotificationRepository;
+import org.example.nabat.application.port.out.NotificationSender;
 import org.example.nabat.domain.model.Notification;
 import org.example.nabat.domain.model.NotificationId;
+import org.example.nabat.domain.model.NotificationType;
 import org.example.nabat.domain.model.UserId;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,7 @@ import java.util.List;
 public class NotificationService implements SendNotificationUseCase, GetNotificationUseCase {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationSender notificationSender;
 
     @Override
     @Transactional(readOnly = true)
@@ -45,12 +48,10 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
             throw new IllegalArgumentException("Notification does not belong to user");
         }
 
-        // Already read — return as-is.
         if (found.isRead()) {
             return found;
         }
 
-        // Notification is an immutable record; markAsRead() returns a new instance.
         Notification updated = found.markAsRead();
         return notificationRepository.save(updated);
     }
@@ -61,14 +62,38 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
         notificationRepository.markAllAsReadByRecipientId(userId);
     }
 
-    // TODO: implement notification creation when AlertVoteService starts triggering events.
     @Override
+    @Transactional
     public Notification sendVoteNotification(VoteNotificationCommand command) {
-        return null;
+        NotificationType type = switch (command.voteType()) {
+            case UPVOTE   -> NotificationType.ALERT_UPVOTED;
+            case DOWNVOTE -> NotificationType.ALERT_DOWNVOTED;
+            case CONFIRM  -> NotificationType.ALERT_CONFIRMED;
+        };
+
+        Notification n = Notification.createVoteNotification(
+                command.alertOwnerId(),
+                type,
+                command.alertId(),
+                command.voterId(),
+                command.alertTitle()
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.alertOwnerId(), saved);
+        return saved;
     }
 
     @Override
+    @Transactional
     public Notification sendMilestoneNotification(MilestoneNotificationCommand command) {
-        return null;
+        Notification n = Notification.createMileStoneNotification(
+                command.alertOwnerId(),
+                command.alertId(),
+                command.milestoneTitle(),
+                command.confirmationCount()
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.alertOwnerId(), saved);
+        return saved;
     }
 }

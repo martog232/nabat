@@ -56,7 +56,8 @@ class CreateAlertServiceTest {
                 Instant.now(),
                 AlertStatus.ACTIVE,
                 UUID.randomUUID(),
-                0, 0, 0
+                0, 0, 0,
+                null
         );
     }
 

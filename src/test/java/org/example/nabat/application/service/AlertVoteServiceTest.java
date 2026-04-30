@@ -1,11 +1,17 @@
 package org.example.nabat.application.service;
 
+import org.example.nabat.application.port.in.SendNotificationUseCase;
 import org.example.nabat.application.port.in.VoteAlertUseCase.VoteCommand;
 import org.example.nabat.application.port.in.VoteAlertUseCase.VoteStats;
 import org.example.nabat.application.port.out.AlertRepository;
 import org.example.nabat.application.port.out.AlertVoteRepository;
+import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.AlertId;
+import org.example.nabat.domain.model.AlertSeverity;
+import org.example.nabat.domain.model.AlertStatus;
+import org.example.nabat.domain.model.AlertType;
 import org.example.nabat.domain.model.AlertVote;
+import org.example.nabat.domain.model.Location;
 import org.example.nabat.domain.model.UserId;
 import org.example.nabat.domain.model.VoteType;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,16 +38,35 @@ public class AlertVoteServiceTest {
     @Mock
     private AlertRepository alertRepository;
 
+    @Mock
+    private SendNotificationUseCase sendNotificationUseCase;
+
     private AlertVoteService alertVoteService;
 
     private AlertId testAlertId;
     private UserId testUserId;
+    private UUID alertOwnerId;
 
     @BeforeEach
     void setUp() {
-        alertVoteService = new AlertVoteService(alertVoteRepository, alertRepository);
+        alertVoteService = new AlertVoteService(alertVoteRepository, alertRepository, sendNotificationUseCase);
         testAlertId = new AlertId(UUID.randomUUID());
         testUserId = new UserId(UUID.randomUUID());
+        alertOwnerId = UUID.randomUUID();
+    }
+
+    private Alert buildAlert(UUID reporterId) {
+        return new Alert(
+                testAlertId,
+                "Title", "Desc",
+                AlertType.FIRE, AlertSeverity.HIGH,
+                Location.of(0, 0),
+                Instant.now(),
+                AlertStatus.ACTIVE,
+                reporterId,
+                0, 0, 0,
+                null
+        );
     }
 
     /**
@@ -59,6 +85,7 @@ public class AlertVoteServiceTest {
                 .then(invocation -> invocation.getArgument(0));
         when(alertVoteRepository.countByAlertIdAndVoteType(any(), any()))
                 .thenReturn(0);
+        when(alertRepository.findById(testAlertId)).thenReturn(Optional.of(buildAlert(alertOwnerId)));
 
         AlertVote result = alertVoteService.vote(command);
 
@@ -69,6 +96,7 @@ public class AlertVoteServiceTest {
 
         verify(alertVoteRepository).save(any(AlertVote.class));
         verify(alertRepository).updateVoteCounts(eq(testAlertId), anyInt(), anyInt(), anyInt());
+        verify(sendNotificationUseCase).sendVoteNotification(any());
     }
 
     @Test
@@ -82,14 +110,98 @@ public class AlertVoteServiceTest {
                 .then(invocation -> invocation.getArgument(0));
         when(alertVoteRepository.countByAlertIdAndVoteType(any(), any()))
                 .thenReturn(0);
+        when(alertRepository.findById(testAlertId)).thenReturn(Optional.of(buildAlert(alertOwnerId)));
+
         AlertVote result = alertVoteService.vote(command);
 
         assertNotNull(result);
         assertEquals(VoteType.DOWNVOTE, result.voteType());
+        // Switch preserves id, no delete/insert.
+        assertEquals(existingVote.id(), result.id());
 
-        verify(alertVoteRepository).deleteByAlertIdAndUserId(testAlertId, testUserId);
+        verify(alertVoteRepository, never()).deleteByAlertIdAndUserId(any(), any());
         verify(alertVoteRepository).save(any(AlertVote.class));
         verify(alertRepository).updateVoteCounts(eq(testAlertId), anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
+    void shouldBeIdempotentOnSameTypeReVote() {
+        VoteCommand command = new VoteCommand(testAlertId, testUserId, VoteType.UPVOTE);
+
+        AlertVote existingVote = AlertVote.create(testAlertId, testUserId, VoteType.UPVOTE);
+        when(alertVoteRepository.findByAlertIdAndUserId(testAlertId, testUserId))
+                .thenReturn(Optional.of(existingVote));
+
+        AlertVote result = alertVoteService.vote(command);
+
+        assertEquals(existingVote, result);
+        verify(alertVoteRepository, never()).save(any());
+        verify(alertRepository, never()).updateVoteCounts(any(), anyInt(), anyInt(), anyInt());
+        verifyNoInteractions(sendNotificationUseCase);
+    }
+
+    @Test
+    void shouldNotNotifyOnSelfVote() {
+        VoteCommand command = new VoteCommand(testAlertId, testUserId, VoteType.UPVOTE);
+
+        when(alertVoteRepository.findByAlertIdAndUserId(testAlertId, testUserId))
+                .thenReturn(Optional.empty());
+        when(alertVoteRepository.save(any(AlertVote.class)))
+                .then(invocation -> invocation.getArgument(0));
+        when(alertVoteRepository.countByAlertIdAndVoteType(any(), any()))
+                .thenReturn(0);
+        // Owner == voter → self-vote
+        when(alertRepository.findById(testAlertId))
+                .thenReturn(Optional.of(buildAlert(testUserId.value())));
+
+        alertVoteService.vote(command);
+
+        verifyNoInteractions(sendNotificationUseCase);
+    }
+
+    @Test
+    void shouldFireMilestoneOnConfirmAtThreshold() {
+        VoteCommand command = new VoteCommand(testAlertId, testUserId, VoteType.CONFIRM);
+
+        when(alertVoteRepository.findByAlertIdAndUserId(testAlertId, testUserId))
+                .thenReturn(Optional.empty());
+        when(alertVoteRepository.save(any(AlertVote.class)))
+                .then(invocation -> invocation.getArgument(0));
+        when(alertVoteRepository.countByAlertIdAndVoteType(testAlertId, VoteType.CONFIRM))
+                .thenReturn(10);
+        when(alertVoteRepository.countByAlertIdAndVoteType(testAlertId, VoteType.UPVOTE))
+                .thenReturn(0);
+        when(alertVoteRepository.countByAlertIdAndVoteType(testAlertId, VoteType.DOWNVOTE))
+                .thenReturn(0);
+        when(alertRepository.findById(testAlertId))
+                .thenReturn(Optional.of(buildAlert(alertOwnerId)));
+
+        alertVoteService.vote(command);
+
+        verify(sendNotificationUseCase).sendVoteNotification(any());
+        verify(sendNotificationUseCase).sendMilestoneNotification(any());
+    }
+
+    @Test
+    void shouldNotFireMilestoneBelowThreshold() {
+        VoteCommand command = new VoteCommand(testAlertId, testUserId, VoteType.CONFIRM);
+
+        when(alertVoteRepository.findByAlertIdAndUserId(testAlertId, testUserId))
+                .thenReturn(Optional.empty());
+        when(alertVoteRepository.save(any(AlertVote.class)))
+                .then(invocation -> invocation.getArgument(0));
+        when(alertVoteRepository.countByAlertIdAndVoteType(testAlertId, VoteType.CONFIRM))
+                .thenReturn(7);
+        when(alertVoteRepository.countByAlertIdAndVoteType(testAlertId, VoteType.UPVOTE))
+                .thenReturn(0);
+        when(alertVoteRepository.countByAlertIdAndVoteType(testAlertId, VoteType.DOWNVOTE))
+                .thenReturn(0);
+        when(alertRepository.findById(testAlertId))
+                .thenReturn(Optional.of(buildAlert(alertOwnerId)));
+
+        alertVoteService.vote(command);
+
+        verify(sendNotificationUseCase, never()).sendMilestoneNotification(any());
     }
 
     @Test
@@ -118,7 +230,6 @@ public class AlertVoteServiceTest {
 
     @Test
     void shouldReturnTrueWhenUserHasVoted() {
-
         when(alertVoteRepository.existsByAlertIdAndUserId(testAlertId, testUserId)).thenReturn(true);
 
         boolean hasVoted = alertVoteService.hasUserVoted(testAlertId, testUserId);

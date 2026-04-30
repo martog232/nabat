@@ -1,5 +1,8 @@
 package org.example.nabat.application.service;
 
+import lombok.extern.slf4j.Slf4j;
+import org.example.nabat.adapter.in.security.LoginAttemptTracker;
+import org.example.nabat.adapter.in.security.RequestContextHelper;
 import org.example.nabat.application.UseCase;
 import org.example.nabat.application.port.in.LoginUserUseCase;
 import org.example.nabat.application.port.in.RefreshTokenUseCase;
@@ -12,27 +15,32 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @UseCase
+@Slf4j
 public class AuthenticationService implements RegisterUserUseCase, LoginUserUseCase, RefreshTokenUseCase {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenProvider tokenProvider;
+    private final LoginAttemptTracker loginAttemptTracker;
 
     public AuthenticationService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
-        TokenProvider tokenProvider
+        TokenProvider tokenProvider,
+        LoginAttemptTracker loginAttemptTracker
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.loginAttemptTracker = loginAttemptTracker;
     }
 
     @Override
     @Transactional
     public User register(RegisterCommand command) {
         if (userRepository.existsByEmail(command.email())) {
-            throw new IllegalArgumentException("Email already exists");
+            log.info("Registration attempt with existing email: {}", command.email());
+            throw new IllegalArgumentException("Registration submitted. Please verify your email.");
         }
 
         String hashedPassword = passwordEncoder.encode(command.password());
@@ -44,14 +52,21 @@ public class AuthenticationService implements RegisterUserUseCase, LoginUserUseC
     @Override
     @Transactional(readOnly = true)
     public LoginUserUseCase.LoginResult login(LoginCommand command) {
+        String clientIp = RequestContextHelper.getClientIp();
+
         User user = userRepository.findByEmail(command.email())
-            .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+                .orElseThrow(() -> {
+                    loginAttemptTracker.recordFailedAttempt(command.email(), clientIp);
+                    return new BadCredentialsException("Invalid email or password");
+                });
 
         if (!passwordEncoder.matches(command.password(), user.password())) {
+            loginAttemptTracker.recordFailedAttempt(command.email(), clientIp);
             throw new BadCredentialsException("Invalid email or password");
         }
 
         if (!user.enabled()) {
+            loginAttemptTracker.recordFailedAttempt(command.email(), clientIp);
             throw new BadCredentialsException("User account is disabled");
         }
 
@@ -59,10 +74,10 @@ public class AuthenticationService implements RegisterUserUseCase, LoginUserUseC
         String refreshToken = tokenProvider.generateRefreshToken(user);
 
         return new LoginUserUseCase.LoginResult(
-            accessToken,
-            refreshToken,
-            tokenProvider.getJwtExpiration(),
-            user
+                accessToken,
+                refreshToken,
+                tokenProvider.getJwtExpiration(),
+                user
         );
     }
 

@@ -18,7 +18,11 @@ public record AlertResponse(
     double longitude,
     Instant createdAt,
     AlertStatus status,
-    UUID reportedBy
+    UUID reportedBy,
+    int upvoteCount,
+    int downvoteCount,
+    int confirmationCount,
+    Instant resolvedAt
 ) {
     public static AlertResponse from(Alert alert) {
         return new AlertResponse(
@@ -31,7 +35,11 @@ public record AlertResponse(
             alert.location().longitude(),
             alert.createdAt(),
             alert.status(),
-            alert.reportedBy()
+            alert.reportedBy(),
+            alert.upvoteCount(),
+            alert.downvoteCount(),
+            alert.confirmationCount(),
+            alert.resolvedAt()
         );
     }
 }

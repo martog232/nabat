@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -26,6 +27,13 @@ public class GlobalExceptionHandler {
     static final String MSG_CONFLICT        = "Request conflicts with current state";
     static final String MSG_NOT_FOUND       = "Resource not found";
     static final String MSG_VALIDATION      = "Validation failed";
+    static final String MSG_FORBIDDEN       = "Forbidden";
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        log.warn("AccessDenied: {}", ex.getMessage());
+        return build(HttpStatus.FORBIDDEN, MSG_FORBIDDEN);
+    }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {

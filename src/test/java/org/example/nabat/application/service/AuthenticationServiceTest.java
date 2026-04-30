@@ -1,5 +1,6 @@
 package org.example.nabat.application.service;
 
+import org.example.nabat.adapter.in.security.LoginAttemptTracker;
 import org.example.nabat.application.port.in.LoginUserUseCase;
 import org.example.nabat.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.application.port.in.RegisterUserUseCase;
@@ -38,10 +39,13 @@ class AuthenticationServiceTest {
     private PasswordEncoder passwordEncoder;
     private AuthenticationService authenticationService;
 
+    @Mock
+    private LoginAttemptTracker loginAttemptTracker;
+
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        authenticationService = new AuthenticationService(userRepository, passwordEncoder, tokenProvider);
+        authenticationService = new AuthenticationService(userRepository, passwordEncoder, tokenProvider, loginAttemptTracker);
     }
 
     @Test

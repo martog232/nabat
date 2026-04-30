@@ -2,6 +2,7 @@ package org.example.nabat.adapter.in.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.nabat.domain.model.Alert;
+import org.example.nabat.domain.model.Notification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -55,6 +56,29 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
                 log.warn("Failed to deliver alert {} to user {}: {}", alert.id(), userId, e.getMessage());
             }
         }
+    }
+
+    /** Pushes a notification to {@code userId}. Returns true if delivered, false if user offline. */
+    public boolean sendNotificationToUser(UUID userId, Notification notification) {
+        WebSocketSession session = userSessions.get(userId);
+        if (session == null || !session.isOpen()) {
+            return false;
+        }
+        try {
+            String payload = objectMapper.writeValueAsString(
+                Map.of("type", "NOTIFICATION", "notification", notification)
+            );
+            session.sendMessage(new TextMessage(payload));
+            return true;
+        } catch (IOException e) {
+            log.warn("Failed to deliver notification to user {}: {}", userId, e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean isUserOnline(UUID userId) {
+        WebSocketSession session = userSessions.get(userId);
+        return session != null && session.isOpen();
     }
 
     private UUID extractUserId(WebSocketSession session) {

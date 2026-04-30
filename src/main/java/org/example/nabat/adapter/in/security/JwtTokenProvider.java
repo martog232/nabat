@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import lombok.Getter;
 import org.example.nabat.application.port.out.TokenProvider;
 import org.example.nabat.domain.model.User;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,8 +22,12 @@ public class JwtTokenProvider implements TokenProvider {
     private static final int MIN_SECRET_LENGTH = 32;
     /** Substring that flags the documented dev placeholder in application.properties. */
     private static final String PLACEHOLDER_MARKER = "change-me-before-production";
+    public static final String TOKEN_TYPE = "tokenType";
+    public static final String REFRESH_TOKEN_TYPE = "refresh";
+    public static final String ACCESS_TOKEN_TYPE = "access";
 
     private final SecretKey secretKey;
+    @Getter
     private final long jwtExpiration;
     private final long refreshExpiration;
 
@@ -59,11 +64,11 @@ public class JwtTokenProvider implements TokenProvider {
     }
 
     public String generateAccessToken(User user) {
-        return generateToken(user, jwtExpiration, "access");
+        return generateToken(user, jwtExpiration, ACCESS_TOKEN_TYPE);
     }
 
     public String generateRefreshToken(User user) {
-        return generateToken(user, refreshExpiration, "refresh");
+        return generateToken(user, refreshExpiration, REFRESH_TOKEN_TYPE);
     }
 
     private String generateToken(User user, long expiration, String tokenType) {
@@ -107,8 +112,8 @@ public class JwtTokenProvider implements TokenProvider {
     public boolean isRefreshToken(String token) {
         try {
             Claims claims = parseToken(token);
-            String tokenType = claims.get("tokenType", String.class);
-            return "refresh".equals(tokenType);
+            String tokenType = claims.get(TOKEN_TYPE, String.class);
+            return REFRESH_TOKEN_TYPE.equals(tokenType);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
@@ -117,8 +122,8 @@ public class JwtTokenProvider implements TokenProvider {
     public boolean isAccessToken(String token) {
         try {
             Claims claims = parseToken(token);
-            String tokenType = claims.get("tokenType", String.class);
-            return "access".equals(tokenType);
+            String tokenType = claims.get(TOKEN_TYPE, String.class);
+            return ACCESS_TOKEN_TYPE.equals(tokenType);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
@@ -132,7 +137,4 @@ public class JwtTokenProvider implements TokenProvider {
             .getPayload();
     }
 
-    public long getJwtExpiration() {
-        return jwtExpiration;
-    }
 }

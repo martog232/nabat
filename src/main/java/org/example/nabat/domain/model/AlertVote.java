@@ -18,4 +18,9 @@ public record AlertVote(
                 Instant.now()
         );
     }
+
+    /** Returns a copy with a new vote type, preserving the id (for idempotent switch). */
+    public AlertVote withVoteType(VoteType newType) {
+        return new AlertVote(id, alertId, userId, newType, Instant.now());
+    }
 }

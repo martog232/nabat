@@ -15,7 +15,8 @@ public record Alert(
         UUID reportedBy,
         int upvoteCount,
         int downvoteCount,
-        int confirmationCount
+        int confirmationCount,
+        Instant resolvedAt
 ) {
     public static Alert create(
             String title,
@@ -35,7 +36,21 @@ public record Alert(
                 Instant.now(),
                 AlertStatus.ACTIVE,
                 reportedBy,
-                0, 0, 0
+                0, 0, 0,
+                null
+        );
+    }
+
+    /** Returns a copy of this alert marked as RESOLVED. Idempotent for already-resolved alerts. */
+    public Alert resolve() {
+        if (status == AlertStatus.RESOLVED) {
+            return this;
+        }
+        return new Alert(
+                id, title, description, type, severity, location,
+                createdAt, AlertStatus.RESOLVED, reportedBy,
+                upvoteCount, downvoteCount, confirmationCount,
+                Instant.now()
         );
     }
 
