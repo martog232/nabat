@@ -2,6 +2,8 @@
 
 A Spring Boot service for crowd-sourced safety alerts: users report incidents tied to a GPS location, vote on each other's reports, and receive real-time pushes over WebSocket. Backed by PostgreSQL, secured with JWT.
 
+> The web client previously hosted in `frontend/` now lives in a separate repository: [martog232/nabat-fe](https://github.com/martog232/nabat-fe). This repository contains the backend only.
+
 > Status: early-stage. Auth, alerts, voting and a WebSocket broadcast skeleton work end-to-end. Notifications domain and per-user subscriptions are scaffolded but not wired up yet (see [Roadmap](#roadmap)).
 
 ---
