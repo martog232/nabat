@@ -29,7 +29,7 @@ export function Navbar() {
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-card/80 backdrop-blur border border-surface-border">
             <div className="w-6 h-6 rounded-full bg-brand-600/30 flex items-center justify-center">
               <span className="text-xs text-brand-400 font-semibold">
-                {user.username?.[0]?.toUpperCase() ?? user.email[0].toUpperCase()}
+                {user.username?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? '?'}
               </span>
             </div>
             <span className="text-sm text-slate-300 max-w-[120px] truncate">{user.username ?? user.email}</span>

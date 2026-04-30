@@ -3,6 +3,7 @@ import { useVoteStats, useMyVote, useVote, useRemoveVote } from '../../hooks/use
 import { useAuthStore } from '../../store/authStore'
 import { ALERT_TYPE_ICONS, ALERT_TYPE_LABELS } from '../../types'
 import { SeverityBadge } from '../common/Badge'
+import type { VoteType } from '../../types'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('en-US', {
@@ -22,6 +23,16 @@ export function AlertDetail() {
   if (!selectedAlert) return null
 
   const a = selectedAlert
+
+  const handleVote = (voteType: VoteType) => {
+    if (!user) return
+    // If user already voted, remove their vote; otherwise cast the chosen vote
+    if (myVote?.hasVoted) {
+      removeVote.mutate()
+    } else {
+      vote.mutate(voteType)
+    }
+  }
   return (
     <div className="absolute bottom-20 left-0 right-0 mx-4 sm:left-auto sm:right-4 sm:mx-0 sm:w-96 z-[1000] animate-slide-in-right">
       <div className="bg-surface-card border border-surface-border rounded-2xl shadow-2xl overflow-hidden">
@@ -72,14 +83,7 @@ export function AlertDetail() {
                 <button
                   key={type}
                   disabled={!user || vote.isPending || removeVote.isPending}
-                  onClick={() => {
-                    if (!user) return
-                    if (myVote?.hasVoted) {
-                      removeVote.mutate()
-                    } else {
-                      vote.mutate(type)
-                    }
-                  }}
+                  onClick={() => handleVote(type as VoteType)}
                   className={`
                     flex flex-col items-center py-2 rounded-xl border transition-all cursor-pointer
                     ${myVote?.hasVoted ? 'border-brand-500/50 bg-brand-500/10' : 'border-surface-border bg-surface-elevated hover:border-brand-500/30'}
