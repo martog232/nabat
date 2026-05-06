@@ -7,7 +7,9 @@ services:
       POSTGRES_USER: nabat_user
       POSTGRES_PASSWORD: nabat_password
     ports:
-      - "5432:5432"
+      # Host port defaults to 5433 to avoid conflicts with a locally installed PostgreSQL on 5432.
+      # Inside Docker, services still use postgres:5432.
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +30,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nabat_db
       SPRING_DATASOURCE_USERNAME: nabat_user
       SPRING_DATASOURCE_PASSWORD: nabat_password
-      JWT_SECRET: nabat-docker-jwt-secret-key-min-256-bits-change-me-before-production-123456
+      # Local-development fallback only. Override with JWT_SECRET in your shell or .env.
+      JWT_SECRET: ${JWT_SECRET:-nabat-local-docker-jwt-secret-key-min-256-bits-for-development-only-123456}
     ports:
       - "8080:8080"
     restart: unless-stopped

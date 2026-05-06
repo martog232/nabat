@@ -20,7 +20,7 @@ import java.util.Map;
 public class JwtTokenProvider implements TokenProvider {
 
     private static final int MIN_SECRET_LENGTH = 32;
-    /** Substring that flags the documented dev placeholder in application.properties. */
+    /** Substring that flags the documented placeholder in application.properties. */
     private static final String PLACEHOLDER_MARKER = "change-me-before-production";
     public static final String TOKEN_TYPE = "tokenType";
     public static final String REFRESH_TOKEN_TYPE = "refresh";

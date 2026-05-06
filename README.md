@@ -67,7 +67,7 @@ JWT-based authentication with role support. The system uses two token types:
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `JWT_SECRET` | **dev placeholder** | ⚠️ **Override in production** (≥ 256 bits) |
+| `JWT_SECRET` | local-dev fallback | Override outside local development. Must be ≥ 32 chars and must not contain `change-me-before-production`. |
 | `jwt.expiration` | `86400000` (24h) | Access token lifetime (ms) |
 | `jwt.refresh-expiration` | `604800000` (7d) | Refresh token lifetime (ms) |
 
@@ -89,11 +89,11 @@ Single configuration — no `dev` / `prod` profile split. All knobs are environm
 
 | Env var | Default | Notes |
 | --- | --- | --- |
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://127.0.0.1:5432/nabat_db` | Use `127.0.0.1` to avoid Windows IPv6 issues |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://127.0.0.1:5432/nabat_db` | Use `127.0.0.1` to avoid Windows IPv6 issues. If using Docker Postgres from the quick start, use port `5433`. |
 | `SPRING_DATASOURCE_USERNAME` | `nabat_user` | |
 | `SPRING_DATASOURCE_PASSWORD` | `nabat_password` | |
 | `SERVER_PORT` | `8080` | |
-| `JWT_SECRET` | dev-only placeholder | **Override in any non-local environment** (≥ 256 bits) |
+| `JWT_SECRET` | local-dev fallback | Override outside local development. Must be ≥ 32 chars and must not contain `change-me-before-production`. |
 | `jwt.expiration` | `86400000` (24h) | Access-token lifetime, ms |
 | `jwt.refresh-expiration` | `604800000` (7d) | Refresh-token lifetime, ms |
 
@@ -104,6 +104,7 @@ Tests use H2 in PostgreSQL compatibility mode (`src/test/resources/application.p
 ### Option 1 — Everything in Docker
 
 ```powershell
+Copy-Item .env.example .env
 docker compose up --build
 ```
 
@@ -119,7 +120,16 @@ docker compose down -v
 
 ```powershell
 docker compose up -d postgres
+$env:SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5433/nabat_db"
+$env:SPRING_DATASOURCE_USERNAME="nabat_user"
+$env:SPRING_DATASOURCE_PASSWORD="nabat_password"
 .\mvnw.cmd spring-boot:run
+```
+
+In IntelliJ IDEA, add these environment variables to your Spring Boot run configuration if you use the Docker database:
+
+```text
+SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5433/nabat_db;SPRING_DATASOURCE_USERNAME=nabat_user;SPRING_DATASOURCE_PASSWORD=nabat_password
 ```
 
 ### Option 3 — Local PostgreSQL
@@ -189,15 +199,40 @@ Run a single test:
 
 ```powershell
 .\mvnw.cmd clean package
-java -jar target\nabat-0.0.1-SNAPSHOT.jar
+& "$env:JAVA_HOME\bin\java.exe" -jar target\nabat-0.0.1-SNAPSHOT.jar
 ```
 
 The Docker image (`Dockerfile`) is multi-stage on Eclipse Temurin 21, runs as the non-root `spring` user, and exposes a `wget` health-check against `/actuator/health`.
 
 ## Troubleshooting
 
+- **`jwt.secret still contains the dev placeholder marker 'change-me-before-production'`** — you are still running with an old placeholder value, likely from an IntelliJ environment variable. Remove that env var or set `JWT_SECRET` to a value that does not contain `change-me-before-production`. For PowerShell:
+  ```powershell
+  $env:JWT_SECRET="nabat-local-dev-jwt-secret-key-min-256-bits-for-local-development-only-123456"
+  .\mvnw.cmd spring-boot:run
+  ```
+- **`FATAL: password authentication failed for user "nabat_user"`** — your app is connecting to a PostgreSQL instance that does not have the expected `nabat_user` / `nabat_password` credentials. For the Docker dev DB, use host port `5433`:
+  ```powershell
+  docker compose down
+  docker compose up -d postgres
+  $env:SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5433/nabat_db"
+  $env:SPRING_DATASOURCE_USERNAME="nabat_user"
+  $env:SPRING_DATASOURCE_PASSWORD="nabat_password"
+  $env:JWT_SECRET="nabat-local-dev-jwt-secret-key-min-256-bits-for-local-development-only-123456"
+  .\mvnw.cmd spring-boot:run
+  ```
 - **Port 5432 in use** — another local Postgres is running. Stop it or change `SPRING_DATASOURCE_URL`.
 - **Port 8080 in use** — `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"`.
+- **`UnsupportedClassVersionError` / `class file version 61.0`** — your `java` command is older than Java 17/21. This project targets Java 21. Check with:
+  ```powershell
+  java -version
+  echo $env:JAVA_HOME
+  where.exe java
+  ```
+  If `java -version` prints Java 8, run the jar with Java 21 explicitly:
+  ```powershell
+  & "$env:JAVA_HOME\bin\java.exe" -jar target\nabat-0.0.1-SNAPSHOT.jar
+  ```
 - **Reset Docker DB** — `docker compose down -v && docker compose up --build`.
 - **`localhost` resolution oddities on Windows/WSL** — this project intentionally uses `127.0.0.1` everywhere.
 

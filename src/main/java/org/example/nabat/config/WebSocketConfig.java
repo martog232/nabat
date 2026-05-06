@@ -26,7 +26,11 @@ public class WebSocketConfig implements WebSocketConfigurer {
     ) {
         this.alertWebSocketHandler = alertWebSocketHandler;
         this.jwtHandshakeInterceptor = jwtHandshakeInterceptor;
-        this.allowedOrigins = allowedOrigins;
+        // Strip blanks so [""] from an empty property does not masquerade as a configured origin.
+        this.allowedOrigins = allowedOrigins.stream()
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .toList();
     }
 
     @Override
@@ -35,12 +39,14 @@ public class WebSocketConfig implements WebSocketConfigurer {
             .addHandler(alertWebSocketHandler, "/ws/alerts")
             .addInterceptors(jwtHandshakeInterceptor);
 
-        if (allowedOrigins.isEmpty()) {
-            // No origins configured → only same-origin requests succeed.
-            registration.setAllowedOrigins();
-        } else {
-            registration.setAllowedOriginPatterns(allowedOrigins.toArray(String[]::new));
-        }
+        // Same fallback as SecurityConfig: localhost dev servers when nothing is configured.
+        List<String> effective = allowedOrigins.isEmpty()
+            ? List.of(
+                "http://localhost:5173", "http://127.0.0.1:5173",
+                "http://localhost:3000", "http://127.0.0.1:3000"
+            )
+            : allowedOrigins;
+        registration.setAllowedOriginPatterns(effective.toArray(String[]::new));
     }
 }
 

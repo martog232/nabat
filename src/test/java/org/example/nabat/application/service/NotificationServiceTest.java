@@ -12,6 +12,9 @@ import org.example.nabat.domain.model.VoteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -101,22 +104,53 @@ class NotificationServiceTest {
     }
 
     @Test
+    void getUnreadNotifications_delegates() {
+        Notification unread = existing(false);
+        when(notificationRepository.findByRecipientIdAndIsReadFalseOrderByCreatedAtDesc(user))
+                .thenReturn(List.of(unread));
+
+        List<Notification> result = service.getUnreadNotifications(user);
+
+        assertEquals(List.of(unread), result);
+        verify(notificationRepository).findByRecipientIdAndIsReadFalseOrderByCreatedAtDesc(user);
+    }
+
+    @Test
     void countUnread_delegates() {
         when(notificationRepository.countByRecipientIdAndIsReadFalse(user)).thenReturn(7);
         assertEquals(7, service.countUnreadNotifications(user));
     }
 
-    @Test
-    void sendVoteNotification_persistsAndDelivers() {
+    @ParameterizedTest
+    @CsvSource({
+            "UPVOTE,ALERT_UPVOTED,Your alert was upvoted",
+            "DOWNVOTE,ALERT_DOWNVOTED,Your alert was downvoted",
+            "CONFIRM,ALERT_CONFIRMED,Your alert was confirmed"
+    })
+    void sendVoteNotification_persistsAndDeliversMappedNotification(
+            VoteType voteType,
+            NotificationType expectedType,
+            String expectedTitle
+    ) {
         when(notificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        UserId voter = UserId.generate();
 
         Notification result = service.sendVoteNotification(
                 new SendNotificationUseCase.VoteNotificationCommand(
-                        user, UserId.generate(), alert, "Title", VoteType.UPVOTE));
+                        user, voter, alert, "Title", voteType));
 
-        assertEquals(NotificationType.ALERT_UPVOTED, result.type());
-        verify(notificationRepository).save(any());
-        verify(notificationSender).sendToUser(eq(user), any());
+        assertEquals(expectedType, result.type());
+        assertEquals(expectedTitle, result.title());
+        assertEquals("Someone voted on 'Title'", result.message());
+        assertEquals(user, result.recipientId());
+        assertEquals(alert, result.relatedAlertId());
+        assertEquals(voter, result.triggeredByUserId());
+        assertFalse(result.isRead());
+
+        ArgumentCaptor<Notification> savedCaptor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(savedCaptor.capture());
+        assertEquals(expectedType, savedCaptor.getValue().type());
+        verify(notificationSender).sendToUser(user, result);
     }
 
     @Test
@@ -128,8 +162,14 @@ class NotificationServiceTest {
                         user, alert, "Title", 10));
 
         assertEquals(NotificationType.ALERT_MILESTONE, result.type());
-        verify(notificationRepository).save(any());
-        verify(notificationSender).sendToUser(eq(user), any());
+        assertEquals("🎉 Milestone reached!", result.title());
+        assertEquals("'Title' now has 10 confirmations!", result.message());
+        assertEquals(user, result.recipientId());
+        assertEquals(alert, result.relatedAlertId());
+        assertNull(result.triggeredByUserId());
+        assertFalse(result.isRead());
+        verify(notificationRepository).save(result);
+        verify(notificationSender).sendToUser(user, result);
     }
 }
 

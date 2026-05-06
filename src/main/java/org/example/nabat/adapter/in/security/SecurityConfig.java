@@ -64,11 +64,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Driven by `nabat.cors.allowed-origins` (comma-separated). Empty by default → no CORS allowed.
-        // Supports patterns (e.g. https://*.example.com) via setAllowedOriginPatterns.
-        if (!allowedOrigins.isEmpty()) {
-            configuration.setAllowedOriginPatterns(allowedOrigins);
-        }
+        // Driven by `nabat.cors.allowed-origins` (comma-separated). When unset, fall back to a
+        // safe localhost-only allow-list so frontend dev servers (Vite 5173, CRA 3000) work
+        // out of the box without leaking access to public origins.
+        List<String> effective = allowedOrigins.isEmpty()
+            ? List.of(
+                "http://localhost:5173", "http://127.0.0.1:5173",
+                "http://localhost:3000", "http://127.0.0.1:3000"
+            )
+            : allowedOrigins;
+        configuration.setAllowedOriginPatterns(effective);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
