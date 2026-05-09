@@ -21,10 +21,6 @@ public class WebSocketAlertNotificationAdapter implements AlertNotificationPort 
     public void broadcastAlert(Alert alert, List<UUID> userIds) {
         userIds.forEach(userId -> webSocketHandler.sendAlertToUser(userId, alert));
     }
-
-    @Override
-    public void notifyUser(UUID userId, Alert alert) {
-        webSocketHandler.sendAlertToUser(userId, alert);
-    }
 }
+
 

@@ -2,6 +2,7 @@ package org.example.nabat.adapter.in.security;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.HttpServletResponse;
 import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.domain.model.Role;
 import org.example.nabat.domain.model.User;
@@ -24,10 +25,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -93,9 +91,16 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void invalidTokenContinuesUnauthenticatedWithoutRepositoryLookup() throws Exception {
-        filter.doFilterInternal(requestWithBearer("not-a-jwt"), new MockHttpServletResponse(), new MockFilterChain());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(
+            requestWithBearer("not-a-jwt"),
+            response,
+            (request, servletResponse) -> ((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NO_CONTENT)
+        );
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertEquals(HttpServletResponse.SC_NO_CONTENT, response.getStatus());
         verifyNoInteractions(userRepository);
     }
 
@@ -137,10 +142,16 @@ class JwtAuthenticationFilterTest {
     @Test
     void missingBearerHeaderDoesNotAuthenticate() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
+        filter.doFilterInternal(
+            request,
+            response,
+            (req, servletResponse) -> ((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NO_CONTENT)
+        );
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertEquals(HttpServletResponse.SC_NO_CONTENT, response.getStatus());
         verifyNoInteractions(userRepository);
     }
 

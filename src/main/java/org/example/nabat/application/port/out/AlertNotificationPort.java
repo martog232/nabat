@@ -7,7 +7,6 @@ import java.util.UUID;
 
 public interface AlertNotificationPort {
 
+    /** Broadcasts a newly-created alert to all subscribed users. */
     void broadcastAlert(Alert alert, List<UUID> userIds);
-
-    void notifyUser(UUID userId, Alert alert);
 }

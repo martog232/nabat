@@ -1,5 +1,6 @@
 package org.example.nabat.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -77,10 +78,17 @@ public class AlertVoteController {
         return ResponseEntity.ok(new UserVoteResponse(hasVoted));
     }
 
-    public record VoteRequest(@NotNull VoteType voteType) {
+    @Schema(description = "Request body for casting a vote on an alert")
+    public record VoteRequest(
+            @Schema(description = "Type of vote to cast", example = "UPVOTE") @NotNull VoteType voteType) {
     }
 
-    public record VoteResponse(UUID id, UUID alertId, VoteType voteType, String createdAt) {
+    @Schema(description = "The recorded vote")
+    public record VoteResponse(
+            @Schema(description = "Vote identifier") UUID id,
+            @Schema(description = "ID of the alert that was voted on") UUID alertId,
+            @Schema(description = "Type of vote") VoteType voteType,
+            @Schema(description = "ISO-8601 timestamp when the vote was cast") String createdAt) {
         public static VoteResponse from(AlertVote vote) {
             return new VoteResponse(
                     vote.id().value(),
@@ -91,11 +99,12 @@ public class AlertVoteController {
         }
     }
 
+    @Schema(description = "Aggregate vote statistics for an alert")
     public record VoteStatsResponse(
-            int upvotes,
-            int downvotes,
-            int confirmations,
-            int credibilityScore
+            @Schema(description = "Number of upvotes") int upvotes,
+            @Schema(description = "Number of downvotes") int downvotes,
+            @Schema(description = "Number of confirmations") int confirmations,
+            @Schema(description = "Computed credibility score") int credibilityScore
     ) {
         public static VoteStatsResponse from(VoteAlertUseCase.VoteStats stats) {
             return new VoteStatsResponse(
@@ -107,5 +116,6 @@ public class AlertVoteController {
         }
     }
 
-    public record UserVoteResponse(boolean hasVoted) {}
+    @Schema(description = "Indicates whether the current user has voted on an alert")
+    public record UserVoteResponse(@Schema(description = "true if the authenticated user has an active vote") boolean hasVoted) {}
 }

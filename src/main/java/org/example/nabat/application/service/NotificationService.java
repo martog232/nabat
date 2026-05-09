@@ -86,7 +86,7 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
     @Override
     @Transactional
     public Notification sendMilestoneNotification(MilestoneNotificationCommand command) {
-        Notification n = Notification.createMileStoneNotification(
+        Notification n = Notification.createMilestoneNotification(
                 command.alertOwnerId(),
                 command.alertId(),
                 command.milestoneTitle(),

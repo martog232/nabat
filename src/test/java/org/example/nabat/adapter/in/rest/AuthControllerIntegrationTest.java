@@ -1,15 +1,24 @@
 package org.example.nabat.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import org.example.nabat.adapter.in.security.JwtTokenProvider;
+import org.example.nabat.adapter.out.persistence.UserJpaEntity;
 import org.example.nabat.adapter.out.persistence.UserJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.Map;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -28,6 +37,9 @@ class AuthControllerIntegrationTest {
 
     @Autowired
     private UserJpaRepository userRepository;
+
+    @Value("${jwt.secret}")
+    private String jwtSecret;
 
     @BeforeEach
     void setUp() {
@@ -193,6 +205,131 @@ class AuthControllerIntegrationTest {
     void shouldReturn401ForProtectedEndpointWithInvalidToken() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me")
                 .header("Authorization", "Bearer invalid-token"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn401WhenRefreshTokenIsUsedForProtectedEndpoint() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest(
+            "refresh-as-access@example.com",
+            "password123",
+            "Refresh As Access User"
+        );
+
+        MvcResult registerResult = mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        AuthResponse authResponse = objectMapper.readValue(
+            registerResult.getResponse().getContentAsString(),
+            AuthResponse.class
+        );
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                .header("Authorization", "Bearer " + authResponse.refreshToken()))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn401WhenExpiredRefreshTokenIsUsed() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest(
+            "expired-refresh@example.com",
+            "password123",
+            "Expired Refresh User"
+        );
+
+        MvcResult registerResult = mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        AuthResponse authResponse = objectMapper.readValue(
+            registerResult.getResponse().getContentAsString(),
+            AuthResponse.class
+        );
+
+        String expiredRefreshToken = Jwts.builder()
+            .claims(Map.of(
+                "userId", authResponse.user().id().toString(),
+                "email", authResponse.user().email(),
+                "role", authResponse.user().role().name(),
+                JwtTokenProvider.TOKEN_TYPE, JwtTokenProvider.REFRESH_TOKEN_TYPE
+            ))
+            .subject(authResponse.user().email())
+            .issuedAt(new Date(System.currentTimeMillis() - 60_000L))
+            .expiration(new Date(System.currentTimeMillis() - 1_000L))
+            .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+            .compact();
+
+        AuthController.RefreshTokenRequest refreshRequest =
+            new AuthController.RefreshTokenRequest(expiredRefreshToken);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(refreshRequest)))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn401WhenAccessTokenIsUsedAsRefreshToken() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest(
+            "access-as-refresh@example.com",
+            "password123",
+            "Access As Refresh User"
+        );
+
+        MvcResult registerResult = mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        AuthResponse authResponse = objectMapper.readValue(
+            registerResult.getResponse().getContentAsString(),
+            AuthResponse.class
+        );
+
+        AuthController.RefreshTokenRequest refreshRequest =
+            new AuthController.RefreshTokenRequest(authResponse.accessToken());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(refreshRequest)))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn401WhenUserIsDisabledDuringRefresh() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest(
+            "disabled-refresh@example.com",
+            "password123",
+            "Disabled Refresh User"
+        );
+
+        MvcResult registerResult = mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        AuthResponse authResponse = objectMapper.readValue(
+            registerResult.getResponse().getContentAsString(),
+            AuthResponse.class
+        );
+
+        UserJpaEntity persisted = userRepository.findByEmail(authResponse.user().email()).orElseThrow();
+        persisted.setEnabled(false);
+        userRepository.save(persisted);
+
+        AuthController.RefreshTokenRequest refreshRequest =
+            new AuthController.RefreshTokenRequest(authResponse.refreshToken());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(refreshRequest)))
             .andExpect(status().isUnauthorized());
     }
 }

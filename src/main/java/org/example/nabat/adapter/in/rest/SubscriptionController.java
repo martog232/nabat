@@ -1,5 +1,6 @@
 package org.example.nabat.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -56,22 +57,24 @@ public class SubscriptionController {
         return ResponseEntity.noContent().build();
     }
 
+    @Schema(description = "Request body for creating an alert subscription")
     public record SubscriptionRequest(
-            @NotNull AlertType alertType,
-            @NotNull Double latitude,
-            @NotNull Double longitude,
-            @NotNull @Positive Double radiusKm
+            @Schema(description = "Alert type to subscribe to", example = "GAS_LEAK") @NotNull AlertType alertType,
+            @Schema(description = "Center latitude of the watch area", example = "40.7128") @NotNull Double latitude,
+            @Schema(description = "Center longitude of the watch area", example = "-74.0060") @NotNull Double longitude,
+            @Schema(description = "Radius in kilometres around the center point", example = "5.0") @NotNull @Positive Double radiusKm
     ) {}
 
+    @Schema(description = "Active subscription details")
     public record SubscriptionResponse(
-            UUID id,
-            UUID userId,
-            AlertType alertType,
-            double latitude,
-            double longitude,
-            double radiusKm,
-            boolean active,
-            Instant createdAt
+            @Schema(description = "Subscription identifier") UUID id,
+            @Schema(description = "Owner of the subscription") UUID userId,
+            @Schema(description = "Subscribed alert type") AlertType alertType,
+            @Schema(description = "Center latitude") double latitude,
+            @Schema(description = "Center longitude") double longitude,
+            @Schema(description = "Watch radius in km") double radiusKm,
+            @Schema(description = "Whether the subscription is active") boolean active,
+            @Schema(description = "Creation timestamp") Instant createdAt
     ) {
         public static SubscriptionResponse from(UserSubscription s) {
             return new SubscriptionResponse(

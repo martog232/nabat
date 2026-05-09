@@ -12,19 +12,19 @@ public interface SendNotificationUseCase {
     Notification sendMilestoneNotification(MilestoneNotificationCommand command);
 
     record VoteNotificationCommand(
-            UserId alertOwnerId,      // Кой притежава alert-а
-            UserId voterId,           // Кой гласува
-            AlertId alertId,          // За кой alert
-            String alertTitle,        // Заглавие на alert-а
-            VoteType voteType         // Тип на гласа
+            UserId alertOwnerId,      // owner of the alert
+            UserId voterId,           // user who cast the vote
+            AlertId alertId,          // alert that was voted on
+            String alertTitle,        // title of the alert
+            VoteType voteType         // type of vote cast
     ) {
     }
 
     record MilestoneNotificationCommand(
-            UserId alertOwnerId,           // Кой потребител притежава alert-а
-            AlertId alertId,               // За кой alert
-            String milestoneTitle,   // Заглавие на постижението
-            int confirmationCount     // Брой потвърждения
+            UserId alertOwnerId,           // owner of the alert
+            AlertId alertId,               // alert that reached the milestone
+            String milestoneTitle,         // title of the alert
+            int confirmationCount          // number of confirmations at milestone
     ) {
     }
 }

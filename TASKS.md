@@ -113,67 +113,77 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 
 ## P2 — Quality, tests, observability
 
-### T-20 🧪 Tests for `NotificationService`
-- New file `application/service/NotificationServiceTest.java` covering:
+### T-20 🧪 Tests for `NotificationService` ✅ COMPLETED
+- `application/service/NotificationServiceTest.java` covers:
   `markAsRead` happy path, already-read short-circuit, wrong-user 400,
-  `markAllAsRead` delegation, list/unread/count delegation.
+  not-found 400, `markAllAsRead` delegation, list/unread/count delegation,
+  plus vote/milestone notification persistence + delivery behavior.
 
-### T-21 🧪 Tests for `JwtAuthenticationFilter`
-- **Note:** Filter has been hardened (2026-04-27) with token type validation, userId-based lookup, and security context cleanup.
-- Cover: no header → next filter, invalid bearer → 401, valid bearer →
-  principal is set to the loaded `User`, disabled user → 401, **refresh token used as access → 401**, **user lookup by userId (not email)**.
+### T-21 🧪 Tests for `JwtAuthenticationFilter` ✅ COMPLETED
+- `adapter/in/security/JwtAuthenticationFilterTest.java` covers: no header,
+  invalid bearer, valid access token (principal set + `ROLE_<role>`),
+  disabled/missing user, refresh token rejected for API auth, malformed `userId`
+  claim clearing security context, and lookup by stable `userId`.
+- Integration check in `AuthControllerIntegrationTest` verifies refresh token
+  used against protected endpoint (`/api/v1/auth/me`) returns 401.
 
-### T-22 🧪 Tests for `GlobalExceptionHandler`
-- One test per handler branch (`BadCredentials`, `IllegalArgument`,
-  `IllegalState`, `AlertNotFound`, `MethodArgumentNotValid`).
+### T-22 🧪 Tests for `GlobalExceptionHandler` ✅ COMPLETED
+- `adapter/in/rest/GlobalExceptionHandlerTest.java` has one test per branch:
+  `BadCredentials`, `IllegalArgument`, `IllegalState`, `AlertNotFound`,
+  `MethodArgumentNotValid` (plus `AccessDenied`).
 
-### T-23 🧪 Persistence-layer tests
-- `@DataJpaTest` for `AlertJpaRepository.findActiveAlertsWithinRadius` against
-  H2 in PG-mode (verifies the native Haversine query keeps working).
-- Repository tests for `AlertVoteJpaRepository` (now-fixed UUID id),
-  `NotificationJpaRepository`, `UserJpaRepository`.
+### T-23 🧪 Persistence-layer tests ✅ COMPLETED
+- `AlertJpaRepositoryHaversineIntegrationTest` verifies
+  `findActiveAlertsWithinRadius` against H2 PG-mode.
+- Added repository tests:
+  - `AlertVoteJpaRepositoryTest` (find/delete/exists/count behavior)
+  - `AlertVoteUniqueConstraintTest` (DB-level unique constraint race guard)
+  - `NotificationJpaRepositoryTest` (ordering, unread, count, mark-all-read)
+  - `UserJpaRepositoryTest` (`findByEmail`, `existsByEmail`)
 
-### T-24 🧪 Integration happy-path tests for `AlertVoteController`
-- Today only `@WebMvcTest`. Add `@SpringBootTest` covering:
-  vote → stats → switch vote → remove vote → 409 on duplicate.
+### T-24 🧪 Integration happy-path tests for `AlertVoteController` ✅ COMPLETED
+- Added `adapter/in/rest/AlertVoteControllerIntegrationTest.java` (`@SpringBootTest`)
+  covering: vote → stats → switch vote → remove vote → duplicate remove 409.
 
-### T-25 🧪 Refresh-token edge cases
-- Expired refresh token → 401, access token used as refresh → 401,
+### T-25 🧪 Refresh-token edge cases ✅ COMPLETED
+- `AuthControllerIntegrationTest` now covers:
+  expired refresh token → 401,
+  access token used as refresh token → 401,
   disabled user during refresh → 401.
 
-### T-26 🧰 Add `springdoc-openapi`
+### T-26 🧰 Add `springdoc-openapi` ✅ COMPLETED
 - Add dependency `org.springdoc:springdoc-openapi-starter-webmvc-ui`.
 - Permit `/v3/api-docs/**` and `/swagger-ui/**` in `SecurityConfig`.
 - Annotate request/response DTOs with minimal `@Schema` where helpful.
 
-### T-27 🧰 Structured request/response logging
-- Add a `RequestLoggingFilter` (commons or a small custom one) that logs
-  method, path, status, duration with the user id when available. Disabled
-  by default; enabled via `logging.nabat.request-log=true`.
+### T-27 🧰 Structured request/response logging ✅ COMPLETED
+- Added `adapter/in/filter/RequestLoggingFilter.java` — a `@ConditionalOnProperty`
+  `OncePerRequestFilter` that logs `[METHOD] /path  →  STATUS  (Nms)  [userId=...]`.
+- Disabled by default; enable with `logging.nabat.request-log=true`.
 
-### T-28 🧰 Replace `setup-db.bat` doc references
-- `setup-db.bat` and `README` historically referenced `LOCAL_DB_SETUP.md` /
-  `DATABASE_SETUP.md` which don't exist. Either create those files or
-  remove the references from the script. Already cleaned in `README`.
+### T-28 🧰 Replace `setup-db.bat` doc references ✅ COMPLETED
+- Created `LOCAL_DB_SETUP.md` with full troubleshooting guide (psql not on PATH,
+  auth failures, port conflicts, Docker shortcut).
 
-### T-29 🧹 Remove the unused `WebSocketAlertNotificationAdapter` field
-- The adapter holds a `userSubscriptionRepository`-shaped chain to
-  `AlertWebSocketHandler.sendAlertToUser`. Once T-13 lands, audit for unused
-  collaborators and remove dead code.
+### T-29 🧹 Remove the unused `WebSocketAlertNotificationAdapter` field ✅ COMPLETED
+- Removed unused `notifyUser(UUID, Alert)` from `AlertNotificationPort` interface
+  and its implementation in `WebSocketAlertNotificationAdapter` — it had no callers
+  after T-13 wired the real subscription fan-out through `broadcastAlert`.
 
-### T-30 🧹 Translate any remaining inline comments to English
-- `Notification.createMileStoneNotification` (note method-name typo "Mile**S**tone"
-  → consider renaming to `createMilestoneNotification`).
-- Audit `application/port/in/*.java` and `domain/model/*.java` for stragglers.
+### T-30 🧹 Translate any remaining inline comments to English ✅ COMPLETED
+- `SendNotificationUseCase.java`: translated 5 Bulgarian inline comments to English.
+- `Notification.java`: renamed `createMileStoneNotification` →
+  `createMilestoneNotification`; updated call site in `NotificationService`.
 
-### T-31 🧹 Tighten `AlertVoteService.vote` consistency
-- Wrap `find → delete → save → updateVoteCounts` is now in `@Transactional`
-  (done) — add a unique-constraint test confirming the
-  `uk_alert_votes_alert_user` is hit on race.
+### T-31 🧹 Tighten `AlertVoteService.vote` consistency ✅ COMPLETED
+- Added `AlertVoteUniqueConstraintTest` (`@DataJpaTest`) with 3 cases:
+  duplicate (alertId, userId) → `DataIntegrityViolationException`, same user
+  different alerts → OK, different users same alert → OK.
 
-### T-32 🧹 Use `Optional<Alert>` properly in `AlertRepository.findById`
-- Currently unused. After T-14 lands, make sure adapters return `Optional`
-  and the service throws `AlertNotFoundException` on miss.
+### T-32 🧹 Use `Optional<Alert>` properly in `AlertRepository.findById` ✅ COMPLETED
+- Already done: `AlertRepository.findById` returns `Optional<Alert>`;
+  `AlertLifecycleService` uses `.orElseThrow(() -> new AlertNotFoundException(id))`
+  and `AlertVoteService` uses `.ifPresent(...)`. No changes needed.
 
 ---
 

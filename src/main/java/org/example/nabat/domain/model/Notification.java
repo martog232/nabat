@@ -43,7 +43,7 @@ public record Notification(
         );
     }
 
-    public static Notification createMileStoneNotification(
+    public static Notification createMilestoneNotification(
             UserId recipientId,
             AlertId alertId,
             String alertTitle,
