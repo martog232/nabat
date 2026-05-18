@@ -11,14 +11,16 @@ public record UserResponse(
     @Schema(description = "Stable user identifier") UUID id,
     @Schema(description = "E-mail address", example = "alice@example.com") String email,
     @Schema(description = "Display name shown to other users", example = "Alice") String displayName,
-    @Schema(description = "Assigned role", example = "USER") Role role
+    @Schema(description = "Assigned role", example = "USER") Role role,
+    @Schema(description = "Whether the email address has been verified") boolean emailVerified
 ) {
     public static UserResponse from(User user) {
         return new UserResponse(
             user.id().value(),
             user.email(),
             user.displayName(),
-            user.role()
+            user.role(),
+            user.emailVerified()
         );
     }
 }

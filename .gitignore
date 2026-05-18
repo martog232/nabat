@@ -6,6 +6,14 @@ build/
 ### Maven ###
 target/
 
+### Java / JVM artifacts ###
+*.class
+*.hprof
+*.dumpstream
+*.exec
+hs_err_pid*
+replay_pid*
+
 .env
 
 ### IDEs ###
@@ -82,6 +90,3 @@ logs/
 ### SSL certificates ###
 nginx/ssl/
 
-### JVM crash logs ###
-hs_err_pid*
-replay_pid*

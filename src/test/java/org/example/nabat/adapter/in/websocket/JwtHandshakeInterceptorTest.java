@@ -38,7 +38,7 @@ class JwtHandshakeInterceptorTest {
         interceptor = new JwtHandshakeInterceptor(tokenProvider);
         user = new User(
             UserId.of(UUID.randomUUID()), "ws@example.com", "h", "WS User",
-            Role.USER, true, Instant.now(), Instant.now()
+            Role.USER, true, false, Instant.now(), Instant.now()
         );
     }
 

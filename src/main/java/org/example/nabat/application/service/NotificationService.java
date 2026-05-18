@@ -10,6 +10,8 @@ import org.example.nabat.domain.model.Notification;
 import org.example.nabat.domain.model.NotificationId;
 import org.example.nabat.domain.model.NotificationType;
 import org.example.nabat.domain.model.UserId;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -20,6 +22,7 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
 
     private final NotificationRepository notificationRepository;
     private final NotificationSender notificationSender;
+    private final MessageSource messageSource;
 
     @Override
     @Transactional(readOnly = true)
@@ -71,12 +74,24 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
             case CONFIRM  -> NotificationType.ALERT_CONFIRMED;
         };
 
+        String title = messageSource.getMessage(
+                voteTitleKey(type),
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                "notification.vote.message",
+                new Object[]{command.alertTitle()},
+                LocaleContextHolder.getLocale()
+        );
+
         Notification n = Notification.createVoteNotification(
                 command.alertOwnerId(),
                 type,
                 command.alertId(),
                 command.voterId(),
-                command.alertTitle()
+                title,
+                message
         );
         Notification saved = notificationRepository.save(n);
         notificationSender.sendToUser(command.alertOwnerId(), saved);
@@ -86,14 +101,34 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
     @Override
     @Transactional
     public Notification sendMilestoneNotification(MilestoneNotificationCommand command) {
+        String title = messageSource.getMessage(
+                "notification.milestone.title",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                "notification.milestone.message",
+                new Object[]{command.milestoneTitle(), command.confirmationCount()},
+                LocaleContextHolder.getLocale()
+        );
+
         Notification n = Notification.createMilestoneNotification(
                 command.alertOwnerId(),
                 command.alertId(),
-                command.milestoneTitle(),
-                command.confirmationCount()
+                title,
+                message
         );
         Notification saved = notificationRepository.save(n);
         notificationSender.sendToUser(command.alertOwnerId(), saved);
         return saved;
+    }
+
+    private String voteTitleKey(NotificationType type) {
+        return switch (type) {
+            case ALERT_UPVOTED -> "notification.vote.title.alert_upvoted";
+            case ALERT_DOWNVOTED -> "notification.vote.title.alert_downvoted";
+            case ALERT_CONFIRMED -> "notification.vote.title.alert_confirmed";
+            default -> "notification.vote.title.default";
+        };
     }
 }

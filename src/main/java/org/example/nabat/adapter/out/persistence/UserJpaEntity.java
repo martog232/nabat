@@ -41,6 +41,9 @@ public class UserJpaEntity {
     private boolean enabled;
 
     @Column(nullable = false)
+    private boolean emailVerified;
+
+    @Column(nullable = false)
     private Instant createdAt;
 
     @Column(nullable = false)
@@ -57,6 +60,7 @@ public class UserJpaEntity {
         entity.displayName = user.displayName();
         entity.role = user.role();
         entity.enabled = user.enabled();
+        entity.emailVerified = user.emailVerified();
         entity.createdAt = user.createdAt();
         entity.updatedAt = user.updatedAt();
         return entity;
@@ -70,6 +74,7 @@ public class UserJpaEntity {
             displayName,
             role,
             enabled,
+            emailVerified,
             createdAt,
             updatedAt
         );

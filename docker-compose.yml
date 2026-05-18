@@ -1,5 +1,6 @@
 services:
   postgres:
+    # ...existing postgres service...
     image: postgres:16-alpine
     container_name: nabat-postgres
     environment:
@@ -7,8 +8,6 @@ services:
       POSTGRES_USER: nabat_user
       POSTGRES_PASSWORD: nabat_password
     ports:
-      # Host port defaults to 5433 to avoid conflicts with a locally installed PostgreSQL on 5432.
-      # Inside Docker, services still use postgres:5432.
       - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -17,6 +16,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: nabat-mailhog
+    ports:
+      - "1025:1025"   # SMTP — Spring Boot sends mail here
+      - "8025:8025"   # Web UI — open http://localhost:8025 to browse emails
+    restart: unless-stopped
 
   nabat-app:
     build:
@@ -32,6 +39,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: nabat_password
       # Local-development fallback only. Override with JWT_SECRET in your shell or .env.
       JWT_SECRET: ${JWT_SECRET:-nabat-local-docker-jwt-secret-key-min-256-bits-for-development-only-123456}
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      NABAT_BASE_URL: http://localhost:8080
     ports:
       - "8080:8080"
     restart: unless-stopped

@@ -24,7 +24,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -89,6 +88,7 @@ class AuthenticationServiceTest {
             "Test User",
             Role.USER,
             true,
+            false,
             Instant.now(),
             Instant.now()
         );
@@ -132,6 +132,7 @@ class AuthenticationServiceTest {
             "Test User",
             Role.USER,
             true,
+            false,
             Instant.now(),
             Instant.now()
         );
@@ -156,6 +157,7 @@ class AuthenticationServiceTest {
             "Test User",
             Role.USER,
             false, // disabled
+            false,
             Instant.now(),
             Instant.now()
         );
@@ -179,6 +181,7 @@ class AuthenticationServiceTest {
             "Test User",
             Role.USER,
             true,
+            false,
             Instant.now(),
             Instant.now()
         );

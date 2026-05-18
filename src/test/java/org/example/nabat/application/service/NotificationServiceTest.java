@@ -17,6 +17,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.context.support.StaticMessageSource;
+
+import java.util.Locale;
 
 import java.time.Instant;
 import java.util.List;
@@ -41,7 +45,21 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new NotificationService(notificationRepository, notificationSender);
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        StaticMessageSource messageSource = new StaticMessageSource();
+        messageSource.addMessage("notification.vote.title.alert_upvoted", Locale.ENGLISH, "Your alert was upvoted");
+        messageSource.addMessage("notification.vote.title.alert_downvoted", Locale.ENGLISH, "Your alert was downvoted");
+        messageSource.addMessage("notification.vote.title.alert_confirmed", Locale.ENGLISH, "Your alert was confirmed");
+        messageSource.addMessage("notification.vote.title.default", Locale.ENGLISH, "New notification");
+        messageSource.addMessage("notification.vote.message", Locale.ENGLISH, "Someone voted on ''{0}''");
+        messageSource.addMessage("notification.milestone.title", Locale.ENGLISH, "🎉 Milestone reached!");
+        messageSource.addMessage("notification.milestone.message", Locale.ENGLISH, "''{0}'' now has {1} confirmations!");
+        service = new NotificationService(notificationRepository, notificationSender, messageSource);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        LocaleContextHolder.resetLocaleContext();
     }
 
     private Notification existing(boolean read) {

@@ -54,6 +54,7 @@ class JwtAuthenticationFilterTest {
             "Filter User",
             Role.ADMIN,
             true,
+            false,
             Instant.now(),
             Instant.now()
         );

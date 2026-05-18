@@ -19,17 +19,9 @@ public record Notification(
             NotificationType type,
             AlertId alertId,
             UserId voterId,
-            String alertTitle
+            String title,
+            String message
     ) {
-        String title = switch (type) {
-            case ALERT_UPVOTED -> "Your alert was upvoted";
-            case ALERT_DOWNVOTED -> "Your alert was downvoted";
-            case ALERT_CONFIRMED -> "Your alert was confirmed";
-            default -> "New notification";
-        };
-
-        String message = String.format("Someone voted on '%s'", alertTitle);
-
         return new Notification(
                 NotificationId.generate(),
                 recipientId,
@@ -46,15 +38,15 @@ public record Notification(
     public static Notification createMilestoneNotification(
             UserId recipientId,
             AlertId alertId,
-            String alertTitle,
-            int confirmationCount
+            String title,
+            String message
     ) {
         return new Notification(
                 NotificationId.generate(),
                 recipientId,
                 NotificationType.ALERT_MILESTONE,
-                "🎉 Milestone reached!",
-                String.format("'%s' now has %d confirmations!", alertTitle, confirmationCount),
+                title,
+                message,
                 alertId,
                 null,
                 false,

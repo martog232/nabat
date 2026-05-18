@@ -64,6 +64,7 @@ class AlertVoteControllerTest {
                 "Test User",
                 Role.USER,
                 true,
+                false,
                 Instant.now(),
                 Instant.now()
         );

@@ -49,7 +49,7 @@ class AlertLifecycleServiceTest {
     }
 
     private User user(UUID id, Role role) {
-        return new User(UserId.of(id), "x@y.z", "p", "n", role, true, Instant.now(), Instant.now());
+        return new User(UserId.of(id), "x@y.z", "p", "n", role, true, false, Instant.now(), Instant.now());
     }
 
     @Test

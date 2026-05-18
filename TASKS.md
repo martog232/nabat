@@ -189,9 +189,13 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 
 ## P3 — Nice-to-have / polish
 
-### T-40 📦 `.env.example` + `docker-compose` `env_file` support
+> **Status (2026-05-17):** Updated after codebase re-check. `T-48` is now complete.
+
+### T-40 📦 `.env.example` + `docker-compose` `env_file` support ⚠️ PARTIALLY COMPLETED
 - Document `JWT_SECRET`, `SPRING_DATASOURCE_*`, `SERVER_PORT`,
   `NABAT_CORS_ALLOWED_ORIGINS`.
+- Done part: `.env.example` exists and documents these variables.
+- Remaining part: explicit `env_file` wiring is still not present in `docker-compose.yml`.
 
 ### T-41 📊 Pagination & filtering on list endpoints
 - `/alerts/nearby` returns an unbounded list. Add `Pageable`, max `radiusKm`,
@@ -205,29 +209,63 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 ### T-43 🐳 Switch tests to Testcontainers (PostgreSQL)
 - Removes the H2/PG-mode dialect drift risk and lets us use PostGIS in tests.
 
-### T-44 🧱 Rate limit `/auth/login` and `/auth/register`
+### T-44 🧱 Rate limit `/auth/login` and `/auth/register` ✅ COMPLETED
 - Bucket4j or Spring's `RateLimiter`. Protects against brute-force.
+- Implemented:
+  - `com.bucket4j:bucket4j-core:8.10.1` added to `pom.xml`.
+  - `RateLimitingFilter` (`adapter/in/security`) — `OncePerRequestFilter` using a per-IP `ConcurrentHashMap<String, Bucket>`.
+    Applies only to `POST /api/v1/auth/login` and `POST /api/v1/auth/register` (all other paths skipped).
+    Returns `429 Too Many Requests` + `X-RateLimit-Retry-After-Seconds` header when bucket exhausted.
+    Passes `X-RateLimit-Remaining` header on allowed requests.
+    Respects `X-Forwarded-For` / `X-Real-IP` headers for correct IP behind reverse proxy.
+  - Wired in `SecurityConfig` before the JWT filter.
+  - Configurable via `nabat.rate-limit.auth.capacity` (default 5) and `nabat.rate-limit.auth.window-minutes` (default 15).
+  - `RateLimitingFilterTest` (8 unit tests) — covers allowed/blocked, per-IP isolation, header values, both endpoints.
+  - `RateLimitingIntegrationTest` (3 `@SpringBootTest` tests) — e2e verification.
+  - All integration tests that call auth endpoints now call `rateLimitingFilter.resetBuckets()` in `@BeforeEach`.
+  - Total: **177 tests pass**, 0 failures.
 
-### T-45 📥 Email verification & password reset flow
+### T-45 📥 Email verification & password reset flow ✅ COMPLETED
 - Add `email_verified`, verification tokens, `POST /auth/verify`,
   `POST /auth/forgot-password`, `POST /auth/reset-password`. Sender abstracted
   behind a port (no SMTP coupling in domain).
+- Implemented:
+  - `VerificationToken` domain record + `VerificationTokenType` enum (no Spring/JPA inside domain).
+  - `emailVerified` field added to `User` record with `User.verifyEmail()` factory method.
+  - Out-ports: `EmailSender` + `VerificationTokenRepository`.
+  - In-ports: `VerifyEmailUseCase`, `ForgotPasswordUseCase`, `ResetPasswordUseCase`.
+  - `EmailVerificationService` (`@UseCase`) implements all three use cases.
+  - Persistence: `VerificationTokenJpaEntity` + `VerificationTokenJpaRepository` + `VerificationTokenRepositoryAdapter`.
+  - Flyway `V3__email_verification.sql` — `email_verified` column on `users`, new `verification_tokens` table.
+  - `SmtpEmailSender` (`adapter/out/email`) implements `EmailSender` via `JavaMailSender`.
+  - `AuthController` extended with `POST /verify`, `POST /forgot-password`, `POST /reset-password`.
+  - `spring-boot-starter-mail` added to `pom.xml`; MailHog service added to `docker-compose.yml`.
+  - `@MockBean EmailSender` in all 3 integration-test classes that call `/auth/register`.
+  - `EmailVerificationServiceTest` (10 tests) covers all happy paths and failure branches.
+  - Total: **166 tests pass**, 0 failures.
 
-### T-46 📈 Metrics & tracing
+### T-46 📈 Metrics & tracing ✅ COMPLETED
 - Expose `prometheus` actuator endpoint; add Micrometer timers around
   use-case services; include trace-id in error envelopes.
+- Implemented:
+  - `micrometer-registry-prometheus` + `micrometer-tracing-bridge-brave` + `spring-boot-starter-aop` added to `pom.xml`.
+  - `management.endpoints.web.exposure.include` extended to include `prometheus`; `/actuator/prometheus` permitted without auth.
+  - `UseCaseMetricsAspect` (`@Around @within(@UseCase)`) records `nabat.usecase.duration` timers with `usecase`, `method`, `outcome` tags.
+  - `GlobalExceptionHandler` error envelopes now include a `traceId` field (from MDC, populated by Brave bridge — `null` when no active span).
 
 ### T-47 🧱 CI pipeline
 - Audit `.github/workflows` (not yet covered): ensure `mvnw verify` runs
   on PRs with caching, and the JaCoCo gate (60%) actually fails the build.
 
-### T-48 🗑️ Rename `Notification.createMileStoneNotification`
+### T-48 🗑️ Rename `Notification.createMileStoneNotification` ✅ COMPLETED
 - Typo: should be `createMilestoneNotification`. Mechanical rename, update
   call sites once T-10 references it.
+- Implemented in `domain/model/Notification.java`; call sites updated in `NotificationService`.
 
-### T-49 🌐 i18n for user-visible strings
+### T-49 🌐 i18n for user-visible strings ✅ COMPLETED
 - Notification titles/messages are hardcoded English now (post-translation).
   Externalize to `messages.properties` so future locales drop in.
+- Implemented: notification text keys moved to `src/main/resources/messages.properties` and resolved in `NotificationService` via `MessageSource` + request locale.
 
 ### T-50 🎚️ Minimum password policy
 - `RegisterRequest.password` is `@Size(min = 6)`. Bump to ≥ 10, require
@@ -255,3 +293,51 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 
 If you want, point at a task ID and I'll pick it up next.
 
+
+
+
+
+
+
+1. Secure WebSocket Connection (Authentication Domain)
+   Context: The AGENTS.md explicitly calls out a technical debt item: AlertWebSocketHandler currently trusts ?userId=. In a production safety system, spoofing users can lead to false alert broadcasts or unauthorized data access. Task:
+
+Implement a ticket-based authentication flow for WebSockets, or parse the JWT from an Authorization header during the initial HTTP upgrade request.
+Create a new @UseCase (e.g., IssueWebSocketTicketUseCase) in the application layer.
+Update adapter/in/websocket/AlertWebSocketHandler to validate the token/ticket before establishing the session. Trade-offs:
+Ticket-based vs JWT in Query Param: Passing JWTs in query params during WS handshake logs them in access logs (security risk). A short-lived ticket system requires an extra HTTP round-trip (higher latency) but keeps the JWT out of logs and URL history.
+2. Introduce Domain Events for Alert Notifications (Core Domain)
+   Context: When an Alert is created or its credibility score changes, users need to be notified in real-time. Direct calls from the CreateAlertService to the WebSocket or Push Notification adapters tightly couples the domains. Task:
+
+Introduce an Event-Driven pattern. When Alert.create() happens, return a domain event (e.g., AlertCreatedEvent).
+Publish this event via Spring's ApplicationEventPublisher (acting as an in-memory message bus for now).
+Create an Event Listener in the application layer that triggers the AlertNotificationPort to broadcast to WebSockets. Trade-offs:
+Coupling vs Traceability: Event-driven decoupling makes the core domain pure and easy to test, but it makes the execution flow harder to trace sequentially. We trade cognitive simplicity for architectural flexibility.
+3. Optimize Spatial Queries for Proximity (Persistence Adapter)
+   Context: The current system uses a native Haversine formula in PostgreSQL. As the platform grows, computing Haversine for every alert against the user's location on every request will cause severe CPU bottlenecks on the database. Task:
+
+Add a spatial index to the AlertJpaEntity using Postgres earthdistance module (since PostGIS might be overkill initially, but earthdistance is built-in).
+Update V3__spatial_indexes.sql via Flyway.
+Rewrite the native query in AlertRepositoryAdapter to utilize the bounding box (<@>) operator instead of raw Haversine math. Trade-offs:
+Write speed vs Read speed: Adding spatial indexes slows down INSERT operations slightly (which happen during emergencies) but drastically speeds up SELECT operations (which happen constantly for all users viewing the map).
+🌐 Frontend Tasks (nabat-fe)
+1. Implement Token Lifecycle & WebSocket Handshake (Auth Module)
+   Context: The backend strictly enforces JWTs and rejects API auth via refresh tokens. The frontend must seamlessly manage this without interrupting the user's real-time feed. Task:
+
+Implement an Axios (or Fetch) interceptor to handle 401s, silently refresh the JWT using the refresh token, and retry the failed request.
+Implement the WebSocket connection manager. If using the ticket-based auth designed in Backend Task #1, the FE must request a short-lived ticket via HTTP, then open the WebSocket with that ticket. Trade-offs:
+Complexity vs Security: Managing silent token refreshes and WS reconnections adds significant state-management complexity to the frontend, but it provides a seamless user experience while adhering to strict backend security boundaries.
+2. Real-Time Map & Feed Synchronization (Alerts Context)
+   Context: The core value proposition is seeing nearby alerts in real-time. The frontend needs to merge REST API data (initial load) with WebSocket data (live updates). Task:
+
+Create a dedicated state store (e.g., Redux, Zustand, or React Context) for Alerts.
+On mount, fetch /api/v1/alerts/nearby via REST.
+Listen to WebSocket events (ALERT_CREATED, ALERT_RESOLVED, SCORE_UPDATED). Upsert or remove these alerts in the local state store dynamically. Trade-offs:
+Client-side state vs Server truth: We are duplicating domain state on the client. If the WebSocket drops, the client's map becomes stale. We trade memory and state duplication for a highly responsive, zero-latency UI.
+3. Optimistic UI for Alert Voting (Engagement Context)
+   Context: Users will vote to impact the credibility score of an alert. Waiting for a server round-trip to show the vote UI changing makes the app feel sluggish during high-stress situations. Task:
+
+Implement Optimistic UI updates when calling the vote endpoint.
+Immediately increment/decrement the score locally and highlight the vote button.
+Revert the local state and display a non-intrusive toast error if the backend returns a 400/409 (e.g., GlobalExceptionHandler's MSG_INVALID_REQUEST). Trade-offs:
+Perceived Performance vs Data Consistency: The user feels the app is instantly responsive, but there is a risk of temporary "UI lying" if the network request ultimately fails.

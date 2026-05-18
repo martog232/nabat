@@ -31,6 +31,7 @@ class JwtTokenProviderTest {
             "Test User",
             Role.USER,
             true,
+            false,
             Instant.now(),
             Instant.now()
         );

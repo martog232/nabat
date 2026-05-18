@@ -4,14 +4,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.example.nabat.adapter.in.security.JwtTokenProvider;
+import org.example.nabat.adapter.in.security.RateLimitingFilter;
 import org.example.nabat.adapter.out.persistence.UserJpaEntity;
 import org.example.nabat.adapter.out.persistence.UserJpaRepository;
+import org.example.nabat.application.port.out.EmailSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -38,12 +41,20 @@ class AuthControllerIntegrationTest {
     @Autowired
     private UserJpaRepository userRepository;
 
+    /** Prevent real SMTP connections during integration tests. */
+    @MockBean
+    private EmailSender emailSender;
+
+    @Autowired
+    private RateLimitingFilter rateLimitingFilter;
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
+        rateLimitingFilter.resetBuckets();
     }
 
     @Test

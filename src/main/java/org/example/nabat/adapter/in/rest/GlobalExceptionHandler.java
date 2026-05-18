@@ -12,6 +12,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import org.slf4j.MDC;
+
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -74,25 +76,29 @@ public class GlobalExceptionHandler {
             HttpStatus.BAD_REQUEST.value(),
             MSG_VALIDATION,
             errors,
-            Instant.now()
+            Instant.now(),
+            MDC.get("traceId")
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message) {
-        return ResponseEntity.status(status).body(new ErrorResponse(status.value(), message, Instant.now()));
+        return ResponseEntity.status(status)
+            .body(new ErrorResponse(status.value(), message, Instant.now(), MDC.get("traceId")));
     }
 
     public record ErrorResponse(
         int status,
         String message,
-        Instant timestamp
+        Instant timestamp,
+        String traceId
     ) {}
 
     public record ValidationErrorResponse(
         int status,
         String message,
         Map<String, String> errors,
-        Instant timestamp
+        Instant timestamp,
+        String traceId
     ) {}
 }
