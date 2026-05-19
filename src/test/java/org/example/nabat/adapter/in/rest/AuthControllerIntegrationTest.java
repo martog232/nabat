@@ -14,8 +14,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -42,7 +42,8 @@ class AuthControllerIntegrationTest {
     private UserJpaRepository userRepository;
 
     /** Prevent real SMTP connections during integration tests. */
-    @MockBean
+    @MockitoBean
+    @SuppressWarnings("unused")
     private EmailSender emailSender;
 
     @Autowired
@@ -207,8 +208,40 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void shouldIssueWebSocketTicketWithValidAccessToken() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest(
+            "ws-ticket@example.com",
+            "password123",
+            "WS Ticket User"
+        );
+
+        MvcResult registerResult = mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        AuthResponse authResponse = objectMapper.readValue(
+            registerResult.getResponse().getContentAsString(),
+            AuthResponse.class
+        );
+
+        mockMvc.perform(post("/api/v1/ws/tickets")
+                .header("Authorization", "Bearer " + authResponse.accessToken()))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.ticket").value(notNullValue()))
+            .andExpect(jsonPath("$.expiresAt").value(notNullValue()));
+    }
+
+    @Test
     void shouldReturn401ForProtectedEndpointWithoutToken() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn401ForWebSocketTicketEndpointWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/v1/ws/tickets"))
             .andExpect(status().isUnauthorized());
     }
 

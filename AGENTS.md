@@ -11,7 +11,7 @@ Spring Boot 3.4 / Java 21 real-time safety-alert service. Hexagonal (ports & ada
   - `application/service` — use-case implementations. **Always annotate with `@UseCase`** (custom stereotype in `application/UseCase.java`). Don’t use `@Service` and don’t register them in `UseCaseConfig` — `UseCaseConfig` does a filtered component scan and explicit `@Bean`s would create duplicates.
   - `adapter/in/rest` — `@RestController` + request/response DTO records under same package; cross-cutting errors handled by `GlobalExceptionHandler`.
   - `adapter/in/security` — `SecurityConfig`, `JwtAuthenticationFilter`, `JwtTokenProvider`, `LoginAttemptTracker`.
-  - `adapter/in/websocket` — `AlertWebSocketHandler` (currently trusts `?userId=` — see Roadmap in README).
+  - `adapter/in/websocket` — `AlertWebSocketHandler` + `JwtHandshakeInterceptor`; browser clients obtain a short-lived ticket from `POST /api/v1/ws/tickets`, then connect to `/ws/alerts?ticket=...`. Non-browser clients may use `Authorization: Bearer <accessToken>` on the upgrade request.
   - `adapter/out/persistence` — `*JpaEntity` (Lombok `@Getter/@Setter`, protected no-arg ctor) + `*JpaRepository` (Spring Data) + `*RepositoryAdapter` (`@Component` implementing the out-port). Mapping is **manual** via static `from(domain)` and instance `toDomain()` methods — keep entities and domain records decoupled.
 
 - Persistence is PostgreSQL with **Flyway** (`src/main/resources/db/migration/V1__schema.sql`, `V2__seed_data.sql`). `spring.jpa.hibernate.ddl-auto=validate` — never let Hibernate auto-DDL; schema changes go through a new `V<n>__*.sql` migration. Tests run against H2 in PostgreSQL compatibility mode (`src/test/resources/application.properties`), so SQL must be cross-compatible (the nearby-alerts query uses a native Haversine — keep it portable).
@@ -55,5 +55,4 @@ docker compose up --build                    # full stack on :8080
 - `AlertStatus.RESOLVED` / `Alert.resolve()` exist but no endpoint calls it.
 - `Role.ADMIN` is seeded; nothing checks it (no `@PreAuthorize` anywhere in the codebase).
 - `POST /api/v1/alerts` currently trusts `reportedBy` from the body instead of the JWT principal.
-- WebSocket handshake (`/ws/alerts?userId=...`) is unauthenticated.
 

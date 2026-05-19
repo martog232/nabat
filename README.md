@@ -161,13 +161,33 @@ Errors use a uniform JSON envelope (`status`, `message`, `timestamp`); validatio
 
 ### WebSocket
 
-```text
-ws://localhost:8080/ws/alerts?userId=<uuid>
+Browser clients should first exchange their access token for a short-lived one-time ticket:
+
+```http
+POST /api/v1/ws/tickets
+Authorization: Bearer <accessToken>
 ```
 
-Server pushes JSON frames `{ "type": "NEW_ALERT", "alert": { ... } }` to subscribed users when a matching alert is created.
+Response:
 
-> ⚠️ Known limitation: the WebSocket handshake currently trusts the `userId` query parameter and is not authenticated. Do not expose to untrusted networks. See [Roadmap](#roadmap).
+```json
+{
+  "ticket": "<short-lived-ticket>",
+  "expiresAt": "2026-05-18T12:00:00Z"
+}
+```
+
+Then open the socket with that ticket:
+
+```text
+ws://127.0.0.1:8080/ws/alerts?ticket=<short-lived-ticket>
+```
+
+Non-browser clients may instead send `Authorization: Bearer <accessToken>` on the initial upgrade request.
+
+Server pushes JSON frames `{ "type": "NEW_ALERT", "alert": { ... } }` to authenticated users when a matching alert is created.
+
+> ℹ️ WebSocket tickets are currently stored in-memory, so they are one-time and node-local. If you later run multiple backend instances, back this with a shared store.
 
 ## Database & migrations
 
@@ -241,7 +261,6 @@ The Docker image (`Dockerfile`) is multi-stage on Eclipse Temurin 21, runs as th
 Tracked gaps (see source for `TODO` markers):
 
 ### Functional
-- [ ] **WebSocket auth** — replace query-string `userId` with JWT-validated handshake (`adapter/in/websocket/AlertWebSocketHandler.java`, `SecurityConfig`).
 - [ ] **Authorize `POST /alerts`** off the `Authorization` header instead of trusting `reportedBy` in the request body.
 - [ ] **Notifications end-to-end** — `NotificationService.sendVoteNotification` / `sendMilestoneNotification` are stubs returning `null`; no REST controller wired for `GetNotificationUseCase`; `AlertVoteService.vote` does not yet emit notifications.
 - [ ] **User subscriptions** — `SubscribeToAlertsUseCase` interface exists with no implementation; `InMemoryUserSubscriptionRepository` always returns an empty list, so WebSocket broadcasts never fan out. The `user_subscriptions` table is seeded but unused.

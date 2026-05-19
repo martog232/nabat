@@ -1,9 +1,11 @@
 package org.example.nabat.adapter.in.websocket;
 
 import org.example.nabat.adapter.in.security.JwtTokenProvider;
+import org.example.nabat.application.port.in.RedeemWebSocketTicketUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -17,9 +19,12 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Validates a JWT on the WebSocket upgrade request. The token is read from
- * either the {@code Authorization: Bearer ...} header or the {@code ?token=...}
- * query parameter (browsers cannot set headers on the WS handshake).
+ * Validates WebSocket authentication on the HTTP upgrade request.
+ *
+ * <p>Non-browser clients may send an access token in the
+ * {@code Authorization: Bearer ...} header. Browser clients should first
+ * obtain a short-lived one-time ticket over the authenticated REST API and
+ * then connect with {@code ?ticket=...}.
  *
  * <p>On success the authenticated user id is placed into the session
  * attributes under {@link #USER_ID_ATTR} so handlers can read it without
@@ -33,60 +38,95 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     private static final Logger log = LoggerFactory.getLogger(JwtHandshakeInterceptor.class);
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final RedeemWebSocketTicketUseCase redeemWebSocketTicketUseCase;
 
-    public JwtHandshakeInterceptor(JwtTokenProvider jwtTokenProvider) {
+    public JwtHandshakeInterceptor(
+        JwtTokenProvider jwtTokenProvider,
+        RedeemWebSocketTicketUseCase redeemWebSocketTicketUseCase
+    ) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.redeemWebSocketTicketUseCase = redeemWebSocketTicketUseCase;
     }
 
     @Override
     public boolean beforeHandshake(
-        ServerHttpRequest request,
-        ServerHttpResponse response,
-        WebSocketHandler wsHandler,
-        Map<String, Object> attributes
+        @NonNull ServerHttpRequest request,
+        @NonNull ServerHttpResponse response,
+        @NonNull WebSocketHandler wsHandler,
+        @NonNull Map<String, Object> attributes
     ) {
-        String token = extractToken(request);
-        if (token == null) {
-            log.warn("WS handshake rejected: missing token");
+        UUID userId = authenticate(request);
+        if (userId == null) {
             reject(response);
             return false;
         }
-        if (!jwtTokenProvider.validateToken(token) || !jwtTokenProvider.isAccessToken(token)) {
-            log.warn("WS handshake rejected: invalid or non-access token");
-            reject(response);
-            return false;
-        }
-        try {
-            UUID userId = UUID.fromString(jwtTokenProvider.getUserIdFromToken(token));
-            attributes.put(USER_ID_ATTR, userId);
-            return true;
-        } catch (IllegalArgumentException ex) {
-            log.warn("WS handshake rejected: token has invalid userId claim");
-            reject(response);
-            return false;
-        }
+
+        attributes.put(USER_ID_ATTR, userId);
+        return true;
     }
 
     @Override
     public void afterHandshake(
-        ServerHttpRequest request,
-        ServerHttpResponse response,
-        WebSocketHandler wsHandler,
+        @NonNull ServerHttpRequest request,
+        @NonNull ServerHttpResponse response,
+        @NonNull WebSocketHandler wsHandler,
         Exception exception
     ) {
         // no-op
     }
 
-    private static String extractToken(ServerHttpRequest request) {
+    private UUID authenticate(ServerHttpRequest request) {
+        String accessToken = extractBearerToken(request);
+        if (accessToken != null) {
+            return authenticateAccessToken(accessToken);
+        }
+
+        String ticket = extractTicket(request);
+        if (ticket != null) {
+            return redeemTicket(ticket);
+        }
+
+        log.warn("WS handshake rejected: missing Authorization header or ticket");
+        return null;
+    }
+
+    private UUID authenticateAccessToken(String token) {
+        if (!jwtTokenProvider.validateToken(token) || !jwtTokenProvider.isAccessToken(token)) {
+            log.warn("WS handshake rejected: invalid or non-access token");
+            return null;
+        }
+
+        try {
+            return UUID.fromString(jwtTokenProvider.getUserIdFromToken(token));
+        } catch (IllegalArgumentException ex) {
+            log.warn("WS handshake rejected: token has invalid userId claim");
+            return null;
+        }
+    }
+
+    private UUID redeemTicket(String ticket) {
+        try {
+            return redeemWebSocketTicketUseCase.redeem(ticket).value();
+        } catch (RuntimeException ex) {
+            log.warn("WS handshake rejected: invalid or expired ticket");
+            return null;
+        }
+    }
+
+    private static String extractBearerToken(ServerHttpRequest request) {
         String header = request.getHeaders().getFirst("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
             return header.substring(7);
         }
+        return null;
+    }
+
+    private static String extractTicket(ServerHttpRequest request) {
         if (request instanceof ServletServerHttpRequest servletRequest) {
             HttpServletRequest httpReq = servletRequest.getServletRequest();
-            String token = httpReq.getParameter("token");
-            if (token != null && !token.isBlank()) {
-                return token;
+            String ticket = httpReq.getParameter("ticket");
+            if (ticket != null && !ticket.isBlank()) {
+                return ticket;
             }
         }
         return null;
