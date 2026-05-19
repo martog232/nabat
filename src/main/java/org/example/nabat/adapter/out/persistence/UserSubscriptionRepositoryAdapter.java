@@ -17,11 +17,13 @@ import java.util.UUID;
 public class UserSubscriptionRepositoryAdapter implements UserSubscriptionRepository {
 
     private final UserSubscriptionJpaRepository jpaRepository;
+    private final SpatialCapabilityDetector spatialCapabilityDetector;
 
     @Override
     public List<UUID> findUsersSubscribedToAlertType(AlertType type, Location center, double radiusKm) {
-        return jpaRepository.findUserIdsMatching(
-                type, center.latitude(), center.longitude(), radiusKm);
+        return spatialCapabilityDetector.isPostgisAvailable()
+                ? jpaRepository.findUserIdsMatching(type, center.latitude(), center.longitude(), radiusKm)
+                : jpaRepository.findUserIdsMatchingHaversine(type, center.latitude(), center.longitude(), radiusKm);
     }
 
     @Override

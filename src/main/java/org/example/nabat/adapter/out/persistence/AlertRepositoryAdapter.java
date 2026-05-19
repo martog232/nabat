@@ -14,9 +14,12 @@ import java.util.Optional;
 public class AlertRepositoryAdapter implements AlertRepository {
 
     private final AlertJpaRepository jpaRepository;
+    private final SpatialCapabilityDetector spatialCapabilityDetector;
 
-    public AlertRepositoryAdapter(AlertJpaRepository jpaRepository) {
+    public AlertRepositoryAdapter(AlertJpaRepository jpaRepository,
+                                  SpatialCapabilityDetector spatialCapabilityDetector) {
         this.jpaRepository = jpaRepository;
+        this.spatialCapabilityDetector = spatialCapabilityDetector;
     }
 
     @Override
@@ -34,13 +37,12 @@ public class AlertRepositoryAdapter implements AlertRepository {
 
     @Override
     public List<Alert> findActiveAlertsWithinRadius(Location center, double radiusKm) {
-        return jpaRepository.findActiveAlertsWithinRadius(
-            center.latitude(),
-            center.longitude(),
-            radiusKm
-        ).stream()
-         .map(AlertJpaEntity::toDomain)
-         .toList();
+        List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
+                ? jpaRepository.findActiveAlertsWithinRadius(center.latitude(), center.longitude(), radiusKm)
+                : jpaRepository.findActiveAlertsWithinRadiusHaversine(center.latitude(), center.longitude(), radiusKm);
+        return results.stream()
+                .map(AlertJpaEntity::toDomain)
+                .toList();
     }
 
     @Override

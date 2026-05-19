@@ -206,7 +206,8 @@ Seeded users (dev only — passwords are placeholder bcrypt hashes; reset before
 
 - Unit tests: services + domain (Mockito).
 - Slice tests: `@WebMvcTest` for controllers (security filters disabled).
-- Integration tests: `@SpringBootTest` with H2 in PostgreSQL-mode — no PostgreSQL required.
+- Integration tests: `@SpringBootTest` with H2 in PostgreSQL-mode.
+- Spatial repository integration tests: `@DataJpaTest` with Testcontainers (`postgis/postgis`) for PostGIS query parity (Docker required).
 - Coverage report: `target/site/jacoco/index.html`. JaCoCo is configured to fail the build below 60% line coverage (BUNDLE).
 
 Run a single test:

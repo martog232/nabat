@@ -10,12 +10,18 @@ and how to resolve them.
 | Requirement | Minimum version |
 |-------------|----------------|
 | PostgreSQL  | 16             |
+| PostGIS extension | 3.x (must be installed on the server) |
 | `psql` on `PATH` | any |
 
 Typical `psql` location on Windows:
 ```
 C:\Program Files\PostgreSQL\16\bin
 ```
+
+> **PostGIS required** — Flyway migration `V4` runs `CREATE EXTENSION postgis`.
+> For native Windows installs, open **StackBuilder** (bundled with the PostgreSQL installer),
+> select your server, then install **PostGIS Bundle** under *Spatial Extensions*.
+> For Docker, use the `postgis/postgis:16-3.4` image (see Docker shortcut below).
 
 ---
 
@@ -95,16 +101,26 @@ Use `127.0.0.1` instead of `localhost` to avoid Windows IPv6 resolution issues.
 
 ## Docker shortcut (recommended for dev)
 
-Skip the manual setup entirely and spin up a pre-configured Postgres container:
+Skip the manual setup entirely and spin up a pre-configured PostGIS container:
 
 ```powershell
 docker compose up -d postgres
 ```
 
-The container exposes Postgres on host port **5433** (to avoid conflicts with a
+The container uses the `postgis/postgis:16-3.4` image, which bundles PostgreSQL 16
+**plus** the PostGIS extension required by the V4 Flyway migration.
+It exposes Postgres on host port **5433** (to avoid conflicts with a
 local install). Update your datasource URL when using Docker:
 
 ```
 SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5433/nabat_db
 ```
+
+> **Upgrading from a plain `postgres:16-alpine` volume?**
+> The old image has no PostGIS binaries, so `V4__postgis_spatial_indexes.sql` will fail.
+> Destroy the old volume and let Flyway re-run from scratch:
+> ```powershell
+> docker compose down -v          # removes postgres_data volume
+> docker compose up -d postgres   # pulls postgis/postgis:16-3.4 and re-creates
+> ```
 

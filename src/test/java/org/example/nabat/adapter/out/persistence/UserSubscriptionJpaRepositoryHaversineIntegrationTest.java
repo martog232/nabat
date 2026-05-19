@@ -2,11 +2,14 @@ package org.example.nabat.adapter.out.persistence;
 
 import org.example.nabat.domain.model.AlertType;
 import org.example.nabat.domain.model.Location;
+import org.example.nabat.domain.model.Role;
+import org.example.nabat.domain.model.User;
 import org.example.nabat.domain.model.UserId;
 import org.example.nabat.domain.model.UserSubscription;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import java.time.Instant;
@@ -16,7 +19,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-class UserSubscriptionJpaRepositoryHaversineIntegrationTest {
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class UserSubscriptionJpaRepositoryPostgisIntegrationTest extends PostgisIntegrationTestSupport {
 
     private static final double SOFIA_LAT = 42.695;
     private static final double SOFIA_LON = 23.329;
@@ -24,9 +28,13 @@ class UserSubscriptionJpaRepositoryHaversineIntegrationTest {
     @Autowired
     private UserSubscriptionJpaRepository repository;
 
+    @Autowired
+    private UserJpaRepository userRepository;
+
     @BeforeEach
     void setUp() {
         repository.deleteAll();
+        userRepository.deleteAll();
     }
 
     @Test
@@ -35,6 +43,11 @@ class UserSubscriptionJpaRepositoryHaversineIntegrationTest {
         UUID inactiveUser = UUID.randomUUID();
         UUID wrongTypeUser = UUID.randomUUID();
         UUID farAwayUser = UUID.randomUUID();
+
+        seedUser(matchingUser, "matching");
+        seedUser(inactiveUser, "inactive");
+        seedUser(wrongTypeUser, "wrong-type");
+        seedUser(farAwayUser, "far-away");
 
         repository.saveAll(List.of(
             entity(matchingUser, AlertType.FIRE, SOFIA_LAT, SOFIA_LON, 0.5, true),
@@ -53,6 +66,7 @@ class UserSubscriptionJpaRepositoryHaversineIntegrationTest {
     @Test
     void findUserIdsMatchingUsesAlertRadiusTogetherWithSubscriptionRadius() {
         UUID subscriberNearAlertEdge = UUID.randomUUID();
+        seedUser(subscriberNearAlertEdge, "near-edge");
         repository.saveAndFlush(entity(
             subscriberNearAlertEdge,
             AlertType.HAZARD,
@@ -67,6 +81,22 @@ class UserSubscriptionJpaRepositoryHaversineIntegrationTest {
 
         assertThat(tooSmallRadius).isEmpty();
         assertThat(combinedRadiusCoversSubscriber).containsExactly(subscriberNearAlertEdge);
+    }
+
+    private void seedUser(UUID userId, String label) {
+        Instant now = Instant.now();
+        User user = new User(
+            UserId.of(userId),
+            label + "@example.com",
+            "hashed-password",
+            "User " + label,
+            Role.USER,
+            true,
+            true,
+            now,
+            now
+        );
+        userRepository.saveAndFlush(UserJpaEntity.from(user));
     }
 
     private static UserSubscriptionJpaEntity entity(

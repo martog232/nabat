@@ -16,6 +16,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.UUID;
 
@@ -27,7 +28,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class AlertControllerIntegrationTest {
+@Testcontainers(disabledWithoutDocker = true)
+class AlertControllerIntegrationTest extends PostgisSpringBootIntegrationTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

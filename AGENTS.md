@@ -14,7 +14,7 @@ Spring Boot 3.4 / Java 21 real-time safety-alert service. Hexagonal (ports & ada
   - `adapter/in/websocket` — `AlertWebSocketHandler` + `JwtHandshakeInterceptor`; browser clients obtain a short-lived ticket from `POST /api/v1/ws/tickets`, then connect to `/ws/alerts?ticket=...`. Non-browser clients may use `Authorization: Bearer <accessToken>` on the upgrade request.
   - `adapter/out/persistence` — `*JpaEntity` (Lombok `@Getter/@Setter`, protected no-arg ctor) + `*JpaRepository` (Spring Data) + `*RepositoryAdapter` (`@Component` implementing the out-port). Mapping is **manual** via static `from(domain)` and instance `toDomain()` methods — keep entities and domain records decoupled.
 
-- Persistence is PostgreSQL with **Flyway** (`src/main/resources/db/migration/V1__schema.sql`, `V2__seed_data.sql`). `spring.jpa.hibernate.ddl-auto=validate` — never let Hibernate auto-DDL; schema changes go through a new `V<n>__*.sql` migration. Tests run against H2 in PostgreSQL compatibility mode (`src/test/resources/application.properties`), so SQL must be cross-compatible (the nearby-alerts query uses a native Haversine — keep it portable).
+- Persistence is PostgreSQL with **Flyway** (`src/main/resources/db/migration/V1__initial_schema.sql`, `V2__seed_data.sql`, ...). `spring.jpa.hibernate.ddl-auto=validate` — never let Hibernate auto-DDL; schema changes go through a new `V<n>__*.sql` migration. Spatial queries use PostGIS (`ST_DWithin`) with GiST indexes. Most tests still run on H2, while spatial integration tests use Testcontainers with a PostGIS image for query parity.
 
 ## Conventions
 
@@ -29,7 +29,7 @@ Spring Boot 3.4 / Java 21 real-time safety-alert service. Hexagonal (ports & ada
 ## Workflows (PowerShell — Windows is the dev OS)
 
 ```powershell
-.\mvnw.cmd test                              # unit + slice + @SpringBootTest (H2, no Docker needed)
+.\mvnw.cmd test                              # full test suite (requires Docker for PostGIS Testcontainers spatial tests)
 .\mvnw.cmd "-Dtest=AlertVoteServiceTest" test  # single test (quotes required in PowerShell)
 .\mvnw.cmd clean package                     # builds jar + runs JaCoCo (fails <60% LINE BUNDLE coverage)
 .\mvnw.cmd spring-boot:run                   # run app; needs Postgres on 127.0.0.1:5432 (or set SPRING_DATASOURCE_URL)
@@ -45,8 +45,9 @@ docker compose up --build                    # full stack on :8080
 
 - Service tests: plain JUnit 5 + Mockito on the `@UseCase` class, mocking out-ports.
 - Controller tests: `@WebMvcTest` with security filters disabled (see existing `*ControllerTest`).
-- End-to-end: `@SpringBootTest` + H2 (e.g. `AuthControllerIntegrationTest`, `AlertControllerIntegrationTest`). No Testcontainers.
-- Known untested areas (Roadmap): `NotificationService`, `JwtAuthenticationFilter`, `GlobalExceptionHandler`, `AlertWebSocketHandler`, native Haversine query.
+- End-to-end: `@SpringBootTest` + H2 (e.g. `AuthControllerIntegrationTest`, `AlertControllerIntegrationTest`).
+- Spatial repository integration: `@DataJpaTest` + Testcontainers PostGIS (Docker required).
+- Known untested areas (Roadmap): `NotificationService`, `JwtAuthenticationFilter`, `GlobalExceptionHandler`, `AlertWebSocketHandler`.
 
 ## Things that look done but aren’t (don’t assume they work)
 

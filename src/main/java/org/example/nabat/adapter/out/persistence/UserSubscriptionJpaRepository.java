@@ -15,21 +15,37 @@ public interface UserSubscriptionJpaRepository extends JpaRepository<UserSubscri
     /**
      * Distinct subscriber userIds whose active subscription matches the alert type and whose
      * radius (combined with the alert's own radius) covers the alert location.
-     * Uses the Haversine formula — same approach as {@code AlertJpaRepository}.
+     * PostGIS path — used when the center_geog generated column exists.
      */
-    @Query("""
-        SELECT DISTINCT s.userId FROM UserSubscriptionJpaEntity s
-        WHERE s.active = true
-          AND s.alertType = :type
-          AND (
-            6371 * acos(
-              cos(radians(:lat)) * cos(radians(s.latitude)) *
-              cos(radians(s.longitude) - radians(:lon)) +
-              sin(radians(:lat)) * sin(radians(s.latitude))
-            )
-          ) <= (s.radiusKm + :radiusKm)
-        """)
+    @Query(value = """
+        SELECT DISTINCT s.user_id FROM user_subscriptions s
+        WHERE s.is_active = true
+          AND s.alert_type = :#{#type.name()}
+          AND ST_DWithin(
+              s.center_geog,
+              ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+              (s.radius_km + :radiusKm) * 1000.0
+          )
+        """, nativeQuery = true)
     List<UUID> findUserIdsMatching(
+            @Param("type") AlertType type,
+            @Param("lat") double latitude,
+            @Param("lon") double longitude,
+            @Param("radiusKm") double radiusKm
+    );
+
+    /** Haversine fallback — used when PostGIS is not installed on the server. */
+    @Query(value = """
+        SELECT DISTINCT s.user_id FROM user_subscriptions s
+        WHERE s.is_active = true
+          AND s.alert_type = :#{#type.name()}
+          AND (6371 * acos(
+              LEAST(1.0, cos(radians(:lat)) * cos(radians(s.latitude))
+              * cos(radians(s.longitude) - radians(:lon))
+              + sin(radians(:lat)) * sin(radians(s.latitude)))
+          )) <= (s.radius_km + :radiusKm)
+        """, nativeQuery = true)
+    List<UUID> findUserIdsMatchingHaversine(
             @Param("type") AlertType type,
             @Param("lat") double latitude,
             @Param("lon") double longitude,

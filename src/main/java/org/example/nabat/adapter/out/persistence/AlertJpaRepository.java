@@ -13,19 +13,35 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
 
     List<AlertJpaEntity> findByStatus(AlertStatus status);
 
+    /** PostGIS path — used when the location_geog generated column exists. */
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
-        AND (
-            6371 * acos(
-                cos(radians(:lat)) * cos(radians(a.latitude)) *
-                cos(radians(a.longitude) - radians(:lon)) +
-                sin(radians(:lat)) * sin(radians(a.latitude))
-            )
-        ) <= :radius
+        AND ST_DWithin(
+            a.location_geog,
+            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+            :radius * 1000.0
+        )
         ORDER BY a.created_at DESC
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadius(
+        @Param("lat") double latitude,
+        @Param("lon") double longitude,
+        @Param("radius") double radiusKm
+    );
+
+    /** Haversine fallback — used when PostGIS is not installed on the server. */
+    @Query(value = """
+        SELECT * FROM alerts a
+        WHERE a.status = 'ACTIVE'
+        AND (6371 * acos(
+            LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
+            * cos(radians(a.longitude) - radians(:lon))
+            + sin(radians(:lat)) * sin(radians(a.latitude)))
+        )) <= :radius
+        ORDER BY a.created_at DESC
+        """, nativeQuery = true)
+    List<AlertJpaEntity> findActiveAlertsWithinRadiusHaversine(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm
