@@ -1,7 +1,6 @@
 package org.example.nabat.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.nabat.adapter.in.security.RateLimitingFilter;
 import org.example.nabat.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.application.port.out.EmailSender;
@@ -42,9 +41,6 @@ class AlertControllerIntegrationTest extends PostgisSpringBootIntegrationTestSup
     private EmailSender emailSender;
 
     @Autowired
-    private RateLimitingFilter rateLimitingFilter;
-
-    @Autowired
     private UserJpaRepository userRepository;
 
     @Autowired
@@ -54,7 +50,6 @@ class AlertControllerIntegrationTest extends PostgisSpringBootIntegrationTestSup
     void setUp() {
         alertRepository.deleteAll();
         userRepository.deleteAll();
-        rateLimitingFilter.resetBuckets();
     }
 
     private AuthResponse registerAndGetAuth() throws Exception {

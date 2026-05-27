@@ -1,8 +1,15 @@
 package org.example.nabat.adapter.out.persistence;
 
+import org.example.nabat.PostgresTestSupport;
+import org.example.nabat.domain.model.AlertSeverity;
+import org.example.nabat.domain.model.AlertStatus;
+import org.example.nabat.domain.model.AlertType;
+import org.example.nabat.domain.model.Role;
 import org.example.nabat.domain.model.VoteType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -15,56 +22,84 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Confirms that the {@code uk_alert_votes_alert_user} unique constraint on
  * {@code alert_votes(alert_id, user_id)} is enforced at the database level.
  *
- * <p>This is the persistence-layer guard that prevents a race condition where
- * two concurrent requests from the same user vote on the same alert before the
- * application-level idempotency check (in {@code AlertVoteService}) has a
- * chance to run.
+ * <p>Parent records (users + alerts) are seeded in {@code @BeforeEach} to satisfy
+ * the FK constraints that PostgreSQL enforces strictly (unlike H2 in permissive mode).
  */
 @DataJpaTest
-class AlertVoteUniqueConstraintTest {
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class AlertVoteUniqueConstraintTest extends PostgresTestSupport {
 
-    @Autowired
-    private AlertVoteJpaRepository repository;
+    @Autowired private AlertVoteJpaRepository repository;
+    @Autowired private AlertJpaRepository alertRepository;
+    @Autowired private UserJpaRepository userRepository;
+
+    // IDs seeded per test (each test runs in its own rolled-back transaction).
+    private UUID userId1;
+    private UUID userId2;
+    private UUID alertId1;
+    private UUID alertId2;
+
+    @BeforeEach
+    void seedParents() {
+        userId1  = saveUser("u1-constraint@test.com");
+        userId2  = saveUser("u2-constraint@test.com");
+        alertId1 = saveAlert(userId1, "Alert A");
+        alertId2 = saveAlert(userId1, "Alert B");
+    }
 
     @Test
     void savingDuplicateVoteForSameAlertAndUserViolatesUniqueConstraint() {
-        UUID alertId = UUID.randomUUID();
-        UUID userId  = UUID.randomUUID();
-
-        AlertVoteJpaEntity first = entity(alertId, userId, VoteType.UPVOTE);
-        repository.saveAndFlush(first);
+        repository.saveAndFlush(entity(alertId1, userId1, VoteType.UPVOTE));
 
         // A second entity with the same (alertId, userId) pair — different id and voteType —
         // must be rejected by the uk_alert_votes_alert_user constraint.
-        AlertVoteJpaEntity duplicate = entity(alertId, userId, VoteType.DOWNVOTE);
-
-        assertThatThrownBy(() -> repository.saveAndFlush(duplicate))
+        assertThatThrownBy(() -> repository.saveAndFlush(entity(alertId1, userId1, VoteType.DOWNVOTE)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void sameUserCanVoteOnDifferentAlerts() {
-        UUID userId   = UUID.randomUUID();
-        UUID alertId1 = UUID.randomUUID();
-        UUID alertId2 = UUID.randomUUID();
-
-        repository.saveAndFlush(entity(alertId1, userId, VoteType.UPVOTE));
+        repository.saveAndFlush(entity(alertId1, userId1, VoteType.UPVOTE));
         // Must not throw — different alert.
-        repository.saveAndFlush(entity(alertId2, userId, VoteType.UPVOTE));
+        repository.saveAndFlush(entity(alertId2, userId1, VoteType.UPVOTE));
     }
 
     @Test
     void differentUsersCanVoteOnSameAlert() {
-        UUID alertId = UUID.randomUUID();
-        UUID userId1 = UUID.randomUUID();
-        UUID userId2 = UUID.randomUUID();
-
-        repository.saveAndFlush(entity(alertId, userId1, VoteType.UPVOTE));
+        repository.saveAndFlush(entity(alertId1, userId1, VoteType.UPVOTE));
         // Must not throw — different user.
-        repository.saveAndFlush(entity(alertId, userId2, VoteType.CONFIRM));
+        repository.saveAndFlush(entity(alertId1, userId2, VoteType.CONFIRM));
     }
 
     // -------------------------------------------------------------------------
+
+    private UUID saveUser(String email) {
+        UserJpaEntity u = new UserJpaEntity();
+        u.setId(UUID.randomUUID());
+        u.setEmail(email);
+        u.setPassword("hash");
+        u.setDisplayName("User");
+        u.setRole(Role.USER);
+        u.setEnabled(true);
+        u.setCreatedAt(Instant.now());
+        u.setUpdatedAt(Instant.now());
+        return userRepository.saveAndFlush(u).getId();
+    }
+
+    private UUID saveAlert(UUID reportedBy, String title) {
+        AlertJpaEntity a = new AlertJpaEntity();
+        a.setId(UUID.randomUUID());
+        a.setTitle(title);
+        a.setDescription("desc");
+        a.setType(AlertType.FIRE);
+        a.setSeverity(AlertSeverity.MEDIUM);
+        a.setLatitude(42.6977);
+        a.setLongitude(23.3219);
+        a.setCreatedAt(Instant.now());
+        a.setStatus(AlertStatus.ACTIVE);
+        a.setReportedBy(reportedBy);
+        return alertRepository.saveAndFlush(a).getId();
+    }
 
     private static AlertVoteJpaEntity entity(UUID alertId, UUID userId, VoteType type) {
         AlertVoteJpaEntity e = new AlertVoteJpaEntity();
@@ -76,4 +111,3 @@ class AlertVoteUniqueConstraintTest {
         return e;
     }
 }
-

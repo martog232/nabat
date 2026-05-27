@@ -44,7 +44,7 @@ public record Alert(
     /** Returns a copy of this alert marked as RESOLVED. Idempotent for already-resolved alerts. */
     public Alert resolve() {
         if (status == AlertStatus.RESOLVED) {
-            return this;
+            throw new IllegalStateException("Alert is already resolved");
         }
         return new Alert(
                 id, title, description, type, severity, location,

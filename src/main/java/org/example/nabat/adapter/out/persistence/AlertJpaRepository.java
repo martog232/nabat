@@ -7,9 +7,20 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> {
+
+    interface VoteStatsProjection {
+        int getUpvoteCount();
+
+        int getDownvoteCount();
+
+        int getConfirmationCount();
+
+        int getCredibilityScore();
+    }
 
     List<AlertJpaEntity> findByStatus(AlertStatus status);
 
@@ -47,8 +58,31 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("radius") double radiusKm
     );
 
+    @Query("""
+        SELECT a.upvoteCount AS upvoteCount,
+               a.downvoteCount AS downvoteCount,
+               a.confirmationCount AS confirmationCount,
+               a.credibilityScore AS credibilityScore
+        FROM AlertJpaEntity a
+        WHERE a.id = :id
+        """)
+    Optional<VoteStatsProjection> findVoteStatsById(@Param("id") UUID id);
+
     @Modifying
-    @Query("UPDATE AlertJpaEntity a SET a.upvoteCount = :upvotes, a.downvoteCount = :downvotes, a.confirmationCount = :confirmations WHERE a.id = :id")
-    void updateVoteCounts(@Param("id") UUID id, @Param("upvotes") int upvotes, @Param("downvotes") int downvotes, @Param("confirmations") int confirmations);
+    @Query("""
+        UPDATE AlertJpaEntity a
+        SET a.upvoteCount = :upvotes,
+            a.downvoteCount = :downvotes,
+            a.confirmationCount = :confirmations,
+            a.credibilityScore = :credibilityScore
+        WHERE a.id = :id
+        """)
+    void updateVoteCounts(
+            @Param("id") UUID id,
+            @Param("upvotes") int upvotes,
+            @Param("downvotes") int downvotes,
+            @Param("confirmations") int confirmations,
+            @Param("credibilityScore") int credibilityScore
+    );
 
 }

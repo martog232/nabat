@@ -32,5 +32,9 @@ public interface VoteAlertUseCase {
             int credibilityScore = upvotes - downvotes + (confirmations * 2);
             return new VoteStats(upvotes, downvotes, confirmations, credibilityScore);
         }
+
+        public static VoteStats of(int upvotes, int downvotes, int confirmations, int credibilityScore) {
+            return new VoteStats(upvotes, downvotes, confirmations, credibilityScore);
+        }
     }
 }

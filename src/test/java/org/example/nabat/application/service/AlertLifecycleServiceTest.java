@@ -87,6 +87,18 @@ class AlertLifecycleServiceTest {
     }
 
     @Test
+    void resolve_alreadyResolved_throwsIllegalState() {
+        Alert resolved = new Alert(alertId, "T", "D", AlertType.FIRE, AlertSeverity.HIGH,
+                Location.of(0, 0), Instant.now(), AlertStatus.RESOLVED,
+                ownerId, 0, 0, 0, Instant.now());
+        when(alertRepository.findById(alertId)).thenReturn(Optional.of(resolved));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.resolve(alertId, user(ownerId, Role.USER)));
+        verify(alertRepository, never()).save(any());
+    }
+
+    @Test
     void resolve_byStranger_throwsAccessDenied() {
         when(alertRepository.findById(alertId)).thenReturn(Optional.of(active()));
         assertThrows(AccessDeniedException.class,

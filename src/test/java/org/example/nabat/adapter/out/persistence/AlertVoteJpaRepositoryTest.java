@@ -1,5 +1,6 @@
 package org.example.nabat.adapter.out.persistence;
 
+import org.example.nabat.PostgresTestSupport;
 import org.example.nabat.domain.model.AlertSeverity;
 import org.example.nabat.domain.model.AlertStatus;
 import org.example.nabat.domain.model.AlertType;
@@ -8,6 +9,7 @@ import org.example.nabat.domain.model.VoteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import java.time.Instant;
@@ -16,16 +18,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-class AlertVoteJpaRepositoryTest {
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class AlertVoteJpaRepositoryTest extends PostgresTestSupport {
 
-    @Autowired
-    private AlertVoteJpaRepository voteRepository;
-
-    @Autowired
-    private AlertJpaRepository alertRepository;
-
-    @Autowired
-    private UserJpaRepository userRepository;
+    @Autowired private AlertVoteJpaRepository voteRepository;
+    @Autowired private AlertJpaRepository alertRepository;
+    @Autowired private UserJpaRepository userRepository;
 
     @BeforeEach
     void setUp() {
@@ -96,5 +94,3 @@ class AlertVoteJpaRepositoryTest {
         return e;
     }
 }
-
-

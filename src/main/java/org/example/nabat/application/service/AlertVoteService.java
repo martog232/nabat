@@ -8,13 +8,15 @@ import org.example.nabat.application.port.in.SendNotificationUseCase.VoteNotific
 import org.example.nabat.application.port.in.VoteAlertUseCase;
 import org.example.nabat.application.port.out.AlertRepository;
 import org.example.nabat.application.port.out.AlertVoteRepository;
-import org.example.nabat.domain.model.Alert;
+import org.example.nabat.domain.event.VoteCastEvent;
 import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.AlertVote;
 import org.example.nabat.domain.model.UserId;
 import org.example.nabat.domain.model.VoteType;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @UseCase
@@ -24,6 +26,7 @@ public class AlertVoteService implements VoteAlertUseCase {
     private final AlertVoteRepository alertVoteRepository;
     private final AlertRepository alertRepository;
     private final SendNotificationUseCase sendNotificationUseCase;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -45,7 +48,16 @@ public class AlertVoteService implements VoteAlertUseCase {
                     command.alertId(), command.userId(), command.voteType()));
         }
 
-        int newConfirmations = updateAlertVoteCounts(command.alertId());
+        eventPublisher.publishEvent(new VoteCastEvent(
+                command.alertId(),
+                command.userId(),
+                command.voteType(),
+                Instant.now()
+        ));
+
+        int newConfirmations = command.voteType() == VoteType.CONFIRM
+                ? alertVoteRepository.countByAlertIdAndVoteType(command.alertId(), VoteType.CONFIRM)
+                : 0;
 
         // Fire owner notifications (skip self-vote).
         alertRepository.findById(command.alertId()).ifPresent(alert -> {
@@ -76,7 +88,7 @@ public class AlertVoteService implements VoteAlertUseCase {
         }
         alertVoteRepository.deleteByAlertIdAndUserId(alertId, userId);
 
-        updateAlertVoteCounts(alertId);
+        rebuildVoteProjection(alertId);
     }
 
     @Override
@@ -88,19 +100,22 @@ public class AlertVoteService implements VoteAlertUseCase {
     @Override
     @Transactional(readOnly = true)
     public VoteStats getVoteStats(AlertId alertId) {
-        int upvotes = alertVoteRepository.countByAlertIdAndVoteType(alertId, VoteType.UPVOTE);
-        int downvotes = alertVoteRepository.countByAlertIdAndVoteType(alertId, VoteType.DOWNVOTE);
-        int confirmations = alertVoteRepository.countByAlertIdAndVoteType(alertId, VoteType.CONFIRM);
-        return VoteStats.of(upvotes, downvotes, confirmations);
+        return alertRepository.findVoteStats(alertId)
+                .map(snapshot -> VoteStats.of(
+                        snapshot.upvotes(),
+                        snapshot.downvotes(),
+                        snapshot.confirmations(),
+                        snapshot.credibilityScore()))
+                .orElse(VoteStats.of(0, 0, 0));
     }
 
-    /** Recomputes denormalized vote counts on the alert; returns the new confirmation count. */
-    private int updateAlertVoteCounts(AlertId alertId) {
+    /** Recomputes the vote projection in the alerts table for non-evented paths (e.g., vote removal). */
+    private void rebuildVoteProjection(AlertId alertId) {
         int upvotes = alertVoteRepository.countByAlertIdAndVoteType(alertId, VoteType.UPVOTE);
         int downvotes = alertVoteRepository.countByAlertIdAndVoteType(alertId, VoteType.DOWNVOTE);
         int confirmations = alertVoteRepository.countByAlertIdAndVoteType(alertId, VoteType.CONFIRM);
+        int credibilityScore = upvotes - downvotes + (confirmations * 2);
 
-        alertRepository.updateVoteCounts(alertId, upvotes, downvotes, confirmations);
-        return confirmations;
+        alertRepository.updateVoteCounts(alertId, upvotes, downvotes, confirmations, credibilityScore);
     }
 }

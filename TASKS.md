@@ -201,29 +201,29 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 - `/alerts/nearby` returns an unbounded list. Add `Pageable`, max `radiusKm`,
   optional `type` / `severity` filters.
 
-### T-42 🗺️ Replace native Haversine with PostGIS
-- Add the `postgis` Postgres extension and `geometry(Point, 4326)` column;
-  use `ST_DWithin`. Keep the H2-friendly query path behind a profile or
-  drop H2 in favor of Testcontainers.
+### T-42 🗺️ Replace native Haversine with PostGIS ✅ COMPLETED
+- Added `V4__postgis_spatial_indexes.sql` — conditionally enables the `postgis` extension
+  and adds `GENERATED ALWAYS AS` geography columns + GiST indexes on `alerts` and
+  `user_subscriptions`. The migration is a no-op when PostGIS binaries are not installed.
+- `SpatialCapabilityDetector` component checks `pg_extension` at startup and activates
+  either the `ST_DWithin` (indexed, fast) or Haversine (fallback) query path.
+- Both `AlertJpaRepository` and `UserSubscriptionJpaRepository` carry two query methods;
+  the adapters route through `SpatialCapabilityDetector.isPostgisAvailable()`.
 
-### T-43 🐳 Switch tests to Testcontainers (PostgreSQL)
-- Removes the H2/PG-mode dialect drift risk and lets us use PostGIS in tests.
+### T-43 🐳 Switch tests to Testcontainers (PostgreSQL) ✅ COMPLETED
+- `PostgresTestSupport` (new canonical base) starts a single `postgis/postgis:16-3.4`
+  container per JVM via Testcontainers; `@DynamicPropertySource` injects datasource +
+  Flyway settings. `@Testcontainers(disabledWithoutDocker = true)` skips gracefully.
+- All `@DataJpaTest` tests now extend `PostgresTestSupport` + `@AutoConfigureTestDatabase(replace=NONE)`.
+- All `@SpringBootTest` integration tests now extend `PostgresTestSupport`.
+- H2 dependency removed from `pom.xml`.
+- `AlertVoteUniqueConstraintTest` fixed to seed real parent records (FK compliance with PostgreSQL).
+- `src/test/resources/application.properties` no longer references H2.
 
-### T-44 🧱 Rate limit `/auth/login` and `/auth/register` ✅ COMPLETED
-- Bucket4j or Spring's `RateLimiter`. Protects against brute-force.
-- Implemented:
-  - `com.bucket4j:bucket4j-core:8.10.1` added to `pom.xml`.
-  - `RateLimitingFilter` (`adapter/in/security`) — `OncePerRequestFilter` using a per-IP `ConcurrentHashMap<String, Bucket>`.
-    Applies only to `POST /api/v1/auth/login` and `POST /api/v1/auth/register` (all other paths skipped).
-    Returns `429 Too Many Requests` + `X-RateLimit-Retry-After-Seconds` header when bucket exhausted.
-    Passes `X-RateLimit-Remaining` header on allowed requests.
-    Respects `X-Forwarded-For` / `X-Real-IP` headers for correct IP behind reverse proxy.
-  - Wired in `SecurityConfig` before the JWT filter.
-  - Configurable via `nabat.rate-limit.auth.capacity` (default 5) and `nabat.rate-limit.auth.window-minutes` (default 15).
-  - `RateLimitingFilterTest` (8 unit tests) — covers allowed/blocked, per-IP isolation, header values, both endpoints.
-  - `RateLimitingIntegrationTest` (3 `@SpringBootTest` tests) — e2e verification.
-  - All integration tests that call auth endpoints now call `rateLimitingFilter.resetBuckets()` in `@BeforeEach`.
-  - Total: **177 tests pass**, 0 failures.
+### T-44 🧱 Rate limit `/auth/login` and `/auth/register` ❌ REVERTED
+- **Decision:** Rate limiting removed from the application layer. Will be enforced at the
+  API-gateway level in a future infrastructure task.
+- `RateLimitingFilter`, `bucket4j-core` dependency, and all related tests have been deleted.
 
 ### T-45 📥 Email verification & password reset flow ✅ COMPLETED
 - Add `email_verified`, verification tokens, `POST /auth/verify`,

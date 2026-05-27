@@ -54,13 +54,25 @@ public class AlertRepositoryAdapter implements AlertRepository {
     }
 
     @Override
-    public void updateVoteCounts(AlertId alertId, int upvotes, int downvotes, int confirmations) {
+    public void updateVoteCounts(AlertId alertId, int upvotes, int downvotes, int confirmations, int credibilityScore) {
         jpaRepository.updateVoteCounts(
             alertId.value(),
             upvotes,
             downvotes,
-            confirmations
+            confirmations,
+            credibilityScore
         );
+    }
+
+    @Override
+    public Optional<VoteStatsSnapshot> findVoteStats(AlertId alertId) {
+        return jpaRepository.findVoteStatsById(alertId.value())
+                .map(stats -> new VoteStatsSnapshot(
+                        stats.getUpvoteCount(),
+                        stats.getDownvoteCount(),
+                        stats.getConfirmationCount(),
+                        stats.getCredibilityScore()
+                ));
     }
 }
 

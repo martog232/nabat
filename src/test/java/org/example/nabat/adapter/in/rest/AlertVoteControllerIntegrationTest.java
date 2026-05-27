@@ -1,7 +1,6 @@
 package org.example.nabat.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.nabat.adapter.in.security.RateLimitingFilter;
 import org.example.nabat.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.application.port.out.EmailSender;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +14,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -41,13 +42,9 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
     @MockBean
     private EmailSender emailSender;
 
-    @Autowired
-    private RateLimitingFilter rateLimitingFilter;
-
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
-        rateLimitingFilter.resetBuckets();
     }
 
     @Test
@@ -64,13 +61,8 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
             .andExpect(jsonPath("$.alertId").value(alertId.toString()))
             .andExpect(jsonPath("$.voteType").value("UPVOTE"));
 
-        // 2) stats after upvote
-        mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/stats", alertId)
-                .header("Authorization", "Bearer " + auth.accessToken()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.upvotes").value(1))
-            .andExpect(jsonPath("$.downvotes").value(0))
-            .andExpect(jsonPath("$.confirmations").value(0));
+        // 2) stats after upvote (eventual consistency: projection updated asynchronously)
+        awaitStats(auth.accessToken(), alertId, 1, 0, 0);
 
         // 3) switch vote to DOWNVOTE
         mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", alertId)
@@ -81,12 +73,7 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
             .andExpect(jsonPath("$.alertId").value(alertId.toString()))
             .andExpect(jsonPath("$.voteType").value("DOWNVOTE"));
 
-        mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/stats", alertId)
-                .header("Authorization", "Bearer " + auth.accessToken()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.upvotes").value(0))
-            .andExpect(jsonPath("$.downvotes").value(1))
-            .andExpect(jsonPath("$.confirmations").value(0));
+        awaitStats(auth.accessToken(), alertId, 0, 1, 0);
 
         // 4) remove vote
         mockMvc.perform(delete("/api/v1/alerts/{alertId}/votes", alertId)
@@ -129,6 +116,31 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
 
         AlertResponse response = objectMapper.readValue(result.getResponse().getContentAsString(), AlertResponse.class);
         return response.id();
+    }
+
+    private void awaitStats(String accessToken, UUID alertId, int expectedUpvotes, int expectedDownvotes, int expectedConfirmations)
+            throws Exception {
+        Instant timeoutAt = Instant.now().plus(Duration.ofSeconds(3));
+        AssertionError lastAssertionError = null;
+
+        while (Instant.now().isBefore(timeoutAt)) {
+            try {
+                mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/stats", alertId)
+                                .header("Authorization", "Bearer " + accessToken))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.upvotes").value(expectedUpvotes))
+                        .andExpect(jsonPath("$.downvotes").value(expectedDownvotes))
+                        .andExpect(jsonPath("$.confirmations").value(expectedConfirmations));
+                return;
+            } catch (AssertionError ex) {
+                lastAssertionError = ex;
+                Thread.sleep(75);
+            }
+        }
+
+        if (lastAssertionError != null) {
+            throw lastAssertionError;
+        }
     }
 }
 

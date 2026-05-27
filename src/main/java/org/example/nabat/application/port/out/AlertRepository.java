@@ -18,5 +18,15 @@ public interface AlertRepository {
 
     List<Alert> findByStatus(AlertStatus status);
 
-    void updateVoteCounts(AlertId alertId, int upvotes, int downvotes, int confirmations);
+    void updateVoteCounts(AlertId alertId, int upvotes, int downvotes, int confirmations, int credibilityScore);
+
+    Optional<VoteStatsSnapshot> findVoteStats(AlertId alertId);
+
+    record VoteStatsSnapshot(
+            int upvotes,
+            int downvotes,
+            int confirmations,
+            int credibilityScore
+    ) {
+    }
 }

@@ -3,8 +3,8 @@ package org.example.nabat.adapter.in.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.example.nabat.PostgresTestSupport;
 import org.example.nabat.adapter.in.security.JwtTokenProvider;
-import org.example.nabat.adapter.in.security.RateLimitingFilter;
 import org.example.nabat.adapter.out.persistence.UserJpaEntity;
 import org.example.nabat.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.application.port.out.EmailSender;
@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
@@ -30,7 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class AuthControllerIntegrationTest {
+@Testcontainers(disabledWithoutDocker = true)
+class AuthControllerIntegrationTest extends PostgresTestSupport {
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,16 +48,12 @@ class AuthControllerIntegrationTest {
     @SuppressWarnings("unused")
     private EmailSender emailSender;
 
-    @Autowired
-    private RateLimitingFilter rateLimitingFilter;
-
     @Value("${jwt.secret}")
     private String jwtSecret;
 
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
-        rateLimitingFilter.resetBuckets();
     }
 
     @Test

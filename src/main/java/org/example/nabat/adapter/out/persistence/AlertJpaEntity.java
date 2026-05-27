@@ -56,6 +56,9 @@ public class AlertJpaEntity {
     @Column(name = "confirmation_count", nullable = false)
     private int confirmationCount = 0;
 
+    @Column(name = "credibility_score", nullable = false)
+    private int credibilityScore = 0;
+
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
@@ -78,6 +81,7 @@ public class AlertJpaEntity {
         entity.upvoteCount = alert.upvoteCount();
         entity.downvoteCount = alert.downvoteCount();
         entity.confirmationCount = alert.confirmationCount();
+        entity.credibilityScore = alert.getCredibilityScore();
         entity.resolvedAt = alert.resolvedAt();
         return entity;
     }

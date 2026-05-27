@@ -1,9 +1,11 @@
 package org.example.nabat.adapter.out.persistence;
 
 import org.example.nabat.domain.model.Role;
+import org.example.nabat.PostgresTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import java.time.Instant;
@@ -13,7 +15,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-class UserJpaRepositoryTest {
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class UserJpaRepositoryTest extends PostgresTestSupport {
 
     @Autowired
     private UserJpaRepository userRepository;

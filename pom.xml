@@ -74,11 +74,7 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
-        </dependency>
+        <!-- H2 removed (T-43) — all tests use real PostgreSQL via Testcontainers. -->
 
         <!-- Flyway Database Migrations -->
         <dependency>
@@ -152,12 +148,7 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
-        <!-- Rate limiting — Bucket4j in-memory token-bucket implementation -->
-        <dependency>
-            <groupId>com.bucket4j</groupId>
-            <artifactId>bucket4j-core</artifactId>
-            <version>8.10.1</version>
-        </dependency>
+        <!-- Rate limiting removed — will be handled at the API-gateway layer (T-44 reverted). -->
 
         <!-- Tracing: Brave bridge — populates MDC traceId/spanId per request -->
         <dependency>
