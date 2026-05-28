@@ -1,6 +1,6 @@
 # Nabat — Real-Time Safety Alert Platform
 
-A Spring Boot service for crowd-sourced safety alerts: users report incidents tied to a GPS location, vote on each other's reports, and receive real-time pushes over WebSocket. Backed by PostgreSQL, secured with JWT.
+A Spring Boot service for crowd-sourced safety alerts: users report incidents tied to a GPS location, vote on each other's reports, and receive real-time pushes over WebSocket. Backed by PostgreSQL and Spring Security.
 
 > The web client previously hosted in `frontend/` now lives in a separate repository: [martog232/nabat-fe](https://github.com/martog232/nabat-fe). This repository contains the backend only.
 
@@ -16,6 +16,7 @@ A Spring Boot service for crowd-sourced safety alerts: users report incidents ti
 - Flyway for schema + seed data
 - `io.jsonwebtoken:jjwt` for token signing/parsing
 - Lombok
+- MapStruct (adapter mappers)
 - Maven Wrapper (`mvnw.cmd` / `mvnw`)
 - JaCoCo (60% line coverage threshold), Checkstyle (non-failing)
 
@@ -45,7 +46,7 @@ src/main/java/org/example/nabat/
 └── config/            # WebSocketConfig, UseCaseConfig
 ```
 
-Domain types are pure Java records with no framework annotations. Adapters translate to/from `*JpaEntity` classes via static `from(...)` / `toDomain()` methods.
+Domain types are pure Java records with no framework annotations. Adapters translate to/from `*JpaEntity` classes via MapStruct mappers.
 
 ## Authentication
 
@@ -151,13 +152,14 @@ All endpoints live under `/api/v1`. `/auth/**` is open; everything else under `/
 | `GET`  | `/api/v1/auth/me` | Current user |
 | `POST` | `/api/v1/alerts` | Create alert |
 | `GET`  | `/api/v1/alerts/nearby?latitude=&longitude=&radiusKm=5.0` | Haversine search |
-| `POST` | `/api/v1/alerts/{alertId}/votes` | `{ voteType: UPVOTE \| DOWNVOTE \| CONFIRM }` |
+| `PATCH` | `/api/v1/alerts/{alertId}/resolve` | Resolve an alert (reporter or admin only) |
+| `POST` | `/api/v1/alerts/{alertId}/votes` | `{ voteType: UPVOTE | DOWNVOTE | CONFIRM }` |
 | `DELETE` | `/api/v1/alerts/{alertId}/votes` | Remove current user's vote |
 | `GET`  | `/api/v1/alerts/{alertId}/votes/stats` | Aggregate counts + credibility score |
 | `GET`  | `/api/v1/alerts/{alertId}/votes/me` | Has the current user voted? |
 | `GET`  | `/actuator/health`, `/actuator/info` | |
 
-Errors use a uniform JSON envelope (`status`, `message`, `timestamp`); validation errors add an `errors` map. Mappings: `BadCredentialsException` → 401, `IllegalArgumentException` → 400, `IllegalStateException` → 409, `AlertNotFoundException` → 404.
+Errors use a uniform JSON envelope (`status`, `message`, `timestamp`); validation errors add an `errors` map. Mappings: `BadCredentialsException` → 401, `IllegalArgumentException` → 400, `IllegalStateException` → 409, `AccessDeniedException` → 403, `AlertNotFoundException` → 404.
 
 ### WebSocket
 
@@ -191,7 +193,7 @@ Server pushes JSON frames `{ "type": "NEW_ALERT", "alert": { ... } }` to authent
 
 ## Database & migrations
 
-Schema and seed data are managed by Flyway under `src/main/resources/db/migration` (`V1__schema.sql`, `V2__seed_data.sql`). On boot the app runs migrations against the configured datasource; `spring.jpa.hibernate.ddl-auto=validate` ensures entities and schema agree.
+Schema and seed data are managed by Flyway under `src/main/resources/db/migration` (`V1__schema.sql`, `V2__seed_data.sql`). On boot the app runs migrations against the configured datasource; `spring.jpa.hibernate.ddl-auto=validate` prevents Hibernate from modifying the schema.
 
 Seeded users (dev only — passwords are placeholder bcrypt hashes; reset before any real use):
 
@@ -227,21 +229,8 @@ The Docker image (`Dockerfile`) is multi-stage on Eclipse Temurin 21, runs as th
 
 ## Troubleshooting
 
-- **`jwt.secret still contains the dev placeholder marker 'change-me-before-production'`** — you are still running with an old placeholder value, likely from an IntelliJ environment variable. Remove that env var or set `JWT_SECRET` to a value that does not contain `change-me-before-production`. For PowerShell:
-  ```powershell
-  $env:JWT_SECRET="nabat-local-dev-jwt-secret-key-min-256-bits-for-local-development-only-123456"
-  .\mvnw.cmd spring-boot:run
-  ```
-- **`FATAL: password authentication failed for user "nabat_user"`** — your app is connecting to a PostgreSQL instance that does not have the expected `nabat_user` / `nabat_password` credentials. For the Docker dev DB, use host port `5433`:
-  ```powershell
-  docker compose down
-  docker compose up -d postgres
-  $env:SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5433/nabat_db"
-  $env:SPRING_DATASOURCE_USERNAME="nabat_user"
-  $env:SPRING_DATASOURCE_PASSWORD="nabat_password"
-  $env:JWT_SECRET="nabat-local-dev-jwt-secret-key-min-256-bits-for-local-development-only-123456"
-  .\mvnw.cmd spring-boot:run
-  ```
+- **`jwt.secret still contains the dev placeholder marker 'change-me-before-production'`** — you are still running with an old placeholder value, likely from an IntelliJ environment variable. Reset it in your run config.
+- **`FATAL: password authentication failed for user "nabat_user"`** — your app is connecting to a PostgreSQL instance that does not have the expected `nabat_user` / `nabat_password` credentials. Re-run the Docker database setup.
 - **Port 5432 in use** — another local Postgres is running. Stop it or change `SPRING_DATASOURCE_URL`.
 - **Port 8080 in use** — `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"`.
 - **`UnsupportedClassVersionError` / `class file version 61.0`** — your `java` command is older than Java 17/21. This project targets Java 21. Check with:
@@ -265,8 +254,7 @@ Tracked gaps (see source for `TODO` markers):
 - [ ] **Authorize `POST /alerts`** off the `Authorization` header instead of trusting `reportedBy` in the request body.
 - [ ] **Notifications end-to-end** — `NotificationService.sendVoteNotification` / `sendMilestoneNotification` are stubs returning `null`; no REST controller wired for `GetNotificationUseCase`; `AlertVoteService.vote` does not yet emit notifications.
 - [ ] **User subscriptions** — `SubscribeToAlertsUseCase` interface exists with no implementation; `InMemoryUserSubscriptionRepository` always returns an empty list, so WebSocket broadcasts never fan out. The `user_subscriptions` table is seeded but unused.
-- [ ] **Alert lifecycle** — `AlertStatus.RESOLVED` and `resolved_at` exist with no endpoint to resolve an alert; `GET /alerts/{id}` and `findByStatus` are unused.
-- [ ] **Role-based authorization** — `Role.ADMIN` exists with a seeded admin user but nothing checks it. No `@PreAuthorize` anywhere.
+- [ ] **Role-based authorization** — `Role.ADMIN` exists with a seeded admin user but nothing checks it outside the admin-only list endpoint.
 
 ### Hardening
 - [ ] Lock down CORS origins (currently `*`) and externalize via property.
@@ -282,6 +270,5 @@ Tracked gaps (see source for `TODO` markers):
 - [ ] Refresh-token edge cases (expired, access-token-as-refresh).
 
 ### DX / docs
-- [ ] Add `springdoc-openapi` for an OpenAPI / Swagger UI spec.
 - [ ] Add `.env.example` documenting `JWT_SECRET`, `SPRING_DATASOURCE_*`, `SERVER_PORT`.
 - [ ] Translate any remaining inline Bulgarian comments to English.
