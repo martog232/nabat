@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -73,6 +74,30 @@ class AuthControllerIntegrationTest extends PostgresTestSupport {
             .andExpect(jsonPath("$.user.email").value("test@example.com"))
             .andExpect(jsonPath("$.user.displayName").value("Test User"))
             .andExpect(jsonPath("$.user.role").value("USER"));
+    }
+
+    @Test
+    void shouldPersistUserAfterRegistration() throws Exception {
+        String email = "persisted-user@example.com";
+        RegisterRequest request = new RegisterRequest(
+            email,
+            "password123",
+            "Persisted User"
+        );
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isCreated());
+
+        UserJpaEntity saved = userRepository.findByEmail(email).orElseThrow();
+        assertThat(saved.getId()).isNotNull();
+        assertThat(saved.getEmail()).isEqualTo(email);
+        assertThat(saved.getDisplayName()).isEqualTo("Persisted User");
+        assertThat(saved.isEnabled()).isTrue();
+        assertThat(saved.isEmailVerified()).isFalse();
+        assertThat(saved.getCreatedAt()).isNotNull();
+        assertThat(saved.getUpdatedAt()).isNotNull();
     }
 
     @Test
