@@ -7,6 +7,7 @@ import org.example.nabat.application.port.out.AlertVoteRepository;
 import org.example.nabat.domain.event.VoteCastEvent;
 import org.example.nabat.domain.model.VoteType;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -19,7 +20,7 @@ public class VoteCastProjectionUpdater {
     private final AlertRepository alertRepository;
 
     @Async
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onVoteCast(VoteCastEvent event) {
         int upvotes = alertVoteRepository.countByAlertIdAndVoteType(event.alertId(), VoteType.UPVOTE);

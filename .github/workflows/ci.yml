@@ -10,6 +10,8 @@ env:
   JAVA_VERSION: '21'
 
 jobs:
+  tests:
+    runs-on: ubuntu-latest
   ci:
     name: Build, Test & Package
     runs-on: ubuntu-latest
