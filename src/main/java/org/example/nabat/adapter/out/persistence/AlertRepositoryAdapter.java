@@ -15,27 +15,24 @@ public class AlertRepositoryAdapter implements AlertRepository {
 
     private final AlertJpaRepository jpaRepository;
     private final SpatialCapabilityDetector spatialCapabilityDetector;
-    private final AlertJpaMapper mapper;
 
     public AlertRepositoryAdapter(AlertJpaRepository jpaRepository,
-                                  SpatialCapabilityDetector spatialCapabilityDetector,
-                                  AlertJpaMapper mapper) {
+                                  SpatialCapabilityDetector spatialCapabilityDetector) {
         this.jpaRepository = jpaRepository;
         this.spatialCapabilityDetector = spatialCapabilityDetector;
-        this.mapper = mapper;
     }
 
     @Override
     public Alert save(Alert alert) {
-        AlertJpaEntity entity = mapper.toEntity(alert);
+        AlertJpaEntity entity = AlertJpaEntity.from(alert);
         AlertJpaEntity saved = jpaRepository.save(entity);
-        return mapper.toDomain(saved);
+        return saved.toDomain();
     }
 
     @Override
     public Optional<Alert> findById(AlertId id) {
         return jpaRepository.findById(id.value())
-            .map(mapper::toDomain);
+            .map(AlertJpaEntity::toDomain);
     }
 
     @Override
@@ -44,7 +41,7 @@ public class AlertRepositoryAdapter implements AlertRepository {
                 ? jpaRepository.findActiveAlertsWithinRadius(center.latitude(), center.longitude(), radiusKm)
                 : jpaRepository.findActiveAlertsWithinRadiusHaversine(center.latitude(), center.longitude(), radiusKm);
         return results.stream()
-                .map(mapper::toDomain)
+                .map(AlertJpaEntity::toDomain)
                 .toList();
     }
 
@@ -52,7 +49,7 @@ public class AlertRepositoryAdapter implements AlertRepository {
     public List<Alert> findByStatus(AlertStatus status) {
         return jpaRepository.findByStatus(status)
             .stream()
-            .map(mapper::toDomain)
+            .map(AlertJpaEntity::toDomain)
             .toList();
     }
 
