@@ -11,28 +11,30 @@ import java.util.Optional;
 public class UserRepositoryAdapter implements UserRepository {
 
     private final UserJpaRepository jpaRepository;
+    private final UserJpaMapper mapper;
 
-    public UserRepositoryAdapter(UserJpaRepository jpaRepository) {
+    public UserRepositoryAdapter(UserJpaRepository jpaRepository, UserJpaMapper mapper) {
         this.jpaRepository = jpaRepository;
+        this.mapper = mapper;
     }
 
     @Override
     public User save(User user) {
-        UserJpaEntity entity = UserJpaEntity.from(user);
+        UserJpaEntity entity = mapper.toEntity(user);
         UserJpaEntity savedEntity = jpaRepository.save(entity);
-        return savedEntity.toDomain();
+        return mapper.toDomain(savedEntity);
     }
 
     @Override
     public Optional<User> findById(UserId id) {
         return jpaRepository.findById(id.value())
-            .map(UserJpaEntity::toDomain);
+            .map(mapper::toDomain);
     }
 
     @Override
     public Optional<User> findByEmail(String email) {
         return jpaRepository.findByEmail(email)
-            .map(UserJpaEntity::toDomain);
+            .map(mapper::toDomain);
     }
 
     @Override
