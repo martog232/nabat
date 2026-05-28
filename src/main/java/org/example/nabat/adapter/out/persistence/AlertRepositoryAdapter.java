@@ -15,24 +15,27 @@ public class AlertRepositoryAdapter implements AlertRepository {
 
     private final AlertJpaRepository jpaRepository;
     private final SpatialCapabilityDetector spatialCapabilityDetector;
+    private final AlertJpaMapper mapper;
 
     public AlertRepositoryAdapter(AlertJpaRepository jpaRepository,
-                                  SpatialCapabilityDetector spatialCapabilityDetector) {
+                                  SpatialCapabilityDetector spatialCapabilityDetector,
+                                  AlertJpaMapper mapper) {
         this.jpaRepository = jpaRepository;
         this.spatialCapabilityDetector = spatialCapabilityDetector;
+        this.mapper = mapper;
     }
 
     @Override
     public Alert save(Alert alert) {
-        AlertJpaEntity entity = AlertJpaEntity.from(alert);
+        AlertJpaEntity entity = mapper.toEntity(alert);
         AlertJpaEntity saved = jpaRepository.save(entity);
-        return saved.toDomain();
+        return mapper.toDomain(saved);
     }
 
     @Override
     public Optional<Alert> findById(AlertId id) {
         return jpaRepository.findById(id.value())
-            .map(AlertJpaEntity::toDomain);
+            .map(mapper::toDomain);
     }
 
     @Override
@@ -41,7 +44,7 @@ public class AlertRepositoryAdapter implements AlertRepository {
                 ? jpaRepository.findActiveAlertsWithinRadius(center.latitude(), center.longitude(), radiusKm)
                 : jpaRepository.findActiveAlertsWithinRadiusHaversine(center.latitude(), center.longitude(), radiusKm);
         return results.stream()
-                .map(AlertJpaEntity::toDomain)
+                .map(mapper::toDomain)
                 .toList();
     }
 
@@ -49,7 +52,7 @@ public class AlertRepositoryAdapter implements AlertRepository {
     public List<Alert> findByStatus(AlertStatus status) {
         return jpaRepository.findByStatus(status)
             .stream()
-            .map(AlertJpaEntity::toDomain)
+            .map(mapper::toDomain)
             .toList();
     }
 
@@ -75,4 +78,3 @@ public class AlertRepositoryAdapter implements AlertRepository {
                 ));
     }
 }
-
