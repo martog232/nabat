@@ -86,6 +86,15 @@ public class AlertController {
         return ResponseEntity.ok(AlertResponse.from(resolved));
     }
 
+    @PatchMapping("/{id}/resolve")
+    public ResponseEntity<AlertResponse> resolveViaPatch(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        Alert resolved = resolveAlertUseCase.resolve(AlertId.of(id), currentUser);
+        return ResponseEntity.ok(AlertResponse.from(resolved));
+    }
+
     /** Admin-only listing of all alerts by status (defaults to ACTIVE). Demonstrates T-15. */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
