@@ -73,7 +73,8 @@ class AuthControllerIntegrationTest extends PostgresTestSupport {
             .andExpect(jsonPath("$.refreshToken").value(notNullValue()))
             .andExpect(jsonPath("$.user.email").value("test@example.com"))
             .andExpect(jsonPath("$.user.displayName").value("Test User"))
-            .andExpect(jsonPath("$.user.role").value("USER"));
+            .andExpect(jsonPath("$.user.role").value("USER"))
+            .andExpect(jsonPath("$.user.notificationRadiusKm").value(5));
     }
 
     @Test
@@ -96,6 +97,7 @@ class AuthControllerIntegrationTest extends PostgresTestSupport {
         assertThat(saved.getDisplayName()).isEqualTo("Persisted User");
         assertThat(saved.isEnabled()).isTrue();
         assertThat(saved.isEmailVerified()).isFalse();
+        assertThat(saved.getNotificationRadiusKm()).isEqualTo(5);
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
     }
@@ -227,7 +229,8 @@ class AuthControllerIntegrationTest extends PostgresTestSupport {
                 .header("Authorization", "Bearer " + authResponse.accessToken()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.email").value("test@example.com"))
-            .andExpect(jsonPath("$.displayName").value("Test User"));
+            .andExpect(jsonPath("$.displayName").value("Test User"))
+            .andExpect(jsonPath("$.notificationRadiusKm").value(5));
     }
 
     @Test

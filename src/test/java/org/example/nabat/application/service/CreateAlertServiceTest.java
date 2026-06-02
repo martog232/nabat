@@ -3,6 +3,7 @@ package org.example.nabat.application.service;
 import org.example.nabat.application.port.in.CreateAlertUseCase.CreateAlertCommand;
 import org.example.nabat.application.port.out.AlertNotificationPort;
 import org.example.nabat.application.port.out.AlertRepository;
+import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.application.port.out.UserSubscriptionRepository;
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.AlertId;
@@ -19,7 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -38,11 +41,19 @@ class CreateAlertServiceTest {
     @Mock
     private UserSubscriptionRepository subscriptionRepository;
 
+    @Mock
+    private UserRepository userRepository;
+
     private CreateAlertService createAlertService;
 
     @BeforeEach
     void setUp() {
-        createAlertService = new CreateAlertService(alertRepository, notificationPort, subscriptionRepository);
+        createAlertService = new CreateAlertService(
+            alertRepository,
+            notificationPort,
+            subscriptionRepository,
+            userRepository
+        );
     }
 
     private Alert buildAlert(AlertSeverity severity) {
@@ -72,6 +83,7 @@ class CreateAlertServiceTest {
         when(alertRepository.save(any(Alert.class))).thenReturn(savedAlert);
         when(subscriptionRepository.findUsersSubscribedToAlertType(any(), any(), anyDouble()))
                 .thenReturn(Collections.emptyList());
+        when(userRepository.findUsersNearLocation(any())).thenReturn(Collections.emptyList());
 
         Alert result = createAlertService.createAlert(command);
 
@@ -92,10 +104,13 @@ class CreateAlertServiceTest {
         when(alertRepository.save(any(Alert.class))).thenReturn(savedAlert);
         when(subscriptionRepository.findUsersSubscribedToAlertType(any(), any(), anyDouble()))
                 .thenReturn(subscribers);
+        when(userRepository.findUsersNearLocation(any())).thenReturn(Collections.emptyList());
 
         createAlertService.createAlert(command);
 
-        verify(notificationPort).broadcastAlert(eq(savedAlert), eq(subscribers));
+        ArgumentCaptor<List<UUID>> recipientsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(notificationPort).broadcastAlert(eq(savedAlert), recipientsCaptor.capture());
+        assertEquals(new HashSet<>(subscribers), new HashSet<>(recipientsCaptor.getValue()));
     }
 
     @Test
@@ -109,6 +124,7 @@ class CreateAlertServiceTest {
         when(alertRepository.save(any(Alert.class))).thenReturn(savedAlert);
         when(subscriptionRepository.findUsersSubscribedToAlertType(any(), any(), anyDouble()))
                 .thenReturn(Collections.emptyList());
+        when(userRepository.findUsersNearLocation(any())).thenReturn(Collections.emptyList());
 
         createAlertService.createAlert(command);
 
@@ -126,6 +142,7 @@ class CreateAlertServiceTest {
         when(alertRepository.save(any(Alert.class))).thenReturn(savedAlert);
         when(subscriptionRepository.findUsersSubscribedToAlertType(any(), any(), anyDouble()))
                 .thenReturn(Collections.emptyList());
+        when(userRepository.findUsersNearLocation(any())).thenReturn(Collections.emptyList());
 
         createAlertService.createAlert(command);
 
@@ -145,6 +162,7 @@ class CreateAlertServiceTest {
         when(alertRepository.save(any(Alert.class))).thenReturn(savedAlert);
         when(subscriptionRepository.findUsersSubscribedToAlertType(any(), any(), anyDouble()))
                 .thenReturn(Collections.emptyList());
+        when(userRepository.findUsersNearLocation(any())).thenReturn(Collections.emptyList());
 
         createAlertService.createAlert(command);
 
@@ -164,6 +182,7 @@ class CreateAlertServiceTest {
         when(alertRepository.save(any(Alert.class))).thenReturn(savedAlert);
         when(subscriptionRepository.findUsersSubscribedToAlertType(any(), any(), anyDouble()))
                 .thenReturn(Collections.emptyList());
+        when(userRepository.findUsersNearLocation(any())).thenReturn(Collections.emptyList());
 
         createAlertService.createAlert(command);
 
@@ -183,11 +202,40 @@ class CreateAlertServiceTest {
         when(alertRepository.save(any(Alert.class))).thenReturn(savedAlert);
         when(subscriptionRepository.findUsersSubscribedToAlertType(any(), any(), anyDouble()))
                 .thenReturn(Collections.emptyList());
+        when(userRepository.findUsersNearLocation(any())).thenReturn(Collections.emptyList());
 
         createAlertService.createAlert(command);
 
         ArgumentCaptor<Double> radiusCaptor = ArgumentCaptor.forClass(Double.class);
         verify(subscriptionRepository).findUsersSubscribedToAlertType(any(), any(), radiusCaptor.capture());
         assertEquals(1.0, radiusCaptor.getValue());
+    }
+
+    @Test
+    void shouldBroadcastDeduplicatedUsersFromSubscriptionsAndLocation() {
+        UUID reportedBy = UUID.randomUUID();
+        CreateAlertCommand command = new CreateAlertCommand(
+                "Test Alert", "Description", AlertType.FIRE, AlertSeverity.HIGH, 42.0, 23.0, reportedBy
+        );
+
+        Alert savedAlert = buildAlert(AlertSeverity.HIGH);
+        UUID sharedUser = UUID.randomUUID();
+        UUID subscribedOnlyUser = UUID.randomUUID();
+        UUID nearbyOnlyUser = UUID.randomUUID();
+
+        when(alertRepository.save(any(Alert.class))).thenReturn(savedAlert);
+        when(subscriptionRepository.findUsersSubscribedToAlertType(any(), any(), anyDouble()))
+                .thenReturn(List.of(sharedUser, subscribedOnlyUser));
+        when(userRepository.findUsersNearLocation(any()))
+                .thenReturn(List.of(sharedUser, nearbyOnlyUser));
+
+        createAlertService.createAlert(command);
+
+        ArgumentCaptor<List<UUID>> recipientsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(notificationPort).broadcastAlert(eq(savedAlert), recipientsCaptor.capture());
+        assertEquals(
+                Set.of(sharedUser, subscribedOnlyUser, nearbyOnlyUser),
+                new HashSet<>(recipientsCaptor.getValue())
+        );
     }
 }

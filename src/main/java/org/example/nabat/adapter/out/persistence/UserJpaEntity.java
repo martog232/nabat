@@ -49,6 +49,18 @@ public class UserJpaEntity {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "notification_radius_km", nullable = false)
+    private int notificationRadiusKm;
+
+    @Column(name = "last_known_lat")
+    private Double lastKnownLat;
+
+    @Column(name = "last_known_lng")
+    private Double lastKnownLng;
+
+    @Column(name = "location_updated_at")
+    private Instant locationUpdatedAt;
+
     protected UserJpaEntity() {
     }
 
@@ -63,6 +75,10 @@ public class UserJpaEntity {
         entity.emailVerified = user.emailVerified();
         entity.createdAt = user.createdAt();
         entity.updatedAt = user.updatedAt();
+        entity.notificationRadiusKm = user.notificationRadiusKm();
+        entity.lastKnownLat = user.lastKnownLat();
+        entity.lastKnownLng = user.lastKnownLng();
+        entity.locationUpdatedAt = user.locationUpdatedAt();
         return entity;
     }
 
@@ -76,7 +92,11 @@ public class UserJpaEntity {
             enabled,
             emailVerified,
             createdAt,
-            updatedAt
+            updatedAt,
+            notificationRadiusKm,
+            lastKnownLat,
+            lastKnownLng,
+            locationUpdatedAt
         );
     }
 }

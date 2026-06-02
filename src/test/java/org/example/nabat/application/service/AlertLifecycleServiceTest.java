@@ -49,7 +49,8 @@ class AlertLifecycleServiceTest {
     }
 
     private User user(UUID id, Role role) {
-        return new User(UserId.of(id), "x@y.z", "p", "n", role, true, false, Instant.now(), Instant.now());
+        return new User(UserId.of(id), "x@y.z", "p", "n", role, true, false, Instant.now(), Instant.now(),
+                5, null, null, null);
     }
 
     @Test
@@ -113,4 +114,3 @@ class AlertLifecycleServiceTest {
                 () -> service.resolve(alertId, user(ownerId, Role.USER)));
     }
 }
-

@@ -63,6 +63,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - **Exceptions → HTTP**: `IllegalArgumentException` → 400, `IllegalStateException` → 409, `*NotFoundException` → 404, `BadCredentialsException` → 401, `AccessDeniedException` → 403. **Message is sent to the client.** Never throw Spring Security exceptions from domain or application layers.
 - All HTTP routes are under `/api/v1`. `/api/v1/auth/**` is open; all other routes require `Authorization: Bearer <accessToken>`. JWT filter sets authorities as `ROLE_<role>`.
 - **`POST /api/v1/alerts`** must extract `reportedBy` from the JWT principal (the `sub` claim), **not** from the request body. The request body field `reportedBy` should be removed or ignored.
+- **`PATCH /api/v1/users/me/preferences`** updates the authenticated user's `notificationRadiusKm` and optionally refreshes `lastKnownLat`/`lastKnownLng`. If either coordinate is omitted, the stored location remains unchanged.
 - Config is env-var driven; **no Spring profiles**. Defaults in `application.properties`. `JWT_SECRET` ≥ 32 chars and must not contain `change-me-before-production`.
 - CORS origins: `nabat.cors.allowed-origins` (comma-separated).
 
@@ -77,8 +78,9 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V3 | Email verification (verification_tokens table) |
 | V4 | PostGIS extension + geography column + GiST index on alerts |
 | V5 | Credibility projection columns on alerts (upvote_count, downvote_count, confirmation_count, credibility_score) |
+| V6 | User notification radius + last-known location columns on users |
 
-Next migration must be **V6**.
+Next migration must be **V7**.
 
 ---
 

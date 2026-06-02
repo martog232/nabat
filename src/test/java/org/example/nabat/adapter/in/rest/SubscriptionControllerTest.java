@@ -53,7 +53,7 @@ class SubscriptionControllerTest {
     @BeforeEach
     void setUp() {
         user = new User(UserId.generate(), "u@x.y", "p", "n",
-                Role.USER, true, false, Instant.now(), Instant.now());
+                Role.USER, true, false, Instant.now(), Instant.now(), 5, null, null, null);
         var auth = new UsernamePasswordAuthenticationToken(user, null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -112,4 +112,3 @@ class SubscriptionControllerTest {
                 .andExpect(status().isForbidden());
     }
 }
-

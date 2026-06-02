@@ -94,7 +94,11 @@ class UserSubscriptionJpaRepositoryPostgisIntegrationTest extends PostgisIntegra
             true,
             true,
             now,
-            now
+            now,
+            5,
+            null,
+            null,
+            null
         );
         userRepository.saveAndFlush(UserJpaEntity.from(user));
     }
@@ -118,5 +122,4 @@ class UserSubscriptionJpaRepositoryPostgisIntegrationTest extends PostgisIntegra
         ));
     }
 }
-
 

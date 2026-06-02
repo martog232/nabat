@@ -55,7 +55,11 @@ class WebSocketTicketControllerTest {
             true,
             true,
             now,
-            now
+            now,
+            5,
+            null,
+            null,
+            null
         );
 
         mockMvc.perform(post("/api/v1/ws/tickets")
@@ -77,4 +81,3 @@ class WebSocketTicketControllerTest {
             .andExpect(status().isUnauthorized());
     }
 }
-
