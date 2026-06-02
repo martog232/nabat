@@ -1,11 +1,11 @@
-package org.example.nabat.application.service;
+package org.example.nabat.voting.application.service;
 
 import org.example.nabat.application.port.out.AlertRepository;
-import org.example.nabat.application.port.out.AlertVoteRepository;
-import org.example.nabat.domain.event.VoteCastEvent;
+import org.example.nabat.voting.application.port.out.AlertVoteRepository;
+import org.example.nabat.voting.domain.event.VoteCastEvent;
 import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.UserId;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

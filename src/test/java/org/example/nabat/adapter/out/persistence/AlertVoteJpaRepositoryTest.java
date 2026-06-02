@@ -5,7 +5,9 @@ import org.example.nabat.domain.model.AlertSeverity;
 import org.example.nabat.domain.model.AlertStatus;
 import org.example.nabat.domain.model.AlertType;
 import org.example.nabat.domain.model.Role;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.adapter.out.persistence.AlertVoteJpaEntity;
+import org.example.nabat.voting.adapter.out.persistence.AlertVoteJpaRepository;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,8 +66,10 @@ class AlertVoteJpaRepositoryTest extends PostgresTestSupport {
         user.setDisplayName("User");
         user.setRole(Role.USER);
         user.setEnabled(true);
+        user.setEmailVerified(true);
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
+        user.setNotificationRadiusKm(5);
         return userRepository.saveAndFlush(user).getId();
     }
 

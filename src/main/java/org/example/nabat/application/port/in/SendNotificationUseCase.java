@@ -3,7 +3,7 @@ package org.example.nabat.application.port.in;
 import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.Notification;
 import org.example.nabat.domain.model.UserId;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 
 public interface SendNotificationUseCase {
 

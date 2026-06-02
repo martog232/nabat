@@ -1,15 +1,15 @@
-package org.example.nabat.adapter.in.rest;
+package org.example.nabat.voting.adapter.in.rest;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
-import org.example.nabat.application.port.in.VoteAlertUseCase;
-import org.example.nabat.application.port.in.VoteAlertUseCase.VoteCommand;
+import org.example.nabat.voting.application.port.in.VoteAlertUseCase;
+import org.example.nabat.voting.application.port.in.VoteAlertUseCase.VoteCommand;
 import org.example.nabat.domain.model.AlertId;
-import org.example.nabat.domain.model.AlertVote;
+import org.example.nabat.voting.domain.model.AlertVote;
 import org.example.nabat.domain.model.User;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

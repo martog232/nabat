@@ -1,18 +1,18 @@
-package org.example.nabat.application.service;
+package org.example.nabat.voting.application.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.nabat.application.UseCase;
-import org.example.nabat.application.port.in.SendNotificationUseCase;
-import org.example.nabat.application.port.in.SendNotificationUseCase.MilestoneNotificationCommand;
-import org.example.nabat.application.port.in.SendNotificationUseCase.VoteNotificationCommand;
-import org.example.nabat.application.port.in.VoteAlertUseCase;
+import org.example.nabat.voting.application.port.in.VoteAlertUseCase;
 import org.example.nabat.application.port.out.AlertRepository;
-import org.example.nabat.application.port.out.AlertVoteRepository;
-import org.example.nabat.domain.event.VoteCastEvent;
+import org.example.nabat.voting.application.port.out.AlertVoteRepository;
+import org.example.nabat.voting.application.port.out.VoteNotificationPort;
+import org.example.nabat.voting.application.port.out.VoteNotificationPort.MilestoneNotificationCommand;
+import org.example.nabat.voting.application.port.out.VoteNotificationPort.VoteNotificationCommand;
+import org.example.nabat.voting.domain.event.VoteCastEvent;
 import org.example.nabat.domain.model.AlertId;
-import org.example.nabat.domain.model.AlertVote;
+import org.example.nabat.voting.domain.model.AlertVote;
 import org.example.nabat.domain.model.UserId;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +25,7 @@ public class AlertVoteService implements VoteAlertUseCase {
 
     private final AlertVoteRepository alertVoteRepository;
     private final AlertRepository alertRepository;
-    private final SendNotificationUseCase sendNotificationUseCase;
+    private final VoteNotificationPort voteNotificationPort;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -65,14 +65,14 @@ public class AlertVoteService implements VoteAlertUseCase {
                 return; // self-vote
             }
             UserId ownerId = UserId.of(alert.reportedBy());
-            sendNotificationUseCase.sendVoteNotification(new VoteNotificationCommand(
+            voteNotificationPort.sendVoteNotification(new VoteNotificationCommand(
                     ownerId, command.userId(), command.alertId(),
                     alert.title(), command.voteType()));
 
             // Milestone notification only on CONFIRM whose new count crosses a threshold.
             if (command.voteType() == VoteType.CONFIRM
                     && NotificationMilestones.isMilestone(newConfirmations)) {
-                sendNotificationUseCase.sendMilestoneNotification(new MilestoneNotificationCommand(
+                voteNotificationPort.sendMilestoneNotification(new MilestoneNotificationCommand(
                         ownerId, command.alertId(), alert.title(), newConfirmations));
             }
         });

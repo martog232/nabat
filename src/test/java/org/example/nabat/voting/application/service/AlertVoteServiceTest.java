@@ -1,20 +1,20 @@
-package org.example.nabat.application.service;
+package org.example.nabat.voting.application.service;
 
-import org.example.nabat.application.port.in.SendNotificationUseCase;
-import org.example.nabat.application.port.in.VoteAlertUseCase.VoteCommand;
-import org.example.nabat.application.port.in.VoteAlertUseCase.VoteStats;
+import org.example.nabat.voting.application.port.in.VoteAlertUseCase.VoteCommand;
+import org.example.nabat.voting.application.port.in.VoteAlertUseCase.VoteStats;
 import org.example.nabat.application.port.out.AlertRepository;
-import org.example.nabat.application.port.out.AlertVoteRepository;
-import org.example.nabat.domain.event.VoteCastEvent;
+import org.example.nabat.voting.application.port.out.AlertVoteRepository;
+import org.example.nabat.voting.application.port.out.VoteNotificationPort;
+import org.example.nabat.voting.domain.event.VoteCastEvent;
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.AlertSeverity;
 import org.example.nabat.domain.model.AlertStatus;
 import org.example.nabat.domain.model.AlertType;
-import org.example.nabat.domain.model.AlertVote;
+import org.example.nabat.voting.domain.model.AlertVote;
 import org.example.nabat.domain.model.Location;
 import org.example.nabat.domain.model.UserId;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,7 +41,7 @@ public class AlertVoteServiceTest {
     private AlertRepository alertRepository;
 
     @Mock
-    private SendNotificationUseCase sendNotificationUseCase;
+    private VoteNotificationPort voteNotificationPort;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -54,7 +54,7 @@ public class AlertVoteServiceTest {
 
     @BeforeEach
     void setUp() {
-        alertVoteService = new AlertVoteService(alertVoteRepository, alertRepository, sendNotificationUseCase, eventPublisher);
+        alertVoteService = new AlertVoteService(alertVoteRepository, alertRepository, voteNotificationPort, eventPublisher);
         testAlertId = new AlertId(UUID.randomUUID());
         testUserId = new UserId(UUID.randomUUID());
         alertOwnerId = UUID.randomUUID();
@@ -99,7 +99,7 @@ public class AlertVoteServiceTest {
 
         verify(alertVoteRepository).save(any(AlertVote.class));
         verify(eventPublisher).publishEvent(any(VoteCastEvent.class));
-        verify(sendNotificationUseCase).sendVoteNotification(any());
+        verify(voteNotificationPort).sendVoteNotification(any());
     }
 
     @Test
@@ -138,7 +138,7 @@ public class AlertVoteServiceTest {
         assertEquals(existingVote, result);
         verify(alertVoteRepository, never()).save(any());
         verifyNoInteractions(eventPublisher);
-        verifyNoInteractions(sendNotificationUseCase);
+        verifyNoInteractions(voteNotificationPort);
     }
 
     @Test
@@ -155,7 +155,7 @@ public class AlertVoteServiceTest {
 
         alertVoteService.vote(command);
 
-        verifyNoInteractions(sendNotificationUseCase);
+        verifyNoInteractions(voteNotificationPort);
     }
 
     @Test
@@ -173,8 +173,8 @@ public class AlertVoteServiceTest {
 
         alertVoteService.vote(command);
 
-        verify(sendNotificationUseCase).sendVoteNotification(any());
-        verify(sendNotificationUseCase).sendMilestoneNotification(any());
+        verify(voteNotificationPort).sendVoteNotification(any());
+        verify(voteNotificationPort).sendMilestoneNotification(any());
     }
 
     @Test
@@ -192,7 +192,7 @@ public class AlertVoteServiceTest {
 
         alertVoteService.vote(command);
 
-        verify(sendNotificationUseCase, never()).sendMilestoneNotification(any());
+        verify(voteNotificationPort, never()).sendMilestoneNotification(any());
     }
 
     @Test

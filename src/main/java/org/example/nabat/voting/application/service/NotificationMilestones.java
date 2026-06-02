@@ -1,4 +1,4 @@
-package org.example.nabat.application.service;
+package org.example.nabat.voting.application.service;
 
 import java.util.Set;
 

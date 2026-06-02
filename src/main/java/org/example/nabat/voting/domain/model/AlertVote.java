@@ -1,4 +1,7 @@
-package org.example.nabat.domain.model;
+package org.example.nabat.voting.domain.model;
+
+import org.example.nabat.domain.model.AlertId;
+import org.example.nabat.domain.model.UserId;
 
 import java.time.Instant;
 

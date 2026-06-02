@@ -22,17 +22,17 @@ A Spring Boot service for crowd-sourced safety alerts: users report incidents ti
 
 ## Architecture
 
-Hexagonal / ports-and-adapters. Package layout under `org.example.nabat`:
+Hexagonal / ports-and-adapters with modulith-oriented module boundaries. Package layout under `org.example.nabat`:
 
 ```text
 src/main/java/org/example/nabat/
 ├── domain/
-│   ├── model/         # records: Alert, AlertVote, User, Location, Notification, value-object IDs, enums
+│   ├── model/         # core records: Alert, User, Location, Notification, value-object IDs, enums
 │   └── exception/
 ├── application/
 │   ├── UseCase.java   # custom @stereotype, picked up by component scan
 │   ├── port/
-│   │   ├── in/        # use-case interfaces (CreateAlert, VoteAlert, AuthN, ...)
+│   │   ├── in/        # use-case interfaces (CreateAlert, AuthN, ...)
 │   │   └── out/       # driven ports (AlertRepository, TokenProvider, AlertNotificationPort, ...)
 │   └── service/       # use-case implementations
 ├── adapter/
@@ -43,6 +43,10 @@ src/main/java/org/example/nabat/
 │   └── out/
 │       ├── persistence/   # JPA entities + adapters implementing out-ports
 │       └── notification/  # WebSocket-backed AlertNotificationPort, log-only NotificationSender
+├── voting/            # dedicated module (ports, adapters, domain/event) for vote workflows
+│   ├── application/
+│   ├── adapter/
+│   └── domain/
 └── config/            # WebSocketConfig, UseCaseConfig
 ```
 

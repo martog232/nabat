@@ -1,5 +1,6 @@
 package org.example.nabat;
 
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -32,6 +33,7 @@ import org.testcontainers.utility.DockerImageName;
  * ({@code disabledWithoutDocker = true}).
  */
 @Testcontainers(disabledWithoutDocker = true)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class PostgresTestSupport {
 
     private static final DockerImageName POSTGIS_IMAGE = DockerImageName
@@ -61,4 +63,3 @@ public abstract class PostgresTestSupport {
         registry.add("management.health.mail.enabled",       () -> "false");
     }
 }
-

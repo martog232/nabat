@@ -7,6 +7,6 @@ import org.example.nabat.PostgresTestSupport;
  *             Kept for backward compatibility; delegates everything to the canonical base.
  */
 @Deprecated(since = "T-43", forRemoval = true)
-abstract class PostgisSpringBootIntegrationTestSupport extends PostgresTestSupport {
+public abstract class PostgisSpringBootIntegrationTestSupport extends PostgresTestSupport {
     // All container setup is inherited from PostgresTestSupport.
 }
