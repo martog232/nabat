@@ -100,7 +100,11 @@ class AlertControllerTest {
                 true,
                 false,
                 now,
-                now
+                now,
+                5,
+                null,
+                null,
+                null
         );
 
         CreateAlertRequest request = new CreateAlertRequest(
@@ -203,7 +207,7 @@ class AlertControllerTest {
         User mockUser = new User(
                 UserId.of(UUID.randomUUID()),
                 "test@example.com", "p", "n",
-                Role.USER, true, false, now, now);
+                Role.USER, true, false, now, now, 5, null, null, null);
         var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                 mockUser, null, java.util.List.of());
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);

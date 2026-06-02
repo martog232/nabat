@@ -12,7 +12,8 @@ public record UserResponse(
     @Schema(description = "E-mail address", example = "alice@example.com") String email,
     @Schema(description = "Display name shown to other users", example = "Alice") String displayName,
     @Schema(description = "Assigned role", example = "USER") Role role,
-    @Schema(description = "Whether the email address has been verified") boolean emailVerified
+    @Schema(description = "Whether the email address has been verified") boolean emailVerified,
+    @Schema(description = "Configured notification radius in kilometres", example = "5") int notificationRadiusKm
 ) {
     public static UserResponse from(User user) {
         return new UserResponse(
@@ -20,7 +21,8 @@ public record UserResponse(
             user.email(),
             user.displayName(),
             user.role(),
-            user.emailVerified()
+            user.emailVerified(),
+            user.notificationRadiusKm()
         );
     }
 }

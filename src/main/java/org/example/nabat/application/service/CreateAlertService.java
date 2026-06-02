@@ -4,12 +4,16 @@ import org.example.nabat.application.UseCase;
 import org.example.nabat.application.port.in.CreateAlertUseCase;
 import org.example.nabat.application.port.out.AlertNotificationPort;
 import org.example.nabat.application.port.out.AlertRepository;
+import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.application.port.out.UserSubscriptionRepository;
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.AlertSeverity;
 import org.example.nabat.domain.model.Location;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @UseCase
@@ -18,15 +22,18 @@ public class CreateAlertService implements CreateAlertUseCase {
     private final AlertRepository alertRepository;
     private final AlertNotificationPort notificationPort;
     private final UserSubscriptionRepository subscriptionRepository;
+    private final UserRepository userRepository;
 
     public CreateAlertService(
         AlertRepository alertRepository,
         AlertNotificationPort notificationPort,
-        UserSubscriptionRepository subscriptionRepository
+        UserSubscriptionRepository subscriptionRepository,
+        UserRepository userRepository
     ) {
         this.alertRepository = alertRepository;
         this.notificationPort = notificationPort;
         this.subscriptionRepository = subscriptionRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -48,8 +55,12 @@ public class CreateAlertService implements CreateAlertUseCase {
         List<UUID> subscribedUsers = subscriptionRepository
             .findUsersSubscribedToAlertType(command.type(), location, getNotificationRadius(command.severity()));
 
-        if (!subscribedUsers.isEmpty()) {
-            notificationPort.broadcastAlert(savedAlert, subscribedUsers);
+        List<UUID> nearbyUsers = userRepository.findUsersNearLocation(location);
+        Set<UUID> allUsers = new HashSet<>(subscribedUsers);
+        allUsers.addAll(nearbyUsers);
+
+        if (!allUsers.isEmpty()) {
+            notificationPort.broadcastAlert(savedAlert, new ArrayList<>(allUsers));
         }
 
         return savedAlert;

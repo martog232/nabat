@@ -82,7 +82,11 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgisIntegrationTestSup
             true,
             true,
             Instant.now(),
-            Instant.now()
+            Instant.now(),
+            5,
+            null,
+            null,
+            null
         );
         userRepository.saveAndFlush(UserJpaEntity.from(user));
         return user.id();
@@ -106,4 +110,3 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgisIntegrationTestSup
         );
     }
 }
-

@@ -40,7 +40,7 @@ class EmailVerificationServiceTest {
 
     private User user(boolean verified) {
         return new User(userId, email, "hash", "Alice", Role.USER, true, verified,
-                Instant.now(), Instant.now());
+                Instant.now(), Instant.now(), 5, null, null, null);
     }
 
     @BeforeEach
@@ -177,4 +177,3 @@ class EmailVerificationServiceTest {
                 () -> service.resetPassword(expired.id(), "pass"));
     }
 }
-

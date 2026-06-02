@@ -28,6 +28,10 @@ class UserJpaMapperTest {
             true,
             false,
             Instant.now(),
+            Instant.now(),
+            10,
+            42.7,
+            23.3,
             Instant.now()
         );
 
@@ -51,13 +55,19 @@ class UserJpaMapperTest {
         entity.setEmailVerified(false);
         entity.setCreatedAt(Instant.now());
         entity.setUpdatedAt(Instant.now());
+        entity.setNotificationRadiusKm(25);
+        entity.setLastKnownLat(42.7);
+        entity.setLastKnownLng(23.3);
+        entity.setLocationUpdatedAt(Instant.now());
 
         User user = mapper.toDomain(entity);
 
         assertNotNull(user);
         assertEquals(id, user.id().value());
         assertEquals(entity.getEmail(), user.email());
+        assertEquals(25, user.notificationRadiusKm());
+        assertEquals(42.7, user.lastKnownLat());
+        assertEquals(23.3, user.lastKnownLng());
     }
 }
-
 

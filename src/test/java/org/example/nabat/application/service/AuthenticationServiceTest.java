@@ -90,7 +90,11 @@ class AuthenticationServiceTest {
             true,
             false,
             Instant.now(),
-            Instant.now()
+            Instant.now(),
+            5,
+            null,
+            null,
+            null
         );
 
         LoginUserUseCase.LoginCommand command = 
@@ -134,7 +138,11 @@ class AuthenticationServiceTest {
             true,
             false,
             Instant.now(),
-            Instant.now()
+            Instant.now(),
+            5,
+            null,
+            null,
+            null
         );
 
         LoginUserUseCase.LoginCommand command = 
@@ -159,7 +167,11 @@ class AuthenticationServiceTest {
             false, // disabled
             false,
             Instant.now(),
-            Instant.now()
+            Instant.now(),
+            5,
+            null,
+            null,
+            null
         );
 
         LoginUserUseCase.LoginCommand command = 
@@ -183,7 +195,11 @@ class AuthenticationServiceTest {
             true,
             false,
             Instant.now(),
-            Instant.now()
+            Instant.now(),
+            5,
+            null,
+            null,
+            null
         );
 
         when(tokenProvider.validateToken(refreshToken)).thenReturn(true);

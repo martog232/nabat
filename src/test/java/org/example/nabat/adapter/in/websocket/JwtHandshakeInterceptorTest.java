@@ -46,7 +46,7 @@ class JwtHandshakeInterceptorTest {
         interceptor = new JwtHandshakeInterceptor(tokenProvider, webSocketTicketService);
         user = new User(
             UserId.of(UUID.randomUUID()), "ws@example.com", "h", "WS User",
-            Role.USER, true, false, Instant.now(), Instant.now()
+            Role.USER, true, false, Instant.now(), Instant.now(), 5, null, null, null
         );
     }
 
@@ -178,7 +178,6 @@ class JwtHandshakeInterceptorTest {
         return new ServletServerHttpRequest(httpReq);
     }
 }
-
 
 
 

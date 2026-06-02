@@ -33,7 +33,11 @@ class JwtTokenProviderTest {
             true,
             false,
             Instant.now(),
-            Instant.now()
+            Instant.now(),
+            5,
+            null,
+            null,
+            null
         );
     }
 
