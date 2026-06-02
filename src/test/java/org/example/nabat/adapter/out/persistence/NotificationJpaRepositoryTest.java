@@ -78,8 +78,10 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
         user.setDisplayName("User");
         user.setRole(Role.USER);
         user.setEnabled(true);
+        user.setEmailVerified(true);
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
+        user.setNotificationRadiusKm(5);
         return userRepository.saveAndFlush(user).getId();
     }
 
@@ -119,4 +121,3 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
         return e;
     }
 }
-

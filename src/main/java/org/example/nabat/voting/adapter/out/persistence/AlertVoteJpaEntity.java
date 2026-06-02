@@ -1,11 +1,11 @@
-package org.example.nabat.adapter.out.persistence;
+package org.example.nabat.voting.adapter.out.persistence;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 
 import java.time.Instant;
 import java.util.UUID;

@@ -1,8 +1,8 @@
-package org.example.nabat.domain.event;
+package org.example.nabat.voting.domain.event;
 
 import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.UserId;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 
 import java.time.Instant;
 

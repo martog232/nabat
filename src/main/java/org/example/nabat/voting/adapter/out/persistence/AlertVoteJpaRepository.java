@@ -1,6 +1,6 @@
-package org.example.nabat.adapter.out.persistence;
+package org.example.nabat.voting.adapter.out.persistence;
 
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

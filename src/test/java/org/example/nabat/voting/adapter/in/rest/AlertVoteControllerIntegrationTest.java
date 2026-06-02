@@ -1,8 +1,14 @@
-package org.example.nabat.adapter.in.rest;
+package org.example.nabat.voting.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.nabat.adapter.in.rest.AlertResponse;
+import org.example.nabat.adapter.in.rest.AuthResponse;
+import org.example.nabat.adapter.in.rest.CreateAlertRequest;
+import org.example.nabat.adapter.in.rest.PostgisSpringBootIntegrationTestSupport;
+import org.example.nabat.adapter.in.rest.RegisterRequest;
 import org.example.nabat.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.application.port.out.EmailSender;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +62,7 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
         mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", alertId)
                 .header("Authorization", "Bearer " + auth.accessToken())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new AlertVoteController.VoteRequest(org.example.nabat.domain.model.VoteType.UPVOTE))))
+                .content(objectMapper.writeValueAsString(new AlertVoteController.VoteRequest(VoteType.UPVOTE))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.alertId").value(alertId.toString()))
             .andExpect(jsonPath("$.voteType").value("UPVOTE"));
@@ -68,7 +74,7 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
         mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", alertId)
                 .header("Authorization", "Bearer " + auth.accessToken())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new AlertVoteController.VoteRequest(org.example.nabat.domain.model.VoteType.DOWNVOTE))))
+                .content(objectMapper.writeValueAsString(new AlertVoteController.VoteRequest(VoteType.DOWNVOTE))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.alertId").value(alertId.toString()))
             .andExpect(jsonPath("$.voteType").value("DOWNVOTE"));
@@ -143,4 +149,3 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
         }
     }
 }
-

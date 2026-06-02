@@ -1,4 +1,4 @@
-package org.example.nabat.domain.model;
+package org.example.nabat.voting.domain.model;
 
 public enum VoteType {
     UPVOTE,    // "this alert is credible"

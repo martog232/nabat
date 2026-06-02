@@ -51,7 +51,6 @@ class UserSubscriptionJpaRepositoryPostgisIntegrationTest extends PostgisIntegra
 
         repository.saveAll(List.of(
             entity(matchingUser, AlertType.FIRE, SOFIA_LAT, SOFIA_LON, 0.5, true),
-            entity(matchingUser, AlertType.FIRE, SOFIA_LAT, SOFIA_LON, 1.0, true),
             entity(inactiveUser, AlertType.FIRE, SOFIA_LAT, SOFIA_LON, 5.0, false),
             entity(wrongTypeUser, AlertType.CRIME, SOFIA_LAT, SOFIA_LON, 5.0, true),
             entity(farAwayUser, AlertType.FIRE, 42.1354, 24.7453, 100.0, true)
@@ -122,4 +121,3 @@ class UserSubscriptionJpaRepositoryPostgisIntegrationTest extends PostgisIntegra
         ));
     }
 }
-

@@ -1,4 +1,4 @@
-package org.example.nabat.domain.model;
+package org.example.nabat.voting.domain.model;
 
 import java.util.UUID;
 

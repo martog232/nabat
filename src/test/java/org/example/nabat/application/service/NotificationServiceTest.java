@@ -8,7 +8,7 @@ import org.example.nabat.domain.model.Notification;
 import org.example.nabat.domain.model.NotificationId;
 import org.example.nabat.domain.model.NotificationType;
 import org.example.nabat.domain.model.UserId;
-import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

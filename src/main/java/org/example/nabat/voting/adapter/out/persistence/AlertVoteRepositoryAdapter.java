@@ -1,8 +1,12 @@
-package org.example.nabat.adapter.out.persistence;
+package org.example.nabat.voting.adapter.out.persistence;
 
 import lombok.RequiredArgsConstructor;
-import org.example.nabat.application.port.out.AlertVoteRepository;
-import org.example.nabat.domain.model.*;
+import org.example.nabat.voting.application.port.out.AlertVoteRepository;
+import org.example.nabat.domain.model.AlertId;
+import org.example.nabat.domain.model.UserId;
+import org.example.nabat.voting.domain.model.AlertVote;
+import org.example.nabat.voting.domain.model.AlertVoteId;
+import org.example.nabat.voting.domain.model.VoteType;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
