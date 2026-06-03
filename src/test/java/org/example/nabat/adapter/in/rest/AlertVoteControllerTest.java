@@ -1,16 +1,14 @@
-package org.example.nabat.voting.adapter.in.rest;
+package org.example.nabat.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.nabat.adapter.in.security.JwtTokenProvider;
-import org.example.nabat.voting.application.port.in.VoteAlertUseCase;
+import org.example.nabat.application.port.in.VoteAlertUseCase;
 import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.domain.model.AlertId;
-import org.example.nabat.voting.domain.model.AlertVote;
-import org.example.nabat.voting.domain.model.AlertVoteId;
 import org.example.nabat.domain.model.Role;
 import org.example.nabat.domain.model.User;
 import org.example.nabat.domain.model.UserId;
-import org.example.nabat.voting.domain.model.VoteType;
+import org.example.nabat.domain.model.VoteType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -87,13 +85,11 @@ class AlertVoteControllerTest {
         User user = buildTestUser();
         authenticateAs(user);
 
-        AlertVote vote = new AlertVote(
-                AlertVoteId.generate(),
+        VoteAlertUseCase.VoteReceipt vote = new VoteAlertUseCase.VoteReceipt(
+                UUID.randomUUID(),
                 AlertId.of(ALERT_ID),
-                UserId.of(USER_ID),
                 VoteType.UPVOTE,
-                Instant.now()
-        );
+                Instant.now());
         when(voteAlertUseCase.vote(any())).thenReturn(vote);
 
         String requestBody = objectMapper.writeValueAsString(
