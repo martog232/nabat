@@ -1,4 +1,4 @@
-package org.example.nabat.voting.adapter.in.rest;
+package org.example.nabat.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.nabat.adapter.in.rest.AlertResponse;
@@ -8,7 +8,10 @@ import org.example.nabat.adapter.in.rest.PostgisSpringBootIntegrationTestSupport
 import org.example.nabat.adapter.in.rest.RegisterRequest;
 import org.example.nabat.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.application.port.out.EmailSender;
-import org.example.nabat.voting.domain.model.VoteType;
+import org.example.nabat.application.port.out.ExternalVotingPort;
+import org.example.nabat.domain.model.AlertId;
+import org.example.nabat.domain.model.UserId;
+import org.example.nabat.domain.model.VoteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,10 +23,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -48,6 +53,9 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
     @MockBean
     private EmailSender emailSender;
 
+    @MockBean
+    private ExternalVotingPort externalVotingPort;
+
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
@@ -57,6 +65,20 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
     void voteStatsSwitchRemoveAndDuplicateRemoveConflict_happyPath() throws Exception {
         AuthResponse auth = register("vote-integration@example.com", "Vote Integration User");
         UUID alertId = createAlert(auth.accessToken());
+        UUID voteId = UUID.randomUUID();
+
+        when(externalVotingPort.vote(any(), any(), any())).thenReturn(new ExternalVotingPort.VoteReceipt(
+                voteId,
+                AlertId.of(alertId),
+                VoteType.UPVOTE,
+                Instant.now()
+        ));
+        when(externalVotingPort.getVoteStats(any())).thenReturn(new ExternalVotingPort.VoteStats(1, 0, 0, 1));
+        when(externalVotingPort.hasUserVoted(any(), any())).thenReturn(true);
+        doNothing()
+                .doThrow(new IllegalStateException("No existing vote to remove."))
+                .when(externalVotingPort)
+                .removeVote(any(AlertId.class), any(UserId.class));
 
         // 1) create vote (UPVOTE)
         mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", alertId)
@@ -67,29 +89,29 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
             .andExpect(jsonPath("$.alertId").value(alertId.toString()))
             .andExpect(jsonPath("$.voteType").value("UPVOTE"));
 
-        // 2) stats after upvote (eventual consistency: projection updated asynchronously)
-        awaitStats(auth.accessToken(), alertId, 1, 0, 0);
+        // 2) stats endpoint still reads from voting service
+        mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/stats", alertId)
+                        .header("Authorization", "Bearer " + auth.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.upvotes").value(1))
+                .andExpect(jsonPath("$.downvotes").value(0))
+                .andExpect(jsonPath("$.confirmations").value(0));
 
-        // 3) switch vote to DOWNVOTE
-        mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", alertId)
-                .header("Authorization", "Bearer " + auth.accessToken())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new AlertVoteController.VoteRequest(VoteType.DOWNVOTE))))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.alertId").value(alertId.toString()))
-            .andExpect(jsonPath("$.voteType").value("DOWNVOTE"));
-
-        awaitStats(auth.accessToken(), alertId, 0, 1, 0);
+        // 3) user vote endpoint still delegates to voting service
+        mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/me", alertId)
+                        .header("Authorization", "Bearer " + auth.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasVoted").value(true));
 
         // 4) remove vote
         mockMvc.perform(delete("/api/v1/alerts/{alertId}/votes", alertId)
                 .header("Authorization", "Bearer " + auth.accessToken()))
             .andExpect(status().isNoContent());
 
-        // 5) duplicate remove -> 409 conflict
+        // 5) duplicate remove still returns conflict
         mockMvc.perform(delete("/api/v1/alerts/{alertId}/votes", alertId)
-                .header("Authorization", "Bearer " + auth.accessToken()))
-            .andExpect(status().isConflict());
+                        .header("Authorization", "Bearer " + auth.accessToken()))
+                .andExpect(status().isConflict());
     }
 
     private AuthResponse register(String email, String displayName) throws Exception {
@@ -124,28 +146,4 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
         return response.id();
     }
 
-    private void awaitStats(String accessToken, UUID alertId, int expectedUpvotes, int expectedDownvotes, int expectedConfirmations)
-            throws Exception {
-        Instant timeoutAt = Instant.now().plus(Duration.ofSeconds(3));
-        AssertionError lastAssertionError = null;
-
-        while (Instant.now().isBefore(timeoutAt)) {
-            try {
-                mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/stats", alertId)
-                                .header("Authorization", "Bearer " + accessToken))
-                        .andExpect(status().isOk())
-                        .andExpect(jsonPath("$.upvotes").value(expectedUpvotes))
-                        .andExpect(jsonPath("$.downvotes").value(expectedDownvotes))
-                        .andExpect(jsonPath("$.confirmations").value(expectedConfirmations));
-                return;
-            } catch (AssertionError ex) {
-                lastAssertionError = ex;
-                Thread.sleep(75);
-            }
-        }
-
-        if (lastAssertionError != null) {
-            throw lastAssertionError;
-        }
-    }
 }

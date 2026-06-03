@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ModulithArchitectureTest {
 
     @Test
-    void detectsVotingModule() {
-        assertThat(ApplicationModules.of(NabatApplication.class).getModuleByName("voting")).isPresent();
+    void doesNotExposeInternalVotingModule() {
+        assertThat(ApplicationModules.of(NabatApplication.class).getModuleByName("voting")).isNotPresent();
     }
 }

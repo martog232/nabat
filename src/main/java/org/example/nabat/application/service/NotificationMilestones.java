@@ -1,4 +1,4 @@
-package org.example.nabat.voting.application.service;
+package org.example.nabat.application.service;
 
 import java.util.Set;
 
@@ -12,4 +12,3 @@ final class NotificationMilestones {
 
     private NotificationMilestones() {}
 }
-

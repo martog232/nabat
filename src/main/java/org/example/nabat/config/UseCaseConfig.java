@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @Configuration
 @EnableTransactionManagement
 @ComponentScan(
-    basePackages = {"org.example.nabat.application.service", "org.example.nabat.voting.application.service"},
+    basePackages = {"org.example.nabat.application.service"},
     includeFilters = @ComponentScan.Filter(type = FilterType.ANNOTATION, classes = UseCase.class)
 )
 public class UseCaseConfig {

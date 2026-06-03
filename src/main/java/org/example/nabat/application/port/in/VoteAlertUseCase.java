@@ -1,13 +1,15 @@
-package org.example.nabat.voting.application.port.in;
+package org.example.nabat.application.port.in;
 
 import org.example.nabat.domain.model.AlertId;
-import org.example.nabat.voting.domain.model.AlertVote;
 import org.example.nabat.domain.model.UserId;
-import org.example.nabat.voting.domain.model.VoteType;
+import org.example.nabat.domain.model.VoteType;
+
+import java.time.Instant;
+import java.util.UUID;
 
 public interface VoteAlertUseCase {
 
-    AlertVote vote(VoteCommand command);
+    VoteReceipt vote(VoteCommand command);
 
     void removeVote(AlertId alertId, UserId userId);
 
@@ -19,6 +21,14 @@ public interface VoteAlertUseCase {
             AlertId alertId,
             UserId userId,
             VoteType voteType
+    ) {
+    }
+
+    record VoteReceipt(
+            UUID id,
+            AlertId alertId,
+            VoteType voteType,
+            Instant createdAt
     ) {
     }
 

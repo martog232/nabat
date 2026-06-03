@@ -1,15 +1,13 @@
-package org.example.nabat.voting.adapter.in.rest;
+package org.example.nabat.adapter.in.rest;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import lombok.RequiredArgsConstructor;
-import org.example.nabat.voting.application.port.in.VoteAlertUseCase;
-import org.example.nabat.voting.application.port.in.VoteAlertUseCase.VoteCommand;
 import org.example.nabat.domain.model.AlertId;
-import org.example.nabat.voting.domain.model.AlertVote;
 import org.example.nabat.domain.model.User;
-import org.example.nabat.voting.domain.model.VoteType;
+import org.example.nabat.domain.model.VoteType;
+import org.example.nabat.application.port.in.VoteAlertUseCase;
+import org.example.nabat.application.port.in.VoteAlertUseCase.VoteCommand;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,11 +16,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequiredArgsConstructor
 @RequestMapping("/api/v1/alerts/{alertId}/votes")
 public class AlertVoteController {
 
     private final VoteAlertUseCase voteAlertUseCase;
+
+    public AlertVoteController(VoteAlertUseCase voteAlertUseCase) {
+        this.voteAlertUseCase = voteAlertUseCase;
+    }
 
     @PostMapping
     public ResponseEntity<VoteResponse> vote(
@@ -36,7 +37,7 @@ public class AlertVoteController {
                 request.voteType()
         );
 
-        AlertVote vote = voteAlertUseCase.vote(command);
+        VoteAlertUseCase.VoteReceipt vote = voteAlertUseCase.vote(command);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -89,9 +90,9 @@ public class AlertVoteController {
             @Schema(description = "ID of the alert that was voted on") UUID alertId,
             @Schema(description = "Type of vote") VoteType voteType,
             @Schema(description = "ISO-8601 timestamp when the vote was cast") String createdAt) {
-        public static VoteResponse from(AlertVote vote) {
+        public static VoteResponse from(VoteAlertUseCase.VoteReceipt vote) {
             return new VoteResponse(
-                    vote.id().value(),
+                    vote.id(),
                     vote.alertId().value(),
                     vote.voteType(),
                     vote.createdAt().toString()
