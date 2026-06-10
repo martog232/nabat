@@ -3,6 +3,7 @@ package org.example.nabat.adapter.in.websocket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import org.example.nabat.adapter.out.notification.RedisWsPublisher;
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.AlertSeverity;
@@ -39,12 +40,14 @@ import static org.mockito.Mockito.when;
 class AlertWebSocketHandlerTest {
 
     private ObjectMapper objectMapper;
+    private RedisWsPublisher redisWsPublisher;
     private AlertWebSocketHandler handler;
 
     @BeforeEach
     void setUp() {
         objectMapper = JsonMapper.builder().findAndAddModules().build();
-        handler = new AlertWebSocketHandler(objectMapper);
+        redisWsPublisher = mock(RedisWsPublisher.class);
+        handler = new AlertWebSocketHandler(objectMapper, redisWsPublisher);
     }
 
     @Test

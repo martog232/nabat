@@ -1,6 +1,8 @@
 package org.example.nabat.adapter.in.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.nabat.adapter.in.rest.AlertResponse;
+import org.example.nabat.adapter.out.notification.RedisWsPublisher;
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.Notification;
 import org.slf4j.Logger;
@@ -23,9 +25,11 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
 
     private final Map<UUID, WebSocketSession> userSessions = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
+    private final RedisWsPublisher redisWsPublisher;
 
-    public AlertWebSocketHandler(ObjectMapper objectMapper) {
+    public AlertWebSocketHandler(ObjectMapper objectMapper, RedisWsPublisher redisWsPublisher) {
         this.objectMapper = objectMapper;
+        this.redisWsPublisher = redisWsPublisher;
     }
 
     @Override
@@ -45,16 +49,30 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
     }
 
     public void sendAlertToUser(UUID userId, Alert alert) {
+        AlertResponse alertResponse = AlertResponse.from(alert);
+        if (!deliverLocally(userId, "NEW_ALERT", alertResponse)) {
+            redisWsPublisher.publish(userId, "NEW_ALERT", alertResponse);
+        }
+    }
+
+    /**
+     * Delivers a message to the user's local WebSocket session.
+     * Returns true if the user was connected to this instance and the message was sent.
+     */
+    public boolean deliverLocally(UUID userId, String type, Object payload) {
         WebSocketSession session = userSessions.get(userId);
-        if (session != null && session.isOpen()) {
-            try {
-                String payload = objectMapper.writeValueAsString(
-                    new AlertNotification("NEW_ALERT", alert)
-                );
-                session.sendMessage(new TextMessage(payload));
-            } catch (IOException e) {
-                log.warn("Failed to deliver alert {} to user {}: {}", alert.id(), userId, e.getMessage());
-            }
+        if (session == null || !session.isOpen()) {
+            return false;
+        }
+        try {
+            String json = objectMapper.writeValueAsString(
+                new AlertResponseWrapper(type, payload)
+            );
+            session.sendMessage(new TextMessage(json));
+            return true;
+        } catch (IOException e) {
+            log.warn("Failed to deliver {} to user {}: {}", type, userId, e.getMessage());
+            return false;
         }
     }
 
@@ -82,7 +100,6 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
     }
 
     private UUID extractUserId(WebSocketSession session) {
-        // Populated by JwtHandshakeInterceptor after JWT validation.
         Object attr = session.getAttributes().get(JwtHandshakeInterceptor.USER_ID_ATTR);
         if (attr instanceof UUID uuid) {
             return uuid;
@@ -90,6 +107,4 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
         log.warn("WebSocket session {} has no authenticated userId attribute", session.getId());
         return null;
     }
-
-    private record AlertNotification(String type, Alert alert) {}
 }

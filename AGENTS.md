@@ -115,9 +115,9 @@ docker compose up --build                    # full stack on :8080
 
 | Area | Status | Notes |
 |------|--------|-------|
-| `POST /api/v1/alerts` trusts `reportedBy` from body | ❌ Bug | Must read from JWT principal — security vulnerability |
-| `PATCH /api/v1/alerts/{id}/resolve` endpoint | ❌ Missing | `Alert.resolve()` and `AlertStatus.RESOLVED` exist; no controller calls them |
-| `Role.ADMIN` enforcement | ❌ Missing | Seeded in DB; no `@PreAuthorize` guards exist anywhere |
+| `POST /api/v1/alerts` trusts `reportedBy` from body | ✅ Fixed | Reads from JWT principal (`currentUser.id().value()`) — see `AlertController.java:51` |
+| `PATCH /api/v1/alerts/{id}/resolve` endpoint | ✅ Done | Implemented in `AlertController.java:89` |
+| `Role.ADMIN` enforcement | 🟡 Partial | `@PreAuthorize("hasRole('ADMIN')")` exists on `GET /api/v1/alerts` — not yet on other admin-only endpoints |
 | `NotificationService` tests | ❌ Missing | Untested — use Mockito service test pattern |
 | `AlertWebSocketHandler` tests | ❌ Missing | Untested |
 | `GlobalExceptionHandler` tests | ❌ Missing | Untested |
