@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.nabat.application.UseCase;
 import org.example.nabat.application.port.in.SendNotificationUseCase;
 import org.example.nabat.application.port.in.VoteAlertUseCase;
+import org.example.nabat.application.port.out.AlertNotificationPort;
 import org.example.nabat.application.port.out.AlertRepository;
 import org.example.nabat.application.port.out.ExternalVotingPort;
 import org.example.nabat.domain.model.AlertId;
@@ -18,6 +19,7 @@ public class ExternalVoteService implements VoteAlertUseCase {
     private final ExternalVotingPort externalVotingPort;
     private final AlertRepository alertRepository;
     private final SendNotificationUseCase sendNotificationUseCase;
+    private final AlertNotificationPort alertNotificationPort;
 
     @Override
     @Transactional
@@ -30,6 +32,7 @@ public class ExternalVoteService implements VoteAlertUseCase {
 
         VoteStats stats = syncProjection(command.alertId());
         notifyAlertOwner(command, stats.confirmations());
+        broadcastIfPresent(command.alertId());
 
         return new VoteReceipt(
                 externalReceipt.id(),
@@ -44,6 +47,7 @@ public class ExternalVoteService implements VoteAlertUseCase {
     public void removeVote(AlertId alertId, UserId userId) {
         externalVotingPort.removeVote(alertId, userId);
         syncProjection(alertId);
+        broadcastIfPresent(alertId);
     }
 
     @Override
@@ -69,6 +73,10 @@ public class ExternalVoteService implements VoteAlertUseCase {
                 stats.credibilityScore()
         );
         return stats;
+    }
+
+    private void broadcastIfPresent(AlertId alertId) {
+        alertRepository.findById(alertId).ifPresent(alertNotificationPort::broadcastAlertUpdate);
     }
 
     private void notifyAlertOwner(VoteCommand command, int confirmations) {

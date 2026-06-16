@@ -35,6 +35,9 @@ RUN apk add --no-cache wget
 RUN addgroup -S spring && adduser -S spring -G spring \
   && chown -R spring:spring /app
 
+# Create uploads directory for photo storage
+RUN mkdir -p /app/uploads && chown -R spring:spring /app/uploads
+
 USER spring:spring
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \

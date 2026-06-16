@@ -2,6 +2,7 @@ package org.example.nabat.application.service;
 
 import org.example.nabat.application.port.in.SendNotificationUseCase;
 import org.example.nabat.application.port.in.VoteAlertUseCase;
+import org.example.nabat.application.port.out.AlertNotificationPort;
 import org.example.nabat.application.port.out.AlertRepository;
 import org.example.nabat.application.port.out.ExternalVotingPort;
 import org.example.nabat.domain.model.Alert;
@@ -37,6 +38,8 @@ class ExternalVoteServiceTest {
     private AlertRepository alertRepository;
     @Mock
     private SendNotificationUseCase sendNotificationUseCase;
+    @Mock
+    private AlertNotificationPort alertNotificationPort;
 
     private ExternalVoteService service;
     private AlertId alertId;
@@ -45,7 +48,7 @@ class ExternalVoteServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ExternalVoteService(externalVotingPort, alertRepository, sendNotificationUseCase);
+        service = new ExternalVoteService(externalVotingPort, alertRepository, sendNotificationUseCase, alertNotificationPort);
         alertId = AlertId.generate();
         voterId = UserId.generate();
         ownerId = UserId.generate();
@@ -96,6 +99,7 @@ class ExternalVoteServiceTest {
                 0,
                 0,
                 0,
+                null,
                 null
         );
     }

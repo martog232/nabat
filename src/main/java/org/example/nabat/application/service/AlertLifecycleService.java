@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.nabat.application.UseCase;
 import org.example.nabat.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.application.port.in.ResolveAlertUseCase;
+import org.example.nabat.application.port.out.AlertNotificationPort;
 import org.example.nabat.application.port.out.AlertRepository;
 import org.example.nabat.domain.exception.AlertNotFoundException;
 import org.example.nabat.domain.model.Alert;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AlertLifecycleService implements GetAlertByIdUseCase, ResolveAlertUseCase {
 
     private final AlertRepository alertRepository;
+    private final AlertNotificationPort alertNotificationPort;
 
     @Override
     @Transactional(readOnly = true)
@@ -38,7 +40,9 @@ public class AlertLifecycleService implements GetAlertByIdUseCase, ResolveAlertU
             throw new AccessDeniedException("Only the reporter or an admin can resolve this alert");
         }
 
-        return alertRepository.save(alert.resolve());
+        Alert resolved = alertRepository.save(alert.resolve());
+        alertNotificationPort.broadcastAlertUpdate(resolved);
+        return resolved;
     }
 }
 

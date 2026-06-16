@@ -10,12 +10,14 @@ Layers under `src/main/java/org/example/nabat/`:
 
 - `domain/model` — pure Java **records** + value-object IDs (`AlertId`, `UserId`, …) and enums. No Spring/JPA/Lombok annotations here. Domain logic lives on records (e.g. `Alert.create(...)`, `Alert.resolve()`).
 - `application/port/in` — use-case interfaces (one method, plus a nested `Command` record when needed, e.g. `CreateAlertUseCase.CreateAlertCommand`).
-- `application/port/out` — driven ports (`AlertRepository`, `AlertVoteRepository`, `UserSubscriptionRepository`, `AlertNotificationPort`, `TokenProvider`, …). Implemented in `adapter/out/**`.
+- `application/port/out` — driven ports (`AlertRepository`, `AlertNotificationPort`, `FileStoragePort`, `TokenProvider`, …). Implemented in `adapter/out/**`.
 - `application/service` — use-case implementations. **Always annotate with `@UseCase`** (custom stereotype in `application/UseCase.java`). Don't use `@Service` and don't register them in `@Configuration` classes; `@UseCase` is itself a `@Component`.
 - `adapter/in/rest` — `@RestController` + request/response DTO records under the same package; cross-cutting errors handled by `GlobalExceptionHandler`.
 - `adapter/in/security` — `SecurityConfig`, `JwtAuthenticationFilter`, `JwtTokenProvider`, `LoginAttemptTracker`.
 - `adapter/in/websocket` — `AlertWebSocketHandler` + `JwtHandshakeInterceptor`. Browser clients **must** first call `POST /api/v1/ws/tickets` (authenticated REST) to obtain a short-lived one-time ticket, then open `ws://.../ws/alerts?ticket=<ticket>`. Non-browser clients may send `Authorization: Bearer <accessToken>` on the HTTP upgrade instead. The `JwtHandshakeInterceptor` handles both paths and stores the resolved `UUID` under `JwtHandshakeInterceptor.USER_ID_ATTR` in the session attributes. **Never trust `?userId=` from the client.**
 - `adapter/out/persistence` — `*JpaEntity` (Lombok `@Getter/@Setter`, protected no-arg ctor) + `*JpaRepository` (Spring Data) + `*RepositoryAdapter` (`@Component` implementing the out-port). Migrations in `src/main/resources/db/migration/`.
+- `adapter/out/notification` — `RedisWsPublisher` + `RedisWsSubscriber` for cross-instance WebSocket delivery via Redis pub/sub. Messages use sentinel userId `"*"` for broadcasts.
+- `adapter/out/storage` — `FileSystemStorageAdapter` implements `FileStoragePort` for local filesystem photo storage.
 
 Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=validate` — never let Hibernate auto-create or update the schema.
 
@@ -33,25 +35,40 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `V4__postgis_spatial_indexes.sql` enables the `postgis` extension and adds a `GEOGRAPHY(Point, 4326)` column + GiST index on `alerts`. Nearby-alert queries use `ST_DWithin` instead of Haversine.
 - Tests that exercise spatial queries use **Testcontainers** with a PostGIS image (`@DataJpaTest`). Docker is required for those tests.
 
-### Credibility projection (CQRS light)
-- `AlertVoteService` publishes a `VoteCastEvent` (Spring `ApplicationEventPublisher`) after each vote is persisted.
-- `VoteCastProjectionUpdater` listens with `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async`. It re-counts votes and calls `AlertRepository.updateVoteCounts(alertId, upvotes, downvotes, confirmations, credibilityScore)`.
-- `V5__alert_credibility_projection.sql` adds the four denormalised columns (`upvote_count`, `downvote_count`, `confirmation_count`, `credibility_score`) to the `alerts` table.
-- Formula: `credibilityScore = upvotes - downvotes + (confirmations × 2)`. Same logic lives on `Alert.getCredibilityScore()` for in-memory use.
+### Voting via Kafka microservice (`application/service/ExternalVoteService.java`)
+- `ExternalVoteService` delegates to `ExternalVotingPort` (HTTP bridge to the `nabat-voting` Kafka-backed microservice).
+- After each vote/removeVote, `syncProjection()` updates denormalised vote counts in `alerts` table.
+- After sync, `broadcastIfPresent()` sends an `ALERT_UPDATED` WebSocket frame to all connected users.
+- Same pattern in `AlertLifecycleService.resolve()` — broadcasts `ALERT_UPDATED` after resolve.
 
 ### Alert state machine (`domain/model`)
 - `AlertStatus` enum: `ACTIVE`, `RESOLVED`.
 - `Alert.resolve()` throws `IllegalStateException` ("Alert is already resolved") if already resolved. It is the **only** way to transition status — do not set status directly in the persistence adapter.
-- `V1__initial_schema.sql` stores status as a VARCHAR with a CHECK constraint.
 
 ### Notification system (`application/service`)
 - `NotificationService` — creates and persists `Notification` records; delivers them in real time via `AlertWebSocketHandler.sendNotificationToUser(...)` if the user is online, or marks them for later retrieval if offline.
 - `NotificationMilestones` — defines the credibility-score thresholds that trigger milestone notifications (e.g. first confirmation, viral alert).
-- `AlertVoteService` calls `NotificationService.sendVoteNotification` and `sendMilestoneNotification` after each vote.
+- `ExternalVoteService` calls `SendNotificationUseCase.sendVoteNotification` and `sendMilestoneNotification` after each vote.
 
 ### Subscription fan-out (`application/service`)
 - `SubscriptionService` — manages `UserSubscription` records (user ↔ alert-type pairs).
 - `CreateAlertService` calls `UserSubscriptionRepository.findUsersSubscribedToAlertType(type)` and fans out WebSocket pushes to all matching online users via `AlertWebSocketHandler.sendAlertToUser(...)`.
+
+### Real-time alert updates (WebSocket broadcast)
+- `AlertWebSocketHandler` sends three frame types:
+  - `NEW_ALERT` — per-user fan-out after create (via `sendAlertToUser`)
+  - `ALERT_UPDATED` — broadcast to all connected users after vote or resolve (via `broadcastAlertUpdate`)
+  - `NOTIFICATION` — per-user notification delivery (via `sendNotificationToUser`)
+- Cross-instance delivery via `RedisWsPublisher`/`RedisWsSubscriber`:
+  - Per-user messages use the user's UUID as the Redis message key.
+  - Broadcasts (`ALERT_UPDATED`) use sentinel userId `"*"`; subscriber calls `deliverToAll()` on every instance.
+
+### Photo upload (two-step)
+- `POST /api/v1/uploads` accepts `multipart/form-data`, returns `{ "url": "/api/v1/uploads/<uuid>.<ext>" }`.
+- `GET /api/v1/uploads/{filename}` serves the stored file.
+- `FileStoragePort` / `FileSystemStorageAdapter` saves to `nabat.storage.upload-dir` (default `./uploads`).
+- `CreateAlertRequest` / `CreateAlertCommand` / `Alert` include optional `photoUrl` field.
+- `V8__add_photo_url_to_alerts.sql` adds `photo_url VARCHAR(500)` to the `alerts` table.
 
 ---
 
@@ -62,9 +79,9 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - **REST DTOs** are records co-located with controllers. Validate with `jakarta.validation`; `MethodArgumentNotValidException` maps to `{status, message, errors, timestamp}`.
 - **Exceptions → HTTP**: `IllegalArgumentException` → 400, `IllegalStateException` → 409, `*NotFoundException` → 404, `BadCredentialsException` → 401, `AccessDeniedException` → 403. **Message is sent to the client.** Never throw Spring Security exceptions from domain or application layers.
 - All HTTP routes are under `/api/v1`. `/api/v1/auth/**` is open; all other routes require `Authorization: Bearer <accessToken>`. JWT filter sets authorities as `ROLE_<role>`.
-- **`POST /api/v1/alerts`** must extract `reportedBy` from the JWT principal (the `sub` claim), **not** from the request body. The request body field `reportedBy` should be removed or ignored.
-- **`PATCH /api/v1/users/me/preferences`** updates the authenticated user's `notificationRadiusKm` and optionally refreshes `lastKnownLat`/`lastKnownLng`. If either coordinate is omitted, the stored location remains unchanged.
-- Config is env-var driven; **no Spring profiles**. Defaults in `application.properties`. `JWT_SECRET` ≥ 32 chars and must not contain `change-me-before-production`.
+- **`POST /api/v1/alerts`** must extract `reportedBy` from the JWT principal (the `sub` claim), **not** from the request body.
+- **`PATCH /api/v1/users/me/preferences`** updates the authenticated user's `notificationRadiusKm` and optionally refreshes `lastKnownLat`/`lastKnownLng`.
+- Config is env-var driven; **no Spring profiles**. Defaults in `application.properties`. `JWT_SECRET` ≥ 32 chars.
 - CORS origins: `nabat.cors.allowed-origins` (comma-separated).
 
 ---
@@ -77,10 +94,10 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V2 | Seed data |
 | V3 | Email verification (verification_tokens table) |
 | V4 | PostGIS extension + geography column + GiST index on alerts |
-| V5 | Credibility projection columns on alerts (upvote_count, downvote_count, confirmation_count, credibility_score) |
+| V5 | Credibility projection columns on alerts |
 | V6 | User notification radius + last-known location columns on users |
-
-Next migration must be **V7**.
+| V7 | Remove internal votes table (migrated to voting microservice) |
+| V8 | Add photo_url column to alerts |
 
 ---
 
@@ -115,11 +132,9 @@ docker compose up --build                    # full stack on :8080
 
 | Area | Status | Notes |
 |------|--------|-------|
-| `POST /api/v1/alerts` trusts `reportedBy` from body | ✅ Fixed | Reads from JWT principal (`currentUser.id().value()`) — see `AlertController.java:51` |
-| `PATCH /api/v1/alerts/{id}/resolve` endpoint | ✅ Done | Implemented in `AlertController.java:89` |
 | `Role.ADMIN` enforcement | 🟡 Partial | `@PreAuthorize("hasRole('ADMIN')")` exists on `GET /api/v1/alerts` — not yet on other admin-only endpoints |
 | `NotificationService` tests | ❌ Missing | Untested — use Mockito service test pattern |
 | `AlertWebSocketHandler` tests | ❌ Missing | Untested |
 | `GlobalExceptionHandler` tests | ❌ Missing | Untested |
-| `GetNotificationUseCase` wiring | ❌ Missing | Interface exists; no REST controller exposes it |
-| Optimistic UI vote endpoint | 🔜 Next | Backend votes API exists (`POST /api/v1/alerts/{id}/votes`); FE needs rollback support |
+| Notification REST API | ✅ Done | `NotificationController` exposes all 5 `GetNotificationUseCase` methods (list, unread, count, mark-read, mark-all) |
+| Photo upload storage (multi-instance) | 🟡 Local FS only | `FileSystemStorageAdapter` uses local disk; needs S3/MinIO adapter for multi-instance production |

@@ -24,7 +24,8 @@ public record AlertResponse(
     @Schema(description = "Number of upvotes") int upvoteCount,
     @Schema(description = "Number of downvotes") int downvoteCount,
     @Schema(description = "Number of confirmations") int confirmationCount,
-    @Schema(description = "Timestamp when the alert was resolved; null if still active") Instant resolvedAt
+    @Schema(description = "Timestamp when the alert was resolved; null if still active") Instant resolvedAt,
+    @Schema(description = "URL of the uploaded photo, if any") String photoUrl
 ) {
     public static AlertResponse from(Alert alert) {
         return new AlertResponse(
@@ -41,7 +42,8 @@ public record AlertResponse(
             alert.upvoteCount(),
             alert.downvoteCount(),
             alert.confirmationCount(),
-            alert.resolvedAt()
+            alert.resolvedAt(),
+            alert.photoUrl()
         );
     }
 }

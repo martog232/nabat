@@ -1,5 +1,6 @@
 package org.example.nabat.application.service;
 
+import org.example.nabat.application.port.out.AlertNotificationPort;
 import org.example.nabat.application.port.out.AlertRepository;
 import org.example.nabat.domain.exception.AlertNotFoundException;
 import org.example.nabat.domain.model.Alert;
@@ -31,6 +32,8 @@ class AlertLifecycleServiceTest {
 
     @Mock
     private AlertRepository alertRepository;
+    @Mock
+    private AlertNotificationPort alertNotificationPort;
 
     private AlertLifecycleService service;
 
@@ -39,13 +42,13 @@ class AlertLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AlertLifecycleService(alertRepository);
+        service = new AlertLifecycleService(alertRepository, alertNotificationPort);
     }
 
     private Alert active() {
         return new Alert(alertId, "T", "D", AlertType.FIRE, AlertSeverity.HIGH,
                 Location.of(0, 0), Instant.now(), AlertStatus.ACTIVE,
-                ownerId, 0, 0, 0, null);
+                ownerId, 0, 0, 0, null, null);
     }
 
     private User user(UUID id, Role role) {
@@ -91,7 +94,7 @@ class AlertLifecycleServiceTest {
     void resolve_alreadyResolved_throwsIllegalState() {
         Alert resolved = new Alert(alertId, "T", "D", AlertType.FIRE, AlertSeverity.HIGH,
                 Location.of(0, 0), Instant.now(), AlertStatus.RESOLVED,
-                ownerId, 0, 0, 0, Instant.now());
+                ownerId, 0, 0, 0, Instant.now(), null);
         when(alertRepository.findById(alertId)).thenReturn(Optional.of(resolved));
 
         assertThrows(IllegalStateException.class,

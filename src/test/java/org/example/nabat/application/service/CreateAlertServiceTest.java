@@ -68,6 +68,7 @@ class CreateAlertServiceTest {
                 AlertStatus.ACTIVE,
                 UUID.randomUUID(),
                 0, 0, 0,
+                null,
                 null
         );
     }
@@ -76,7 +77,7 @@ class CreateAlertServiceTest {
     void shouldCreateAlertAndSaveToRepository() {
         UUID reportedBy = UUID.randomUUID();
         CreateAlertCommand command = new CreateAlertCommand(
-                "Test Alert", "Description", AlertType.FIRE, AlertSeverity.HIGH, 42.0, 23.0, reportedBy
+                "Test Alert", "Description", AlertType.FIRE, AlertSeverity.HIGH, 42.0, 23.0, reportedBy, null
         );
 
         Alert savedAlert = buildAlert(AlertSeverity.HIGH);
@@ -95,7 +96,7 @@ class CreateAlertServiceTest {
     void shouldBroadcastNotificationToSubscribedUsers() {
         UUID reportedBy = UUID.randomUUID();
         CreateAlertCommand command = new CreateAlertCommand(
-                "Test Alert", "Description", AlertType.CRIME, AlertSeverity.MEDIUM, 42.0, 23.0, reportedBy
+                "Test Alert", "Description", AlertType.CRIME, AlertSeverity.MEDIUM, 42.0, 23.0, reportedBy, null
         );
 
         Alert savedAlert = buildAlert(AlertSeverity.MEDIUM);
@@ -117,7 +118,7 @@ class CreateAlertServiceTest {
     void shouldNotBroadcastWhenNoUsersSubscribed() {
         UUID reportedBy = UUID.randomUUID();
         CreateAlertCommand command = new CreateAlertCommand(
-                "Test Alert", "Description", AlertType.ACCIDENT, AlertSeverity.LOW, 42.0, 23.0, reportedBy
+                "Test Alert", "Description", AlertType.ACCIDENT, AlertSeverity.LOW, 42.0, 23.0, reportedBy, null
         );
 
         Alert savedAlert = buildAlert(AlertSeverity.LOW);
@@ -135,7 +136,7 @@ class CreateAlertServiceTest {
     void shouldUseCriticalRadiusOf10Km() {
         UUID reportedBy = UUID.randomUUID();
         CreateAlertCommand command = new CreateAlertCommand(
-                "Critical Alert", "Description", AlertType.FIRE, AlertSeverity.CRITICAL, 42.0, 23.0, reportedBy
+                "Critical Alert", "Description", AlertType.FIRE, AlertSeverity.CRITICAL, 42.0, 23.0, reportedBy, null
         );
 
         Alert savedAlert = buildAlert(AlertSeverity.CRITICAL);
@@ -155,7 +156,7 @@ class CreateAlertServiceTest {
     void shouldUseHighRadiusOf5Km() {
         UUID reportedBy = UUID.randomUUID();
         CreateAlertCommand command = new CreateAlertCommand(
-                "High Alert", "Description", AlertType.CRIME, AlertSeverity.HIGH, 42.0, 23.0, reportedBy
+                "High Alert", "Description", AlertType.CRIME, AlertSeverity.HIGH, 42.0, 23.0, reportedBy, null
         );
 
         Alert savedAlert = buildAlert(AlertSeverity.HIGH);
@@ -175,7 +176,7 @@ class CreateAlertServiceTest {
     void shouldUseMediumRadiusOf2Km() {
         UUID reportedBy = UUID.randomUUID();
         CreateAlertCommand command = new CreateAlertCommand(
-                "Medium Alert", "Description", AlertType.ACCIDENT, AlertSeverity.MEDIUM, 42.0, 23.0, reportedBy
+                "Medium Alert", "Description", AlertType.ACCIDENT, AlertSeverity.MEDIUM, 42.0, 23.0, reportedBy, null
         );
 
         Alert savedAlert = buildAlert(AlertSeverity.MEDIUM);
@@ -195,7 +196,7 @@ class CreateAlertServiceTest {
     void shouldUseLowRadiusOf1Km() {
         UUID reportedBy = UUID.randomUUID();
         CreateAlertCommand command = new CreateAlertCommand(
-                "Low Alert", "Description", AlertType.MISSING_PERSON, AlertSeverity.LOW, 42.0, 23.0, reportedBy
+                "Low Alert", "Description", AlertType.MISSING_PERSON, AlertSeverity.LOW, 42.0, 23.0, reportedBy, null
         );
 
         Alert savedAlert = buildAlert(AlertSeverity.LOW);
@@ -215,7 +216,7 @@ class CreateAlertServiceTest {
     void shouldBroadcastDeduplicatedUsersFromSubscriptionsAndLocation() {
         UUID reportedBy = UUID.randomUUID();
         CreateAlertCommand command = new CreateAlertCommand(
-                "Test Alert", "Description", AlertType.FIRE, AlertSeverity.HIGH, 42.0, 23.0, reportedBy
+                "Test Alert", "Description", AlertType.FIRE, AlertSeverity.HIGH, 42.0, 23.0, reportedBy, null
         );
 
         Alert savedAlert = buildAlert(AlertSeverity.HIGH);

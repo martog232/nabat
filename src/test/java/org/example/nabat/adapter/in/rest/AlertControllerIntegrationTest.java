@@ -83,7 +83,8 @@ class AlertControllerIntegrationTest extends PostgisSpringBootIntegrationTestSup
                 AlertType.FIRE,
                 AlertSeverity.HIGH,
                 42.695,
-                23.329
+                23.329,
+                null
         );
 
         MvcResult result = mockMvc.perform(post("/api/v1/alerts")
@@ -115,7 +116,8 @@ class AlertControllerIntegrationTest extends PostgisSpringBootIntegrationTestSup
                 AlertType.CRIME,
                 AlertSeverity.MEDIUM,
                 42.695,
-                23.329
+                23.329,
+                null
         );
 
         mockMvc.perform(post("/api/v1/alerts")
@@ -142,7 +144,8 @@ class AlertControllerIntegrationTest extends PostgisSpringBootIntegrationTestSup
                 AlertType.FIRE,
                 AlertSeverity.LOW,
                 42.0,
-                23.0
+                23.0,
+                null
         );
 
         mockMvc.perform(post("/api/v1/alerts")
@@ -187,7 +190,8 @@ class AlertControllerIntegrationTest extends PostgisSpringBootIntegrationTestSup
                 AlertType.OTHER,
                 AlertSeverity.LOW,
                 40.0,
-                20.0
+                20.0,
+                null
         );
 
         MvcResult alertResult = mockMvc.perform(post("/api/v1/alerts")

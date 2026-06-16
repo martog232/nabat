@@ -62,6 +62,9 @@ public class AlertJpaEntity {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
+    @Column(name = "photo_url", length = 500)
+    private String photoUrl;
+
     // JPA requires default constructor
     protected AlertJpaEntity() {
     }
@@ -83,6 +86,7 @@ public class AlertJpaEntity {
         entity.confirmationCount = alert.confirmationCount();
         entity.credibilityScore = alert.getCredibilityScore();
         entity.resolvedAt = alert.resolvedAt();
+        entity.photoUrl = alert.photoUrl();
         return entity;
     }
 
@@ -100,7 +104,8 @@ public class AlertJpaEntity {
                 upvoteCount,
                 downvoteCount,
                 confirmationCount,
-                resolvedAt
+                resolvedAt,
+                photoUrl
         );
     }
 }

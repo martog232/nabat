@@ -35,5 +35,17 @@ public class RedisWsPublisher {
         }
     }
 
+    /** Publishes a message to be broadcast to all connected users on every instance. */
+    public void publishBroadcast(String type, Object payload) {
+        try {
+            String message = objectMapper.writeValueAsString(
+                new RedisWsMessage("*", type, payload)
+            );
+            redisTemplate.convertAndSend(CHANNEL, message);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize broadcast message: {}", e.getMessage());
+        }
+    }
+
     public record RedisWsMessage(String userId, String type, Object alert) {}
 }

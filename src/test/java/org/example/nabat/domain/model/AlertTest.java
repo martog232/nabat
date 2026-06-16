@@ -19,7 +19,8 @@ class AlertTest {
                 AlertType.FIRE,
                 AlertSeverity.HIGH,
                 Location.of(42.0, 23.0),
-                reportedBy
+                reportedBy,
+                null
         );
 
         assertNotNull(alert.id());
@@ -40,7 +41,8 @@ class AlertTest {
                 AlertType.FIRE,
                 AlertSeverity.CRITICAL,
                 location,
-                reportedBy
+                reportedBy,
+                null
         );
 
         assertEquals("London Fire", alert.title());
@@ -59,7 +61,8 @@ class AlertTest {
                 AlertType.CRIME,
                 AlertSeverity.LOW,
                 Location.of(42.0, 23.0),
-                UUID.randomUUID()
+                UUID.randomUUID(),
+                null
         );
 
         assertEquals(0, alert.upvoteCount());
@@ -69,8 +72,8 @@ class AlertTest {
 
     @Test
     void shouldGenerateUniqueIds() {
-        Alert alert1 = Alert.create("A1", "D1", AlertType.FIRE, AlertSeverity.HIGH, Location.of(42.0, 23.0), UUID.randomUUID());
-        Alert alert2 = Alert.create("A2", "D2", AlertType.CRIME, AlertSeverity.LOW, Location.of(42.0, 23.0), UUID.randomUUID());
+        Alert alert1 = Alert.create("A1", "D1", AlertType.FIRE, AlertSeverity.HIGH, Location.of(42.0, 23.0), UUID.randomUUID(), null);
+        Alert alert2 = Alert.create("A2", "D2", AlertType.CRIME, AlertSeverity.LOW, Location.of(42.0, 23.0), UUID.randomUUID(), null);
 
         assertNotEquals(alert1.id(), alert2.id());
     }

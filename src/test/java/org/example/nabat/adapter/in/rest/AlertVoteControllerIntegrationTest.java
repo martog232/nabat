@@ -132,7 +132,8 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
             org.example.nabat.domain.model.AlertType.ACCIDENT,
             org.example.nabat.domain.model.AlertSeverity.MEDIUM,
             42.6977,
-            23.3219
+            23.3219,
+            null
         );
 
         MvcResult result = mockMvc.perform(post("/api/v1/alerts")

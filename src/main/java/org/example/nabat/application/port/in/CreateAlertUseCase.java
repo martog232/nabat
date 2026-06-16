@@ -17,7 +17,8 @@ public interface CreateAlertUseCase {
         AlertSeverity severity,
         double latitude,
         double longitude,
-        UUID reportedBy
+        UUID reportedBy,
+        String photoUrl
     ) {
     }
 }

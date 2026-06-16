@@ -106,7 +106,8 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgisIntegrationTestSup
             0,
             0,
             0,
-            status == AlertStatus.RESOLVED ? createdAt.plusSeconds(60) : null
+            status == AlertStatus.RESOLVED ? createdAt.plusSeconds(60) : null,
+            null
         );
     }
 }

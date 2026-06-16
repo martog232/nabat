@@ -16,7 +16,8 @@ public record Alert(
         int upvoteCount,
         int downvoteCount,
         int confirmationCount,
-        Instant resolvedAt
+        Instant resolvedAt,
+        String photoUrl
 ) {
     public static Alert create(
             String title,
@@ -24,7 +25,8 @@ public record Alert(
             AlertType type,
             AlertSeverity severity,
             Location location,
-            UUID reportedBy
+            UUID reportedBy,
+            String photoUrl
     ) {
         return new Alert(
                 AlertId.generate(),
@@ -37,7 +39,8 @@ public record Alert(
                 AlertStatus.ACTIVE,
                 reportedBy,
                 0, 0, 0,
-                null
+                null,
+                photoUrl
         );
     }
 
@@ -50,7 +53,7 @@ public record Alert(
                 id, title, description, type, severity, location,
                 createdAt, AlertStatus.RESOLVED, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount,
-                Instant.now()
+                Instant.now(), photoUrl
         );
     }
 

@@ -80,6 +80,7 @@ class AlertControllerTest {
                 AlertStatus.ACTIVE,
                 UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 0, 0, 0,
+                null,
                 null
         );
     }
@@ -113,7 +114,8 @@ class AlertControllerTest {
                 AlertType.FIRE,
                 AlertSeverity.HIGH,
                 42.0,
-                23.0
+                23.0,
+                null
         );
 
         mockMvc.perform(post("/api/v1/alerts")

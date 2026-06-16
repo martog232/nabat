@@ -40,11 +40,14 @@ public record CreateAlertRequest(
     @Schema(description = "WGS-84 longitude of the incident", example = "-74.0060", minimum = "-180", maximum = "180")
     @NotNull(message = "Longitude is required")
     @DecimalMin(value = "-180.0") @DecimalMax(value = "180.0")
-    Double longitude
+    Double longitude,
+
+    @Schema(description = "URL of an uploaded photo for this alert", example = "/api/v1/uploads/uuid.jpg")
+    String photoUrl
 ) {
     public CreateAlertUseCase.CreateAlertCommand toCommand(UUID reportedBy) {
         return new CreateAlertUseCase.CreateAlertCommand(
-            title, description, type, severity, latitude, longitude, reportedBy
+            title, description, type, severity, latitude, longitude, reportedBy, photoUrl
         );
     }
 }

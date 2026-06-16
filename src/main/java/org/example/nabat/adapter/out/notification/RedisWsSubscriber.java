@@ -48,6 +48,13 @@ public class RedisWsSubscriber implements MessageListener {
         String body = new String(message.getBody());
         try {
             RedisWsMessage msg = objectMapper.readValue(body, RedisWsMessage.class);
+
+            // "*" userId signals a broadcast to all connected sessions.
+            if ("*".equals(msg.userId())) {
+                webSocketHandler.deliverToAll(msg.type(), msg.alert());
+                return;
+            }
+
             UUID userId = UUID.fromString(msg.userId());
             webSocketHandler.deliverLocally(userId, msg.type(), msg.alert());
         } catch (JsonProcessingException e) {

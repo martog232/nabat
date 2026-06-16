@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 @Component
 public class AlertWebSocketHandler extends TextWebSocketHandler {
 
@@ -53,6 +55,44 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
         if (!deliverLocally(userId, "NEW_ALERT", alertResponse)) {
             redisWsPublisher.publish(userId, "NEW_ALERT", alertResponse);
         }
+    }
+
+    public void sendAlertUpdateToUser(UUID userId, Alert alert) {
+        AlertResponse alertResponse = AlertResponse.from(alert);
+        if (!deliverLocally(userId, "ALERT_UPDATED", alertResponse)) {
+            redisWsPublisher.publish(userId, "ALERT_UPDATED", alertResponse);
+        }
+    }
+
+    /**
+     * Sends an ALERT_UPDATED frame to all connected users on this instance
+     * and publishes a broadcast to Redis for other instances.
+     */
+    public void broadcastAlertUpdate(Alert alert) {
+        AlertResponse alertResponse = AlertResponse.from(alert);
+        deliverToAll("ALERT_UPDATED", alertResponse);
+        redisWsPublisher.publishBroadcast("ALERT_UPDATED", alertResponse);
+    }
+
+    /** Delivers a message to every locally-connected WebSocket session. */
+    public void deliverToAll(String type, Object payload) {
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(new AlertResponseWrapper(type, payload));
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize {} broadcast: {}", type, e.getMessage());
+            return;
+        }
+        TextMessage message = new TextMessage(json);
+        userSessions.values().forEach(session -> {
+            if (session.isOpen()) {
+                try {
+                    session.sendMessage(message);
+                } catch (IOException e) {
+                    log.warn("Failed to deliver {} to session: {}", type, e.getMessage());
+                }
+            }
+        });
     }
 
     /**

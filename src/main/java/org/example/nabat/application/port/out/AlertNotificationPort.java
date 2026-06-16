@@ -9,4 +9,7 @@ public interface AlertNotificationPort {
 
     /** Broadcasts a newly-created alert to all subscribed users. */
     void broadcastAlert(Alert alert, List<UUID> userIds);
+
+    /** Broadcasts an alert update (vote counts, resolve) to all connected users. */
+    void broadcastAlertUpdate(Alert alert);
 }
