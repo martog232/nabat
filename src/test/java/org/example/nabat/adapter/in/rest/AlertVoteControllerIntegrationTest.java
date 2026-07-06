@@ -74,7 +74,7 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
                 Instant.now()
         ));
         when(externalVotingPort.getVoteStats(any())).thenReturn(new ExternalVotingPort.VoteStats(1, 0, 0, 1));
-        when(externalVotingPort.hasUserVoted(any(), any())).thenReturn(true);
+        when(externalVotingPort.hasUserVoted(any(), any())).thenReturn(VoteType.UPVOTE);
         doNothing()
                 .doThrow(new IllegalStateException("No existing vote to remove."))
                 .when(externalVotingPort)
@@ -101,7 +101,8 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
         mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/me", alertId)
                         .header("Authorization", "Bearer " + auth.accessToken()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasVoted").value(true));
+                .andExpect(jsonPath("$.hasVoted").value(true))
+                .andExpect(jsonPath("$.voteType").value("UPVOTE"));
 
         // 4) remove vote
         mockMvc.perform(delete("/api/v1/alerts/{alertId}/votes", alertId)

@@ -4,7 +4,19 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    url: http://nabat-prometheus:9090
     isDefault: true
+    editable: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://nabat-loki:3100
+    editable: true
+
+  - name: Zipkin
+    type: zipkin
+    access: proxy
+    url: http://nabat-zipkin:9411
     editable: true
 

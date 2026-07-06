@@ -71,12 +71,12 @@ public class AlertVoteController {
             @PathVariable UUID alertId,
             @AuthenticationPrincipal User currentUser
     ) {
-        boolean hasVoted = voteAlertUseCase.hasUserVoted(
+        VoteType myVote = voteAlertUseCase.hasUserVoted(
                 AlertId.of(alertId),
                 currentUser.id()
         );
 
-        return ResponseEntity.ok(new UserVoteResponse(hasVoted));
+        return ResponseEntity.ok(new UserVoteResponse(myVote != null, myVote));
     }
 
     @Schema(description = "Request body for casting a vote on an alert")
@@ -118,5 +118,8 @@ public class AlertVoteController {
     }
 
     @Schema(description = "Indicates whether the current user has voted on an alert")
-    public record UserVoteResponse(@Schema(description = "true if the authenticated user has an active vote") boolean hasVoted) {}
+    public record UserVoteResponse(
+            @Schema(description = "true if the authenticated user has an active vote") boolean hasVoted,
+            @Schema(description = "The vote type, or null if hasVoted is false") VoteType voteType
+    ) {}
 }

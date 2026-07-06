@@ -82,7 +82,7 @@ public class NabatVotingRestClientAdapter implements ExternalVotingPort {
     }
 
     @Override
-    public boolean hasUserVoted(AlertId alertId, UserId userId) {
+    public VoteType hasUserVoted(AlertId alertId, UserId userId) {
         try {
             UserVoteResponse response = withAuthHeaders(
                     restClient.get().uri(uriBuilder -> uriBuilder
@@ -91,7 +91,7 @@ public class NabatVotingRestClientAdapter implements ExternalVotingPort {
                             .build(alertId.value()))
             ).retrieve().body(UserVoteResponse.class);
 
-            return response != null && response.hasVoted();
+            return response != null ? response.voteType() : null;
         } catch (RestClientResponseException ex) {
             throw mapHttpException(ex);
         } catch (RestClientException ex) {
@@ -170,6 +170,6 @@ public class NabatVotingRestClientAdapter implements ExternalVotingPort {
     ) {
     }
 
-    private record UserVoteResponse(boolean hasVoted) {
+    private record UserVoteResponse(boolean hasVoted, VoteType voteType) {
     }
 }

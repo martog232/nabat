@@ -132,10 +132,24 @@ class AlertVoteControllerTest {
         User user = buildTestUser();
         authenticateAs(user);
 
-        when(voteAlertUseCase.hasUserVoted(any(), any())).thenReturn(true);
+        when(voteAlertUseCase.hasUserVoted(any(), any())).thenReturn(VoteType.UPVOTE);
 
         mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/me", ALERT_ID))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasVoted").value(true));
+                .andExpect(jsonPath("$.hasVoted").value(true))
+                .andExpect(jsonPath("$.voteType").value("UPVOTE"));
+    }
+
+    @Test
+    void shouldReturnHasVotedFalseWhenNoVote() throws Exception {
+        User user = buildTestUser();
+        authenticateAs(user);
+
+        when(voteAlertUseCase.hasUserVoted(any(), any())).thenReturn(null);
+
+        mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/me", ALERT_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasVoted").value(false))
+                .andExpect(jsonPath("$.voteType").isEmpty());
     }
 }

@@ -13,7 +13,7 @@ public interface ExternalVotingPort {
 
     void removeVote(AlertId alertId, UserId userId);
 
-    boolean hasUserVoted(AlertId alertId, UserId userId);
+    VoteType hasUserVoted(AlertId alertId, UserId userId);
 
     VoteStats getVoteStats(AlertId alertId);
 

@@ -52,7 +52,7 @@ public class ExternalVoteService implements VoteAlertUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public boolean hasUserVoted(AlertId alertId, UserId userId) {
+    public VoteType hasUserVoted(AlertId alertId, UserId userId) {
         return externalVotingPort.hasUserVoted(alertId, userId);
     }
 
