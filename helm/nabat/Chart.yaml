@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nabat
+description: Nabat safety-alert platform — Spring Boot + PostgreSQL + Redis
+type: application
+version: 0.1.0
+appVersion: "0.0.1"

@@ -1,122 +1,56 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main]
   pull_request:
-    branches: [ main, develop ]
-
-env:
-  JAVA_VERSION: '21'
+    branches: [main]
 
 jobs:
-  tests:
+  build:
     runs-on: ubuntu-latest
-  ci:
-    name: Build, Test & Package
-    runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: temurin
-          cache: maven
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: 21
+        distribution: temurin
+        cache: maven
 
-      - name: Make mvnw executable
-        run: chmod +x mvnw
+    - name: Build and test
+      run: ./mvnw verify -B
 
-      - name: Run full build (compile + test + package)
-        run: ./mvnw clean verify -B
+    - name: Upload JaCoCo coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: jacoco-report
+        path: target/site/jacoco/index.html
+        retention-days: 7
 
-      - name: Upload JaCoCo coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: jacoco-report
-          path: target/site/jacoco/
+    - name: Docker build
+      run: |
+        docker build -t nabat-app:${{ github.sha }} .
+        docker tag nabat-app:${{ github.sha }} nabat-app:latest
 
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports
-          path: target/surefire-reports/
+    - name: Lint Dockerfile
+      uses: hadolint/hadolint-action@v3
+      with:
+        dockerfile: Dockerfile
 
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-jar
-          path: target/*.jar
-
-  docker:
-    name: Build & Push Docker
+  lint:
     runs-on: ubuntu-latest
-    needs: ci
-    # Only run on push to main. Inside the job, we additionally short-circuit
-    # if Docker Hub credentials are missing — otherwise an unset secret turns
-    # the image name into "/nabat" and metadata-action / login-action fail
-    # with confusing errors.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
     steps:
-      - name: Check Docker Hub credentials
-        id: check-secrets
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
-          if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_PASSWORD" ]; then
-            echo "::warning ::DOCKER_USERNAME / DOCKER_PASSWORD secrets not set — skipping image push."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
+    - uses: actions/checkout@v4
 
-      - name: Checkout code
-        if: steps.check-secrets.outputs.configured == 'true'
-        uses: actions/checkout@v4
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: 21
+        distribution: temurin
+        cache: maven
 
-      - name: Download built JAR
-        if: steps.check-secrets.outputs.configured == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: app-jar
-          path: target/
-
-      - name: Set up Docker Buildx
-        if: steps.check-secrets.outputs.configured == 'true'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        if: steps.check-secrets.outputs.configured == 'true'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Extract Docker metadata
-        if: steps.check-secrets.outputs.configured == 'true'
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKER_USERNAME }}/nabat
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix=main-
-            type=raw,value=latest
-
-      - name: Build and push image
-        if: steps.check-secrets.outputs.configured == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/nabat:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/nabat:buildcache,mode=max
+    - name: Checkstyle
+      run: ./mvnw checkstyle:check -B

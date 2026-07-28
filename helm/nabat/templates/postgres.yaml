@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "nabat.fullname" . }}-postgres-data
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.postgres.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nabat.fullname" . }}-postgres
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: postgres
+        {{- include "nabat.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: postgres
+        image: {{ .Values.postgres.image }}
+        env:
+        - name: POSTGRES_DB
+          value: {{ .Values.postgres.database }}
+        - name: POSTGRES_USER
+          value: {{ .Values.postgres.user }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "nabat.fullname" . }}-secrets
+              key: postgres-password
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: postgres-storage
+        startupProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ .Values.postgres.user }}
+            - -d
+            - {{ .Values.postgres.database }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 30
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ .Values.postgres.user }}
+            - -d
+            - {{ .Values.postgres.database }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: {{ include "nabat.fullname" . }}-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nabat.fullname" . }}-postgres
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app.kubernetes.io/component: postgres
+  ports:
+  - port: 5432

@@ -1,0 +1,84 @@
+namespace: nabat
+
+global:
+  jwtSecret: "nabat-local-docker-jwt-secret-key-min-256-bits-for-development-only-123456"
+
+postgres:
+  image: postgis/postgis:16-3.4
+  database: nabat_db
+  user: nabat_user
+  password: nabat_password
+  storage: 1Gi
+
+redis:
+  image: redis:7-alpine
+
+nabatApp:
+  image: nabat-app:latest
+  imagePullPolicy: IfNotPresent
+  replicas: 2
+  port: 8080
+  baseUrl: http://localhost:8080
+  votingServiceUrl: http://nabat-voting-app:8081
+  mailHost: mailhog
+  mailPort: 1025
+  uploadsStorage: 100Mi
+  resources:
+    requests:
+      cpu: 256m
+      memory: 512Mi
+    limits:
+      cpu: 512m
+      memory: 1Gi
+  probes:
+    startup:
+      initialDelaySeconds: 15
+      periodSeconds: 5
+      failureThreshold: 30
+    liveness:
+      initialDelaySeconds: 60
+      periodSeconds: 15
+
+votingPostgres:
+  image: postgres:16
+  database: nabat_voting_db
+  user: nabat_voting_user
+  password: nabat_voting_password
+  storage: 1Gi
+
+kafka:
+  image: apache/kafka:latest
+  nodeId: "1"
+  clusterId: "DWKW8vl4RI6tPZGCbhhHVg"
+
+votingApp:
+  image: nabat-voting-app:latest
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  port: 8081
+  resources:
+    requests:
+      cpu: 256m
+      memory: 512Mi
+    limits:
+      cpu: 512m
+      memory: 1Gi
+
+ingress:
+  host: nabat.local
+
+monitoring:
+  prometheus:
+    image: prom/prometheus:latest
+    storage: 2Gi
+  grafana:
+    image: grafana/grafana:latest
+    adminPassword: admin
+    storage: 1Gi
+  loki:
+    image: grafana/loki:latest
+    storage: 2Gi
+  promtail:
+    image: grafana/promtail:latest
+  zipkin:
+    image: openzipkin/zipkin:latest

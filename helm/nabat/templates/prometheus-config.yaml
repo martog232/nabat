@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nabat.fullname" . }}-prometheus-config
+  namespace: {{ .Values.namespace }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+    - job_name: nabat-app
+      static_configs:
+      - targets:
+        - {{ include "nabat.fullname" . }}-app:{{ .Values.nabatApp.port }}
+        - {{ include "nabat.fullname" . }}-voting-app:{{ .Values.votingApp.port }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nabat.fullname" . }}-prometheus
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: prometheus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: prometheus
+        {{- include "nabat.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: prometheus
+        image: {{ .Values.monitoring.prometheus.image }}
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - mountPath: /etc/prometheus
+          name: config
+        - mountPath: /prometheus
+          name: storage
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "nabat.fullname" . }}-prometheus-config
+      - name: storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nabat.fullname" . }}-prometheus
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app.kubernetes.io/component: prometheus
+  ports:
+  - port: 9090
+  type: NodePort
