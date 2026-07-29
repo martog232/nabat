@@ -3,7 +3,7 @@ package org.example.nabat.adapter.in.websocket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import org.example.nabat.adapter.out.notification.RedisWsPublisher;
+
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.AlertSeverity;
@@ -40,14 +40,59 @@ import static org.mockito.Mockito.when;
 class AlertWebSocketHandlerTest {
 
     private ObjectMapper objectMapper;
-    private RedisWsPublisher redisWsPublisher;
+    private WsClusterRelay clusterRelay;
     private AlertWebSocketHandler handler;
 
     @BeforeEach
     void setUp() {
         objectMapper = JsonMapper.builder().findAndAddModules().build();
-        redisWsPublisher = mock(RedisWsPublisher.class);
-        handler = new AlertWebSocketHandler(objectMapper, redisWsPublisher);
+        // The handler now depends on the relay interface rather than on the Redis
+        // publisher class directly.
+        clusterRelay = mock(WsClusterRelay.class);
+        handler = new AlertWebSocketHandler(objectMapper, clusterRelay, 5000);
+    }
+
+    @Test
+    void keepsBothSessionsWhenAUserOpensTwoTabs() throws Exception {
+        UUID userId = UUID.randomUUID();
+        WebSocketSession firstTab = session(userId, true, "tab-1");
+        WebSocketSession secondTab = session(userId, true, "tab-2");
+
+        handler.afterConnectionEstablished(firstTab);
+        handler.afterConnectionEstablished(secondTab);
+
+        handler.sendAlertToUser(userId, alert());
+
+        // Both tabs receive the frame. Sessions used to be keyed by user alone, so the
+        // second connection evicted the first.
+        verify(firstTab).sendMessage(any(TextMessage.class));
+        verify(secondTab).sendMessage(any(TextMessage.class));
+    }
+
+    @Test
+    void closingOneTabDoesNotDisconnectTheOther() {
+        UUID userId = UUID.randomUUID();
+        WebSocketSession firstTab = session(userId, true, "tab-1");
+        WebSocketSession secondTab = session(userId, true, "tab-2");
+
+        handler.afterConnectionEstablished(firstTab);
+        handler.afterConnectionEstablished(secondTab);
+
+        handler.afterConnectionClosed(firstTab, CloseStatus.NORMAL);
+
+        // Previously removal was by user id, so closing the first tab deleted the entry
+        // belonging to the second and silently cut off a live client.
+        assertTrue(handler.isUserOnline(userId));
+    }
+
+    @Test
+    void broadcastDeliversLocallyAndRelaysOnce() {
+        UUID userId = UUID.randomUUID();
+        handler.afterConnectionEstablished(session(userId, true, "tab-1"));
+
+        handler.broadcastAlertUpdate(alert());
+
+        verify(clusterRelay).relayBroadcast(any(WsFrame.class));
     }
 
     @Test
@@ -157,11 +202,16 @@ class AlertWebSocketHandlerTest {
     }
 
     private static WebSocketSession session(UUID userId, boolean open) {
+        return session(userId, open, "session-" + userId);
+    }
+
+    /** Explicit session id, so two concurrent sessions for one user are distinguishable. */
+    private static WebSocketSession session(UUID userId, boolean open, String sessionId) {
         WebSocketSession session = mock(WebSocketSession.class);
         Map<String, Object> attributes = new HashMap<>();
         attributes.put(JwtHandshakeInterceptor.USER_ID_ATTR, userId);
         when(session.getAttributes()).thenReturn(attributes);
-        when(session.getId()).thenReturn("session-" + userId);
+        when(session.getId()).thenReturn(sessionId);
         when(session.isOpen()).thenReturn(open);
         return session;
     }
@@ -172,6 +222,7 @@ class AlertWebSocketHandlerTest {
         return captor.getValue();
     }
 
+    @SuppressWarnings("unused")
     private static Alert alert() {
         return new Alert(
             AlertId.generate(),
@@ -186,6 +237,7 @@ class AlertWebSocketHandlerTest {
             0,
             0,
             0,
+             0,
             null,
             null
         );

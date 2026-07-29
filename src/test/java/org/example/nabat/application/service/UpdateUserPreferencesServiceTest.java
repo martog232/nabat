@@ -11,7 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.example.nabat.domain.exception.UserNotFoundException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -91,7 +91,7 @@ class UpdateUserPreferencesServiceTest {
         UserId userId = UserId.of(UUID.randomUUID());
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThrows(UsernameNotFoundException.class, () -> service.updatePreferences(
+        assertThrows(UserNotFoundException.class, () -> service.updatePreferences(
             new UpdateUserPreferencesUseCase.UpdatePreferencesCommand(userId, 5, null, null)
         ));
     }
@@ -112,6 +112,8 @@ class UpdateUserPreferencesServiceTest {
             lat,
             lng,
             locationUpdatedAt
-        );
+        ,
+
+            0);
     }
 }

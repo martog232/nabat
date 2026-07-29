@@ -66,7 +66,9 @@ class UserControllerTest {
             42.1,
             23.1,
             now
-        );
+        ,
+
+            0);
         var auth = new UsernamePasswordAuthenticationToken(
             user,
             null,

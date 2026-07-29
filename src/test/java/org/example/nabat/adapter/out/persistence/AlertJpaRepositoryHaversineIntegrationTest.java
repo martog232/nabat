@@ -87,7 +87,9 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgisIntegrationTestSup
             null,
             null,
             null
-        );
+        ,
+
+            0);
         userRepository.saveAndFlush(UserJpaEntity.from(user));
         return user.id();
     }
@@ -105,6 +107,8 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgisIntegrationTestSup
             reporterId.value(),
             0,
             0,
+            0,
+
             0,
             status == AlertStatus.RESOLVED ? createdAt.plusSeconds(60) : null,
             null

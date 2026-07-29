@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import org.example.nabat.domain.exception.NotAuthorizedException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -48,12 +48,14 @@ class AlertLifecycleServiceTest {
     private Alert active() {
         return new Alert(alertId, "T", "D", AlertType.FIRE, AlertSeverity.HIGH,
                 Location.of(0, 0), Instant.now(), AlertStatus.ACTIVE,
-                ownerId, 0, 0, 0, null, null);
+                ownerId, 0, 0, 0,
+        0, null, null);
     }
 
     private User user(UUID id, Role role) {
         return new User(UserId.of(id), "x@y.z", "p", "n", role, true, false, Instant.now(), Instant.now(),
-                5, null, null, null);
+                5, null, null, null,
+        0);
     }
 
     @Test
@@ -94,7 +96,8 @@ class AlertLifecycleServiceTest {
     void resolve_alreadyResolved_throwsIllegalState() {
         Alert resolved = new Alert(alertId, "T", "D", AlertType.FIRE, AlertSeverity.HIGH,
                 Location.of(0, 0), Instant.now(), AlertStatus.RESOLVED,
-                ownerId, 0, 0, 0, Instant.now(), null);
+                ownerId, 0, 0, 0,
+        0, Instant.now(), null);
         when(alertRepository.findById(alertId)).thenReturn(Optional.of(resolved));
 
         assertThrows(IllegalStateException.class,
@@ -105,7 +108,7 @@ class AlertLifecycleServiceTest {
     @Test
     void resolve_byStranger_throwsAccessDenied() {
         when(alertRepository.findById(alertId)).thenReturn(Optional.of(active()));
-        assertThrows(AccessDeniedException.class,
+        assertThrows(NotAuthorizedException.class,
                 () -> service.resolve(alertId, user(UUID.randomUUID(), Role.USER)));
         verify(alertRepository, never()).save(any());
     }

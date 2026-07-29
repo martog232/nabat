@@ -1,70 +1,152 @@
 package org.example.nabat.adapter.in.security;
 
+import org.example.nabat.application.port.out.LoginAttemptPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
+/**
+ * Counts recent failed logins per email and per client IP and logs when either
+ * crosses an alerting threshold.
+ *
+ * <p>Observability only — it never blocks a request. Throttling lives at the Kong
+ * gateway.
+ *
+ * <h2>Bounded by construction</h2>
+ * The previous implementation kept two unbounded {@link java.util.concurrent.ConcurrentHashMap}s
+ * keyed by email and IP, and only ever removed <em>entries within</em> each list —
+ * never the keys themselves. Anyone could grow the maps without limit simply by
+ * failing logins against distinct addresses, and every failed attempt walked the
+ * whole of both maps to prune old records, so the cost of an attack grew with the
+ * size of the attack.
+ *
+ * <p>Both maps are now fixed-capacity LRU caches: memory is capped regardless of
+ * input, and pruning touches only the key being recorded. Evicting a cold key is
+ * harmless here — losing the count for an address that has not failed recently
+ * costs nothing, since the point is to spot bursts.
+ */
 @Component
-public class LoginAttemptTracker {
+public class LoginAttemptTracker implements LoginAttemptPort {
 
     private static final Logger logger = LoggerFactory.getLogger(LoginAttemptTracker.class);
-    private static final int WINDOW_MINUTES = 60;
-    private static final int ALERT_THRESHOLD = 10; // Alert after 10 failed attempts
 
-    private final Map<String, List<LoginAttemptRecord>> failedAttemptsByEmail = new ConcurrentHashMap<>();
-    private final Map<String, List<LoginAttemptRecord>> failedAttemptsByIp = new ConcurrentHashMap<>();
+    private static final Duration WINDOW = Duration.ofMinutes(60);
 
-    public void recordFailedAttempt(String email, String clientIp) {
-        Instant now = Instant.now();
-        Instant oneHourAgo = now.minus(WINDOW_MINUTES, ChronoUnit.MINUTES);
+    /**
+     * Alert once this many failures have accumulated in the window. The old check was
+     * {@code count > ALERT_THRESHOLD}, which fired on the 11th attempt while the
+     * comment beside it promised the 10th.
+     */
+    private static final int ALERT_THRESHOLD = 10;
 
-        // Clean up old attempts
-        cleanupOldAttempts(failedAttemptsByEmail, oneHourAgo);
-        cleanupOldAttempts(failedAttemptsByIp, oneHourAgo);
+    /** Distinct identities tracked per dimension before the coldest is dropped. */
+    private static final int MAX_TRACKED_KEYS = 10_000;
 
-        // Record email-based attempt
-        var emailAttempts = failedAttemptsByEmail.computeIfAbsent(email, k -> Collections.synchronizedList(new ArrayList<>()));
-        emailAttempts.add(new LoginAttemptRecord(email, clientIp, now));
+    private final Map<String, Window> failuresByEmail = boundedLruMap();
+    private final Map<String, Window> failuresByIp = boundedLruMap();
 
-        int emailFailureCount = countRecentFailures(emailAttempts, oneHourAgo);
-        if (emailFailureCount > ALERT_THRESHOLD) {
-            logger.warn("⚠️  BRUTE FORCE ALERT: {} failed login attempts for email: {} in last {} minutes",
-                    emailFailureCount, email, WINDOW_MINUTES);
+    @Override
+    public void recordFailure(String email, String clientIp) {
+        int emailFailures = record(failuresByEmail, email);
+        if (emailFailures >= ALERT_THRESHOLD) {
+            logger.warn("Possible brute force: {} failed login attempts for one email in the last {} minutes",
+                emailFailures, WINDOW.toMinutes());
         }
 
-        // Record IP-based attempt
-        var ipAttempts = failedAttemptsByIp.computeIfAbsent(clientIp, k -> Collections.synchronizedList(new ArrayList<>()));
-        ipAttempts.add(new LoginAttemptRecord(email, clientIp, now));
-
-        int ipFailureCount = countRecentFailures(ipAttempts, oneHourAgo);
-        if (ipFailureCount > ALERT_THRESHOLD) {
-            logger.warn("⚠️  BRUTE FORCE ALERT: {} failed login attempts from IP: {} in last {} minutes",
-                    ipFailureCount, clientIp, WINDOW_MINUTES);
+        int ipFailures = record(failuresByIp, clientIp);
+        if (ipFailures >= ALERT_THRESHOLD) {
+            logger.warn("Possible brute force: {} failed login attempts from IP {} in the last {} minutes",
+                ipFailures, clientIp, WINDOW.toMinutes());
         }
     }
 
-    private void cleanupOldAttempts(Map<String, List<LoginAttemptRecord>> attempts, Instant cutoff) {
-        attempts.values().forEach(list -> list.removeIf(record -> record.timestamp.isBefore(cutoff)));
+    @Override
+    public void recordSuccess(String email, String clientIp) {
+        // Only the email history is cleared. A shared IP (office NAT, mobile carrier)
+        // may be the source of a genuine attack alongside legitimate logins, so one
+        // success there must not reset the count.
+        synchronized (failuresByEmail) {
+            failuresByEmail.remove(email);
+        }
     }
 
-    private int countRecentFailures(List<LoginAttemptRecord> attempts, Instant cutoff) {
-        return (int) attempts.stream().filter(a -> a.timestamp.isAfter(cutoff)).count();
-    }
-
+    /** Failures recorded for this email inside the current window. */
     public int getFailedAttemptCountForEmail(String email) {
-        List<LoginAttemptRecord> attempts = failedAttemptsByEmail.getOrDefault(email, List.of());
-        return countRecentFailures(attempts, Instant.now().minus(WINDOW_MINUTES, ChronoUnit.MINUTES));
+        return count(failuresByEmail, email);
     }
 
+    /** Failures recorded for this IP inside the current window. */
     public int getFailedAttemptCountForIp(String clientIp) {
-        List<LoginAttemptRecord> attempts = failedAttemptsByIp.getOrDefault(clientIp, List.of());
-        return countRecentFailures(attempts, Instant.now().minus(WINDOW_MINUTES, ChronoUnit.MINUTES));
+        return count(failuresByIp, clientIp);
     }
 
-    private record LoginAttemptRecord(String email, String clientIp, Instant timestamp) {}
+    private int record(Map<String, Window> store, String key) {
+        if (key == null || key.isBlank()) {
+            return 0;
+        }
+        Instant now = Instant.now();
+        synchronized (store) {
+            Window window = store.computeIfAbsent(key, k -> new Window());
+            return window.add(now, WINDOW);
+        }
+    }
+
+    private int count(Map<String, Window> store, String key) {
+        if (key == null) {
+            return 0;
+        }
+        synchronized (store) {
+            Window window = store.get(key);
+            return window == null ? 0 : window.countSince(Instant.now().minus(WINDOW));
+        }
+    }
+
+    private static Map<String, Window> boundedLruMap() {
+        return Collections.synchronizedMap(new LinkedHashMap<>(256, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Window> eldest) {
+                return size() > MAX_TRACKED_KEYS;
+            }
+        });
+    }
+
+    /**
+     * A fixed-size ring of recent failure timestamps.
+     *
+     * <p>Capped at {@link #ALERT_THRESHOLD} entries because nothing above the
+     * threshold changes the decision — there is no reason to retain a million
+     * timestamps for one key to conclude "more than ten".
+     */
+    private static final class Window {
+        private final long[] timestamps = new long[ALERT_THRESHOLD];
+        private int size;
+        private int next;
+
+        /** @return the number of failures inside {@code retention}, after adding this one */
+        int add(Instant at, Duration retention) {
+            timestamps[next] = at.toEpochMilli();
+            next = (next + 1) % timestamps.length;
+            if (size < timestamps.length) {
+                size++;
+            }
+            return countSince(at.minus(retention));
+        }
+
+        int countSince(Instant cutoff) {
+            long cutoffMillis = cutoff.toEpochMilli();
+            int count = 0;
+            for (int i = 0; i < size; i++) {
+                if (timestamps[i] >= cutoffMillis) {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
 }

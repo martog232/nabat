@@ -1,142 +1,205 @@
 package org.example.nabat.adapter.in.websocket;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.nabat.adapter.in.rest.AlertResponse;
-import org.example.nabat.adapter.out.notification.RedisWsPublisher;
+import org.example.nabat.adapter.in.rest.NotificationResponse;
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.Notification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-
+/**
+ * Pushes alert and notification frames to connected clients.
+ *
+ * <h2>Multiple sessions per user</h2>
+ * Sessions are held as {@code userId -> (sessionId -> session)}. The previous
+ * {@code Map<UUID, WebSocketSession>} allowed exactly one session per user, which
+ * broke ordinary use: opening a second tab replaced the first session in the map,
+ * and then closing the <em>first</em> tab removed the entry belonging to the
+ * <em>second</em>, silently cutting off a client that was still connected.
+ *
+ * <h2>Concurrent sends</h2>
+ * Sessions are wrapped in {@link ConcurrentWebSocketSessionDecorator}, because
+ * frames originate from several threads at once — HTTP request threads handling
+ * votes, and the Redis listener thread — and a raw {@code WebSocketSession} throws
+ * {@code IllegalStateException} ("TEXT_PARTIAL_WRITING") if two threads write to it
+ * concurrently.
+ *
+ * <h2>Payloads</h2>
+ * Frames carry the same DTOs the REST API returns ({@link AlertResponse},
+ * {@link NotificationResponse}) so the two transports cannot drift. Notifications
+ * used to be serialised from the domain record directly, which produced
+ * {@code {"id":{"value":"…"},"isRead":false}} over the socket against
+ * {@code {"id":"…","read":false}} over REST, for the same logical object.
+ */
 @Component
-public class AlertWebSocketHandler extends TextWebSocketHandler {
+public class AlertWebSocketHandler extends TextWebSocketHandler implements LocalWsDelivery {
 
     private static final Logger log = LoggerFactory.getLogger(AlertWebSocketHandler.class);
 
-    private final Map<UUID, WebSocketSession> userSessions = new ConcurrentHashMap<>();
-    private final ObjectMapper objectMapper;
-    private final RedisWsPublisher redisWsPublisher;
+    /**
+     * Buffer allowance per session before a slow client is closed rather than allowed
+     * to consume heap indefinitely.
+     */
+    private static final int SEND_BUFFER_LIMIT_BYTES = 512 * 1024;
 
-    public AlertWebSocketHandler(ObjectMapper objectMapper, RedisWsPublisher redisWsPublisher) {
+    private final Map<UUID, Map<String, WebSocketSession>> sessionsByUser = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper;
+    private final WsClusterRelay clusterRelay;
+    private final int sendTimeLimitMillis;
+
+    public AlertWebSocketHandler(
+        ObjectMapper objectMapper,
+        WsClusterRelay clusterRelay,
+        @Value("${nabat.websocket.send-time-limit-ms:5000}") int sendTimeLimitMillis
+    ) {
         this.objectMapper = objectMapper;
-        this.redisWsPublisher = redisWsPublisher;
+        this.clusterRelay = clusterRelay;
+        this.sendTimeLimitMillis = sendTimeLimitMillis;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         UUID userId = extractUserId(session);
-        if (userId != null) {
-            userSessions.put(userId, session);
+        if (userId == null) {
+            // The handshake interceptor should have rejected this; refuse to serve a
+            // session we cannot attribute rather than holding it open.
+            closeQuietly(session);
+            return;
         }
+        WebSocketSession guarded =
+            new ConcurrentWebSocketSessionDecorator(session, sendTimeLimitMillis, SEND_BUFFER_LIMIT_BYTES);
+        sessionsByUser
+            .computeIfAbsent(userId, key -> new ConcurrentHashMap<>())
+            .put(session.getId(), guarded);
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         UUID userId = extractUserId(session);
-        if (userId != null) {
-            userSessions.remove(userId);
+        if (userId == null) {
+            return;
         }
+        // Removed by session id, so closing one tab cannot evict another tab's session.
+        sessionsByUser.computeIfPresent(userId, (key, sessions) -> {
+            sessions.remove(session.getId());
+            return sessions.isEmpty() ? null : sessions;
+        });
     }
 
     public void sendAlertToUser(UUID userId, Alert alert) {
-        AlertResponse alertResponse = AlertResponse.from(alert);
-        if (!deliverLocally(userId, "NEW_ALERT", alertResponse)) {
-            redisWsPublisher.publish(userId, "NEW_ALERT", alertResponse);
+        WsFrame frame = WsFrame.alert(WsFrame.NEW_ALERT, AlertResponse.from(alert));
+        if (!deliverLocally(userId, frame)) {
+            clusterRelay.relayToUser(userId, frame);
         }
     }
 
     public void sendAlertUpdateToUser(UUID userId, Alert alert) {
-        AlertResponse alertResponse = AlertResponse.from(alert);
-        if (!deliverLocally(userId, "ALERT_UPDATED", alertResponse)) {
-            redisWsPublisher.publish(userId, "ALERT_UPDATED", alertResponse);
+        WsFrame frame = WsFrame.alert(WsFrame.ALERT_UPDATED, AlertResponse.from(alert));
+        if (!deliverLocally(userId, frame)) {
+            clusterRelay.relayToUser(userId, frame);
         }
     }
 
-    /**
-     * Sends an ALERT_UPDATED frame to all connected users on this instance
-     * and publishes a broadcast to Redis for other instances.
-     */
+    /** Sends an ALERT_UPDATED frame to every connected user, on this instance and the others. */
     public void broadcastAlertUpdate(Alert alert) {
-        AlertResponse alertResponse = AlertResponse.from(alert);
-        deliverToAll("ALERT_UPDATED", alertResponse);
-        redisWsPublisher.publishBroadcast("ALERT_UPDATED", alertResponse);
+        WsFrame frame = WsFrame.alert(WsFrame.ALERT_UPDATED, AlertResponse.from(alert));
+        deliverToAll(frame);
+        // Peers ignore frames stamped with our own instance id, so our local clients are
+        // not served a second copy when the message comes back round the channel.
+        clusterRelay.relayBroadcast(frame);
     }
 
-    /** Delivers a message to every locally-connected WebSocket session. */
-    public void deliverToAll(String type, Object payload) {
-        String json;
-        try {
-            json = objectMapper.writeValueAsString(new AlertResponseWrapper(type, payload));
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to serialize {} broadcast: {}", type, e.getMessage());
+    /** Pushes a notification to {@code userId}. Returns true if delivered here or relayed. */
+    public boolean sendNotificationToUser(UUID userId, Notification notification) {
+        WsFrame frame = WsFrame.notification(NotificationResponse.from(notification));
+        if (deliverLocally(userId, frame)) {
+            return true;
+        }
+        // Relay so a user connected to another replica still gets it in real time.
+        // Without this, notifications for users on other instances were dropped and
+        // only surfaced on the next REST poll — unlike alerts, which already relayed.
+        clusterRelay.relayToUser(userId, frame);
+        return false;
+    }
+
+    @Override
+    public boolean deliverLocally(UUID userId, WsFrame frame) {
+        Collection<WebSocketSession> sessions = sessionsFor(userId);
+        if (sessions.isEmpty()) {
+            return false;
+        }
+        String json = serialize(frame);
+        if (json == null) {
+            return false;
+        }
+
+        boolean deliveredToAny = false;
+        for (WebSocketSession session : sessions) {
+            deliveredToAny |= write(session, json, frame.type());
+        }
+        return deliveredToAny;
+    }
+
+    @Override
+    public void deliverToAll(WsFrame frame) {
+        String json = serialize(frame);
+        if (json == null) {
             return;
         }
-        TextMessage message = new TextMessage(json);
-        userSessions.values().forEach(session -> {
-            if (session.isOpen()) {
-                try {
-                    session.sendMessage(message);
-                } catch (IOException e) {
-                    log.warn("Failed to deliver {} to session: {}", type, e.getMessage());
-                }
-            }
-        });
-    }
-
-    /**
-     * Delivers a message to the user's local WebSocket session.
-     * Returns true if the user was connected to this instance and the message was sent.
-     */
-    public boolean deliverLocally(UUID userId, String type, Object payload) {
-        WebSocketSession session = userSessions.get(userId);
-        if (session == null || !session.isOpen()) {
-            return false;
-        }
-        try {
-            String json = objectMapper.writeValueAsString(
-                new AlertResponseWrapper(type, payload)
-            );
-            session.sendMessage(new TextMessage(json));
-            return true;
-        } catch (IOException e) {
-            log.warn("Failed to deliver {} to user {}: {}", type, userId, e.getMessage());
-            return false;
-        }
-    }
-
-    /** Pushes a notification to {@code userId}. Returns true if delivered, false if user offline. */
-    public boolean sendNotificationToUser(UUID userId, Notification notification) {
-        WebSocketSession session = userSessions.get(userId);
-        if (session == null || !session.isOpen()) {
-            return false;
-        }
-        try {
-            String payload = objectMapper.writeValueAsString(
-                Map.of("type", "NOTIFICATION", "notification", notification)
-            );
-            session.sendMessage(new TextMessage(payload));
-            return true;
-        } catch (IOException e) {
-            log.warn("Failed to deliver notification to user {}: {}", userId, e.getMessage());
-            return false;
-        }
+        sessionsByUser.values().forEach(sessions ->
+            sessions.values().forEach(session -> write(session, json, frame.type())));
     }
 
     public boolean isUserOnline(UUID userId) {
-        WebSocketSession session = userSessions.get(userId);
-        return session != null && session.isOpen();
+        return !sessionsFor(userId).isEmpty();
+    }
+
+    private Collection<WebSocketSession> sessionsFor(UUID userId) {
+        Map<String, WebSocketSession> sessions = sessionsByUser.get(userId);
+        if (sessions == null) {
+            return Set.of();
+        }
+        return sessions.values().stream().filter(WebSocketSession::isOpen).toList();
+    }
+
+    private String serialize(WsFrame frame) {
+        try {
+            return objectMapper.writeValueAsString(frame.forClient());
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize {} frame: {}", frame.type(), e.getMessage());
+            return null;
+        }
+    }
+
+    private boolean write(WebSocketSession session, String json, String type) {
+        if (!session.isOpen()) {
+            return false;
+        }
+        try {
+            session.sendMessage(new TextMessage(json));
+            return true;
+        } catch (IOException | IllegalStateException e) {
+            // IllegalStateException: the decorator closes a session that exceeds its send
+            // buffer or time limit, i.e. a client too slow to keep up.
+            log.warn("Failed to deliver {} to session {}: {}", type, session.getId(), e.getMessage());
+            return false;
+        }
     }
 
     private UUID extractUserId(WebSocketSession session) {
@@ -146,5 +209,13 @@ public class AlertWebSocketHandler extends TextWebSocketHandler {
         }
         log.warn("WebSocket session {} has no authenticated userId attribute", session.getId());
         return null;
+    }
+
+    private void closeQuietly(WebSocketSession session) {
+        try {
+            session.close(CloseStatus.POLICY_VIOLATION);
+        } catch (IOException e) {
+            log.debug("Failed to close unauthenticated session {}: {}", session.getId(), e.getMessage());
+        }
     }
 }

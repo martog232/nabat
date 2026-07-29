@@ -1,32 +1,44 @@
 package org.example.nabat.application.service;
 
-import org.example.nabat.adapter.in.security.LoginAttemptTracker;
 import org.example.nabat.application.port.in.LoginUserUseCase;
 import org.example.nabat.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.application.port.in.RegisterUserUseCase;
+import org.example.nabat.application.port.out.LoginAttemptPort;
+import org.example.nabat.application.port.out.RefreshTokenStore;
+import org.example.nabat.application.port.out.RequestContextPort;
 import org.example.nabat.application.port.out.TokenProvider;
 import org.example.nabat.application.port.out.UserRepository;
+import org.example.nabat.domain.exception.AuthenticationFailedException;
+import org.example.nabat.domain.exception.EmailAlreadyRegisteredException;
 import org.example.nabat.domain.model.Role;
 import org.example.nabat.domain.model.User;
-import org.example.nabat.domain.model.UserId;
+import org.example.nabat.testsupport.Fixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.time.Instant;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class AuthenticationServiceTest {
 
     @Mock
@@ -35,70 +47,72 @@ class AuthenticationServiceTest {
     @Mock
     private TokenProvider tokenProvider;
 
-    private PasswordEncoder passwordEncoder;
-    private AuthenticationService authenticationService;
+    @Mock
+    private RefreshTokenStore refreshTokenStore;
 
     @Mock
-    private LoginAttemptTracker loginAttemptTracker;
+    private LoginAttemptPort loginAttempts;
+
+    @Mock
+    private RequestContextPort requestContext;
+
+    private PasswordEncoder passwordEncoder;
+    private AuthenticationService authenticationService;
 
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        authenticationService = new AuthenticationService(userRepository, passwordEncoder, tokenProvider, loginAttemptTracker);
+        authenticationService = new AuthenticationService(
+            userRepository, passwordEncoder, tokenProvider, refreshTokenStore, loginAttempts, requestContext);
+        when(requestContext.clientIp()).thenReturn("203.0.113.7");
     }
 
     @Test
-    void shouldRegisterNewUser() {
-        RegisterUserUseCase.RegisterCommand command = 
+    void shouldRegisterNewUserAndIssueSession() {
+        RegisterUserUseCase.RegisterCommand command =
             new RegisterUserUseCase.RegisterCommand("test@example.com", "password123", "Test User");
-        
+
         when(userRepository.existsByEmail(command.email())).thenReturn(false);
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tokenProvider.generateAccessToken(any())).thenReturn("access-token");
+        when(tokenProvider.generateRefreshToken(any())).thenReturn("refresh-token");
+        when(tokenProvider.getJwtExpiration()).thenReturn(3600000L);
 
-        User result = authenticationService.register(command);
+        RegisterUserUseCase.RegistrationResult result = authenticationService.register(command);
 
         assertNotNull(result);
-        assertEquals(command.email(), result.email());
-        assertEquals(command.displayName(), result.displayName());
-        assertEquals(Role.USER, result.role());
-        assertTrue(result.enabled());
+        assertEquals(command.email(), result.user().email());
+        assertEquals(command.displayName(), result.user().displayName());
+        assertEquals(Role.USER, result.user().role());
+        assertTrue(result.user().enabled());
+        // Registration issues the session itself rather than replaying the password
+        // through login().
+        assertEquals("access-token", result.accessToken());
+        assertEquals("refresh-token", result.refreshToken());
         verify(userRepository).save(any(User.class));
     }
 
     @Test
-    void shouldNotRegisterUserWithExistingEmail() {
-        RegisterUserUseCase.RegisterCommand command = 
+    void shouldRejectDuplicateEmailAsConflict() {
+        RegisterUserUseCase.RegisterCommand command =
             new RegisterUserUseCase.RegisterCommand("test@example.com", "password123", "Test User");
-        
+
         when(userRepository.existsByEmail(command.email())).thenReturn(true);
 
-        assertThrows(IllegalArgumentException.class, () -> authenticationService.register(command));
+        // Was IllegalArgumentException (→ 400) carrying a success-sounding message.
+        assertThrows(EmailAlreadyRegisteredException.class, () -> authenticationService.register(command));
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     void shouldLoginWithValidCredentials() {
         String rawPassword = "password123";
-        String hashedPassword = passwordEncoder.encode(rawPassword);
-        
-        User user = new User(
-            UserId.of(UUID.randomUUID()),
-            "test@example.com",
-            hashedPassword,
-            "Test User",
-            Role.USER,
-            true,
-            false,
-            Instant.now(),
-            Instant.now(),
-            5,
-            null,
-            null,
-            null
-        );
+        User user = Fixtures.user().toBuilder()
+            .password(passwordEncoder.encode(rawPassword))
+            .build();
 
-        LoginUserUseCase.LoginCommand command = 
-            new LoginUserUseCase.LoginCommand("test@example.com", rawPassword);
+        LoginUserUseCase.LoginCommand command =
+            new LoginUserUseCase.LoginCommand(user.email(), rawPassword);
 
         when(userRepository.findByEmail(command.email())).thenReturn(Optional.of(user));
         when(tokenProvider.generateAccessToken(user)).thenReturn("access-token");
@@ -107,132 +121,119 @@ class AuthenticationServiceTest {
 
         LoginUserUseCase.LoginResult result = authenticationService.login(command);
 
-        assertNotNull(result);
         assertEquals("access-token", result.accessToken());
         assertEquals("refresh-token", result.refreshToken());
         assertEquals(user, result.user());
-        verify(tokenProvider).generateAccessToken(user);
-        verify(tokenProvider).generateRefreshToken(user);
+        verify(loginAttempts).recordSuccess(command.email(), "203.0.113.7");
     }
 
     @Test
-    void shouldNotLoginWithInvalidEmail() {
-        LoginUserUseCase.LoginCommand command = 
+    void shouldNotLoginWithUnknownEmail() {
+        LoginUserUseCase.LoginCommand command =
             new LoginUserUseCase.LoginCommand("nonexistent@example.com", "password123");
 
         when(userRepository.findByEmail(command.email())).thenReturn(Optional.empty());
 
-        assertThrows(BadCredentialsException.class, () -> authenticationService.login(command));
+        assertThrows(AuthenticationFailedException.class, () -> authenticationService.login(command));
+        verify(loginAttempts).recordFailure(command.email(), "203.0.113.7");
     }
 
     @Test
     void shouldNotLoginWithInvalidPassword() {
-        String hashedPassword = passwordEncoder.encode("correctPassword");
-        
-        User user = new User(
-            UserId.of(UUID.randomUUID()),
-            "test@example.com",
-            hashedPassword,
-            "Test User",
-            Role.USER,
-            true,
-            false,
-            Instant.now(),
-            Instant.now(),
-            5,
-            null,
-            null,
-            null
-        );
+        User user = Fixtures.user().toBuilder()
+            .password(passwordEncoder.encode("correctPassword"))
+            .build();
 
-        LoginUserUseCase.LoginCommand command = 
-            new LoginUserUseCase.LoginCommand("test@example.com", "wrongPassword");
+        LoginUserUseCase.LoginCommand command =
+            new LoginUserUseCase.LoginCommand(user.email(), "wrongPassword");
 
         when(userRepository.findByEmail(command.email())).thenReturn(Optional.of(user));
 
-        assertThrows(BadCredentialsException.class, () -> authenticationService.login(command));
+        assertThrows(AuthenticationFailedException.class, () -> authenticationService.login(command));
+        verify(loginAttempts).recordFailure(command.email(), "203.0.113.7");
     }
 
     @Test
     void shouldNotLoginDisabledUser() {
         String rawPassword = "password123";
-        String hashedPassword = passwordEncoder.encode(rawPassword);
-        
-        User user = new User(
-            UserId.of(UUID.randomUUID()),
-            "test@example.com",
-            hashedPassword,
-            "Test User",
-            Role.USER,
-            false, // disabled
-            false,
-            Instant.now(),
-            Instant.now(),
-            5,
-            null,
-            null,
-            null
-        );
+        User user = Fixtures.user().toBuilder()
+            .password(passwordEncoder.encode(rawPassword))
+            .enabled(false)
+            .build();
 
-        LoginUserUseCase.LoginCommand command = 
-            new LoginUserUseCase.LoginCommand("test@example.com", rawPassword);
+        LoginUserUseCase.LoginCommand command =
+            new LoginUserUseCase.LoginCommand(user.email(), rawPassword);
 
         when(userRepository.findByEmail(command.email())).thenReturn(Optional.of(user));
 
-        assertThrows(BadCredentialsException.class, () -> authenticationService.login(command));
+        assertThrows(AuthenticationFailedException.class, () -> authenticationService.login(command));
     }
 
     @Test
-    void shouldRefreshTokens() {
+    void shouldRefreshTokensAndConsumeThePresentedToken() {
+        User user = Fixtures.user();
         String refreshToken = "valid-refresh-token";
-        
-        User user = new User(
-            UserId.of(UUID.randomUUID()),
-            "test@example.com",
-            "hashedPassword",
-            "Test User",
-            Role.USER,
-            true,
-            false,
-            Instant.now(),
-            Instant.now(),
-            5,
-            null,
-            null,
-            null
-        );
 
-        when(tokenProvider.validateToken(refreshToken)).thenReturn(true);
-        when(tokenProvider.isRefreshToken(refreshToken)).thenReturn(true);
-        when(tokenProvider.getEmailFromToken(refreshToken)).thenReturn(user.email());
-        when(userRepository.findByEmail(user.email())).thenReturn(Optional.of(user));
+        when(tokenProvider.parseRefreshToken(refreshToken)).thenReturn(Optional.of(
+            new TokenProvider.RefreshTokenClaims(user.id().value(), "jti-1", user.tokenVersion())));
+        when(userRepository.findById(user.id())).thenReturn(Optional.of(user));
+        when(tokenProvider.refreshTokenLifetime()).thenReturn(Duration.ofDays(7));
+        when(refreshTokenStore.consume("jti-1", Duration.ofDays(7))).thenReturn(true);
         when(tokenProvider.generateAccessToken(user)).thenReturn("new-access-token");
         when(tokenProvider.generateRefreshToken(user)).thenReturn("new-refresh-token");
         when(tokenProvider.getJwtExpiration()).thenReturn(3600000L);
 
         RefreshTokenUseCase.AuthTokens result = authenticationService.refresh(refreshToken);
 
-        assertNotNull(result);
         assertEquals("new-access-token", result.accessToken());
         assertEquals("new-refresh-token", result.refreshToken());
+        verify(refreshTokenStore).consume("jti-1", Duration.ofDays(7));
     }
 
     @Test
-    void shouldNotRefreshInvalidToken() {
-        String invalidToken = "invalid-token";
+    void shouldRejectReplayedRefreshToken() {
+        User user = Fixtures.user();
+        String refreshToken = "already-used";
 
-        when(tokenProvider.validateToken(invalidToken)).thenReturn(false);
+        when(tokenProvider.parseRefreshToken(refreshToken)).thenReturn(Optional.of(
+            new TokenProvider.RefreshTokenClaims(user.id().value(), "jti-used", user.tokenVersion())));
+        when(userRepository.findById(user.id())).thenReturn(Optional.of(user));
+        when(tokenProvider.refreshTokenLifetime()).thenReturn(Duration.ofDays(7));
+        // Already exchanged once.
+        when(refreshTokenStore.consume(anyString(), any())).thenReturn(false);
 
-        assertThrows(BadCredentialsException.class, () -> authenticationService.refresh(invalidToken));
+        assertThrows(AuthenticationFailedException.class, () -> authenticationService.refresh(refreshToken));
+        verify(tokenProvider, never()).generateAccessToken(any());
     }
 
     @Test
-    void shouldNotRefreshAccessTokenAsRefreshToken() {
-        String accessToken = "access-token";
+    void shouldRejectRefreshTokenInvalidatedByPasswordChange() {
+        User user = Fixtures.user().toBuilder().tokenVersion(3).build();
+        String refreshToken = "stale-version";
 
-        when(tokenProvider.validateToken(accessToken)).thenReturn(true);
-        when(tokenProvider.isRefreshToken(accessToken)).thenReturn(false);
+        when(tokenProvider.parseRefreshToken(refreshToken)).thenReturn(Optional.of(
+            // Minted before the credential change bumped the version to 3.
+            new TokenProvider.RefreshTokenClaims(user.id().value(), "jti-2", 2)));
+        when(userRepository.findById(user.id())).thenReturn(Optional.of(user));
 
-        assertThrows(BadCredentialsException.class, () -> authenticationService.refresh(accessToken));
+        assertThrows(AuthenticationFailedException.class, () -> authenticationService.refresh(refreshToken));
+        verify(refreshTokenStore, never()).consume(anyString(), any());
+    }
+
+    @Test
+    void shouldNotRefreshUnparseableToken() {
+        when(tokenProvider.parseRefreshToken("invalid-token")).thenReturn(Optional.empty());
+
+        assertThrows(AuthenticationFailedException.class, () -> authenticationService.refresh("invalid-token"));
+    }
+
+    @Test
+    void shouldNotRefreshWhenUserNoLongerExists() {
+        UUID userId = UUID.randomUUID();
+        when(tokenProvider.parseRefreshToken("orphan")).thenReturn(Optional.of(
+            new TokenProvider.RefreshTokenClaims(userId, "jti-3", 0)));
+        when(userRepository.findById(any())).thenReturn(Optional.empty());
+
+        assertThrows(AuthenticationFailedException.class, () -> authenticationService.refresh("orphan"));
     }
 }

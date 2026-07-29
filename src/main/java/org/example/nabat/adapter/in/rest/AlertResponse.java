@@ -24,6 +24,10 @@ public record AlertResponse(
     @Schema(description = "Number of upvotes") int upvoteCount,
     @Schema(description = "Number of downvotes") int downvoteCount,
     @Schema(description = "Number of confirmations") int confirmationCount,
+    // Included so clients can render credibility straight from a list response.
+    // Its absence was why the frontend fetched /votes/stats per alert card — two
+    // extra requests per alert — and then recomputed the score locally anyway.
+    @Schema(description = "Credibility score as computed by the voting service") int credibilityScore,
     @Schema(description = "Timestamp when the alert was resolved; null if still active") Instant resolvedAt,
     @Schema(description = "URL of the uploaded photo, if any") String photoUrl
 ) {
@@ -42,6 +46,7 @@ public record AlertResponse(
             alert.upvoteCount(),
             alert.downvoteCount(),
             alert.confirmationCount(),
+            alert.credibilityScore(),
             alert.resolvedAt(),
             alert.photoUrl()
         );

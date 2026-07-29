@@ -15,7 +15,7 @@ public interface SubscribeToAlertsUseCase {
 
     /**
      * Removes the subscription owned by {@code actor}.
-     * @throws org.springframework.security.access.AccessDeniedException if not owner
+     * @throws org.example.nabat.domain.exception.NotAuthorizedException if not owner
      * @throws IllegalArgumentException if no such subscription
      */
     void unsubscribe(UUID subscriptionId, UserId actor);

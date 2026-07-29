@@ -13,12 +13,14 @@
        ▼                      ▼                      ▼
 ┌──────────────────────────────────────────────────────────────┐
 │              Kong API Gateway (:8000 / :8001)                │
-│  DB-less mode — declarative config in kong.yml               │
+│  DB-less mode — declarative config lives in a SEPARATE repo  │
 │                                                              │
 │  Routes:                                                     │
 │    /api/v1/*  ────────────► nabat-service (:8080)            │
 │    /ws/*      ────────────► nabat-service (:8080)            │
-│    ~/api/v1/alerts/[^/]+/votes ──► nabat-voting-service (:8081) │
+│                                                              │
+│  Also owns rate limiting / brute-force protection for the    │
+│  platform — nabat-app does not throttle in-process.          │
 │                                                              │
 │  Note: FE dev server proxies /api → 127.0.0.1:8080 directly │
 │        (bypasses Kong). Kong is used in production/staging.  │
@@ -96,6 +98,12 @@ Browser → POST /api/v1/alerts  ──► nabat-app AlertController
 
 ### 2. Voting (frontend → nabat-app → nabat-voting)
 
+> nabat-app forwards **the caller's own access token** to nabat-voting, which derives
+> the voter from its `userId` claim. `POST .../votes` and `DELETE .../votes` return the
+> resulting tallies, read from the voting service's write model inside its own
+> transaction — the `/votes/stats` endpoint is served from the asynchronously-updated
+> projection and cannot be used for read-your-writes.
+
 ```
 Browser → POST /api/v1/alerts/{id}/votes ──► nabat-app AlertVoteController
                                                   │
@@ -104,40 +112,41 @@ Browser → POST /api/v1/alerts/{id}/votes ──► nabat-app AlertVoteControll
                                                   │
                                                   ├──► externalVotingPort.vote()
                                                   │       │
-                                                  │       └──► HTTP POST
+                                                  │       └──► HTTP POST (caller's bearer token)
                                                   │             nabat-voting:8081
                                                   │             /api/v1/alerts/{id}/votes
                                                   │                  │
                                                   │                  ▼
                                                   │             VoteController
+                                                  │               voter = token's userId claim
                                                   │                  │
                                                   │                  ▼
-                                                  │             CastVoteService
+                                                  │             CastVoteService (one transaction)
                                                   │                  │
                                                   │                  ├──► voteRepository.save()
                                                   │                  │       └──► Postgres (nabat_voting_db)
                                                   │                  │
+                                                  │                  ├──► voteRepository.countsFor()
+                                                  │                  │       └──► fresh tallies, returned
+                                                  │                  │            in the response body
+                                                  │                  │
                                                   │                  └──► kafkaVoteEventPublisher
                                                   │                          .publish()
                                                   │                          └──► Kafka topic: vote.cast
+                                                  │                                  (updates the read-model
+                                                  │                                   asynchronously)
                                                   │
-                                                  ├──► syncProjection()
-                                                  │       │
-                                                  │       └──► HTTP GET nabat-voting:8081
-                                                  │             /api/v1/alerts/{id}/votes/stats
-                                                  │                  │
-                                                  │                  ▼
-                                                  │             returns upvotes/downvotes/confirmations
-                                                  │                  │
-                                                  │                  ▼
-                                                  │             alertRepository.updateVoteCounts()
-                                                  │               └──► update alerts table (nabat_db)
+                                                  ├──► syncProjection(stats from the response)
+                                                  │       └──► alertRepository.applyVoteCounts()
+                                                  │             update + reread, one short transaction,
+                                                  │             outside the HTTP call
                                                   │
-                                                  └──► notifyAlertOwner()
-                                                          │
-                                                          └──► NotificationService
-                                                                  ├──► persist Notification
-                                                                  └──► WebSocket push to owner
+                                                  ├──► notifyAlertOwner()
+                                                  │       └──► NotificationService
+                                                  │               ├──► persist Notification
+                                                  │               └──► WebSocket push to owner
+                                                  │
+                                                  └──► broadcastAlertUpdate()
 ```
 
 ### 3. Nearby alerts (read-heavy)
@@ -198,10 +207,12 @@ Browser → GET /api/v1/alerts/nearby?lat=...&lng=...&radius=...
 
 ## Redis
 
-| Purpose       | Mechanism        | Key/Channel            | Notes                          |
-|---------------|------------------|------------------------|--------------------------------|
-| WebSocket Pub/Sub | Redis Pub/Sub | `ws:alerts`           | Cross-instance WS message relay |
-| Near-cache    | Cache-aside      | `nearbyAlerts::key`    | TTL 15s, JSON-serialized       |
+| Purpose            | Mechanism     | Key/Channel                     | Notes |
+|--------------------|---------------|---------------------------------|-------|
+| WebSocket Pub/Sub  | Redis Pub/Sub | `ws:alerts`                     | Cross-instance WS relay. Frames carry an `origin` instance id so a publisher ignores its own echo. |
+| Near-cache         | Cache-aside   | `nearbyAlerts::<lat>_<lng>_<r>` | TTL 15s. Coordinates are quantized to ~110 m so nearby requests share an entry; evicted whenever an alert is created or resolved. |
+| WebSocket tickets  | Expiring key  | `ws:ticket:<value>`             | Single-use, consumed with `GETDEL`. In Redis rather than in memory so any replica can redeem a ticket issued by another. |
+| Refresh-token reuse | Expiring key | `auth:refresh:consumed:<jti>`   | Marks a refresh token as exchanged, giving single-use rotation with replay detection across replicas. |
 
 ## Database layout
 
@@ -210,27 +221,63 @@ Browser → GET /api/v1/alerts/nearby?lat=...&lng=...&radius=...
 | nabat-app  | nabat_db         | 5433  | users, alerts, user_subscriptions, notifications |
 | nabat-voting | nabat_voting_db | 5434  | votes                                |
 
-- `alerts` table has denormalized vote count columns (`upvote_count`, `downvote_count`, `confirmation_count`, `credibility_score`) updated by `ExternalVoteService.syncProjection()` after each vote.
+- `alerts` has denormalized vote-count columns (`upvote_count`, `downvote_count`,
+  `confirmation_count`, `credibility_score`) written by `ExternalVoteService` from the
+  tallies nabat-voting returns. `credibility_score` has exactly one author — the voting
+  service — and is carried through the domain unchanged; it is never recomputed locally.
+- `alerts.version` provides optimistic locking, so a concurrent resolve and vote-count
+  sync cannot silently overwrite each other.
 - Vote persistence is owned by `nabat-voting` only. The original `alert_votes` table in `nabat_db` was dropped by migration V7.
 
 ## Kong routing
 
-| Path pattern         | Upstream          | Priority | Strip path |
-|----------------------|-------------------|----------|------------|
-| `/api/v1`            | nabat-app:8080    | 0        | No         |
-| `/ws`                | nabat-app:8080    | 0        | No         |
-| `~/api/v1/alerts/[^/]+/votes` | nabat-voting-app:8081 | 100 | No |
+The declarative Kong config lives in its own repository, not here.
 
-The regex route for `/votes` has higher priority and matches before the prefix route for `/api/v1`.
+| Path pattern | Upstream       | Strip path |
+|--------------|----------------|------------|
+| `/api/v1`    | nabat-app:8080 | No         |
+| `/ws`        | nabat-app:8080 | No         |
+
+**Votes must not be routed directly to nabat-voting.** An earlier version of this
+document described a higher-priority regex route sending
+`~/api/v1/alerts/[^/]+/votes` straight to `nabat-voting-app:8081`. That would bypass
+`ExternalVoteService` entirely, and with it the denormalised vote-count sync on
+`alerts`, the owner/milestone notifications, and the `ALERT_UPDATED` WebSocket
+broadcast — so votes would land in the voting database and nothing else in the system
+would ever hear about them. Vote traffic goes to nabat-app, which calls nabat-voting
+and forwards the caller's own access token.
+
+Rate limiting and brute-force protection are Kong's responsibility. nabat-app's
+`LoginAttemptTracker` only observes and logs failed logins; it does not block.
 
 ## Kafka topics
 
-| Topic       | Publisher              | Consumer                | Purpose                          |
-|-------------|------------------------|-------------------------|----------------------------------|
-| `vote.cast` | nabat-voting (KafkaVoteEventPublisher) | nabat-voting (KafkaVoteEventConsumer) | Credibility projection recalculation |
+| Topic          | Publisher    | Consumer     | Purpose |
+|----------------|--------------|--------------|---------|
+| `vote.cast`    | nabat-voting | nabat-voting | Credibility projection recalculation |
+| `vote.removed` | nabat-voting | nabat-voting | Same, on vote removal |
+
+Both are keyed by alert id so events for one alert keep their order. Replica count is
+configurable via `NABAT_KAFKA_TOPIC_REPLICAS` and defaults to 1, matching the
+single-broker clusters used in docker-compose and the Helm chart.
+
+The publish is a dual write: the database transaction and the Kafka send are not
+atomic, so a crash between commit and send loses the event. Send failures are logged
+loudly, and the projection can be rebuilt from the write model at any time via
+`POST /api/v1/admin/credibility/rebuild` (ADMIN only). A transactional outbox is the
+proper fix and is not yet implemented.
 
 ## Debugging
 
-Remote JVM debug ports (when enabled in docker-compose):
+Remote JVM debugging is **off by default** — an open JDWP port is remote code
+execution, so it is not something to ship enabled. Turn it on for a local session:
+
+```bash
+# nabat-voting
+NABAT_VOTING_DEBUG_OPTS='-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006' \
+  docker compose up
+```
+
+Ports, when enabled (bound to loopback only):
 - nabat-app: `:5005`
 - nabat-voting-app: `:5006`

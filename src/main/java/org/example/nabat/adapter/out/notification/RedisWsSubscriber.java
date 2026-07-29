@@ -1,21 +1,25 @@
 package org.example.nabat.adapter.out.notification;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import org.example.nabat.adapter.in.websocket.AlertWebSocketHandler;
+import org.example.nabat.adapter.in.websocket.LocalWsDelivery;
+import org.example.nabat.adapter.in.websocket.WsFrame;
 import org.example.nabat.adapter.out.notification.RedisWsPublisher.RedisWsMessage;
+import org.example.nabat.config.InstanceId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+/**
+ * Delivers frames relayed by peer instances to locally-connected sessions.
+ */
 @Component
 public class RedisWsSubscriber implements MessageListener {
 
@@ -23,18 +27,20 @@ public class RedisWsSubscriber implements MessageListener {
     private static final ChannelTopic TOPIC = new ChannelTopic(RedisWsPublisher.CHANNEL);
 
     private final RedisMessageListenerContainer listenerContainer;
-    private final AlertWebSocketHandler webSocketHandler;
+    private final LocalWsDelivery localDelivery;
     private final ObjectMapper objectMapper;
+    private final InstanceId instanceId;
 
     public RedisWsSubscriber(
         RedisMessageListenerContainer listenerContainer,
-        StringRedisTemplate redisTemplate,
-        AlertWebSocketHandler webSocketHandler,
-        ObjectMapper objectMapper
+        LocalWsDelivery localDelivery,
+        ObjectMapper objectMapper,
+        InstanceId instanceId
     ) {
         this.listenerContainer = listenerContainer;
-        this.webSocketHandler = webSocketHandler;
+        this.localDelivery = localDelivery;
         this.objectMapper = objectMapper;
+        this.instanceId = instanceId;
     }
 
     @PostConstruct
@@ -45,22 +51,36 @@ public class RedisWsSubscriber implements MessageListener {
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
-        String body = new String(message.getBody());
+        // Explicit UTF-8: the default charset differs between a Windows dev machine and
+        // a Linux container, so relying on it made the wire format environment-dependent.
+        String body = new String(message.getBody(), StandardCharsets.UTF_8);
         try {
             RedisWsMessage msg = objectMapper.readValue(body, RedisWsMessage.class);
+            WsFrame frame = msg.frame();
 
-            // "*" userId signals a broadcast to all connected sessions.
-            if ("*".equals(msg.userId())) {
-                webSocketHandler.deliverToAll(msg.type(), msg.alert());
+            if (frame == null) {
+                log.warn("Ignoring relayed message with no frame");
                 return;
             }
 
-            UUID userId = UUID.fromString(msg.userId());
-            webSocketHandler.deliverLocally(userId, msg.type(), msg.alert());
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to deserialize Redis WS message: {}", e.getMessage());
+            // Redis echoes published messages back to the publisher. Delivering our own
+            // broadcast again would show every client each ALERT_UPDATED twice.
+            if (instanceId.value().equals(frame.origin())) {
+                return;
+            }
+
+            if (RedisWsPublisher.BROADCAST_RECIPIENT.equals(msg.recipient())) {
+                localDelivery.deliverToAll(frame);
+                return;
+            }
+
+            localDelivery.deliverLocally(UUID.fromString(msg.recipient()), frame);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid userId in Redis WS message: {}", e.getMessage());
+            // Covers both an unparseable recipient and Jackson's own argument errors.
+            log.warn("Ignoring malformed relayed WS message: {}", e.getMessage());
+        } catch (Exception e) {
+            // A single bad message must not kill the listener thread.
+            log.warn("Failed to handle relayed WS message: {}", e.getMessage());
         }
     }
 }

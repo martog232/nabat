@@ -1,32 +1,38 @@
 package org.example.nabat.adapter.in.rest;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.example.nabat.application.port.in.GetNotificationUseCase;
-import org.example.nabat.application.port.in.SendNotificationUseCase;
-import org.example.nabat.application.port.in.SendNotificationUseCase.VoteNotificationCommand;
-import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.NotificationId;
 import org.example.nabat.domain.model.User;
-import org.example.nabat.domain.model.UserId;
-import org.example.nabat.domain.model.VoteType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Read and acknowledge the caller's own notifications.
+ *
+ * <p>There is deliberately no endpoint for <em>creating</em> a notification. One used
+ * to exist — {@code POST /api/v1/notifications/test} — which accepted an arbitrary
+ * voter id, alert id, title and vote type from any authenticated caller and persisted
+ * plus pushed the result. Although the recipient was always the caller, it let anyone
+ * write unbounded rows into {@code notifications} and put arbitrary attacker-chosen
+ * text into a WebSocket frame that clients render. Notifications are raised by the
+ * domain (voting, milestones), never by a client request.
+ */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
 
     private final GetNotificationUseCase getNotificationUseCase;
-    private final SendNotificationUseCase sendNotificationUseCase;
 
     @GetMapping
     public List<NotificationResponse> list(@AuthenticationPrincipal User user) {
@@ -59,27 +65,4 @@ public class NotificationController {
         getNotificationUseCase.markAllAsRead(user.id());
         return ResponseEntity.noContent().build();
     }
-
-    record SendTestNotificationRequest(
-            @NotNull UUID voterId,
-            @NotNull UUID alertId,
-            @NotBlank String alertTitle,
-            @NotNull VoteType voteType
-    ) {}
-
-    @PostMapping("/test")
-    public NotificationResponse sendTest(
-            @Valid @RequestBody SendTestNotificationRequest request,
-            @AuthenticationPrincipal User user
-    ) {
-        var command = new VoteNotificationCommand(
-                user.id(),
-                UserId.of(request.voterId()),
-                AlertId.of(request.alertId()),
-                request.alertTitle(),
-                request.voteType()
-        );
-        return NotificationResponse.from(sendNotificationUseCase.sendVoteNotification(command));
-    }
 }
-

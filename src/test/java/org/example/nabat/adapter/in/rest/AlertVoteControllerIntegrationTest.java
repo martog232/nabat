@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -67,18 +68,19 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
         UUID alertId = createAlert(auth.accessToken());
         UUID voteId = UUID.randomUUID();
 
-        when(externalVotingPort.vote(any(), any(), any())).thenReturn(new ExternalVotingPort.VoteReceipt(
+        when(externalVotingPort.vote(any(), any(), any())).thenReturn(new ExternalVotingPort.VoteResult(
                 voteId,
                 AlertId.of(alertId),
                 VoteType.UPVOTE,
-                Instant.now()
+                Instant.now(),
+                // Tallies now travel back with the vote rather than being fetched afterwards.
+                new ExternalVotingPort.VoteStats(1, 0, 0, 1)
         ));
         when(externalVotingPort.getVoteStats(any())).thenReturn(new ExternalVotingPort.VoteStats(1, 0, 0, 1));
-        when(externalVotingPort.hasUserVoted(any(), any())).thenReturn(VoteType.UPVOTE);
-        doNothing()
-                .doThrow(new IllegalStateException("No existing vote to remove."))
-                .when(externalVotingPort)
-                .removeVote(any(AlertId.class), any(UserId.class));
+        when(externalVotingPort.findUserVote(any(), any())).thenReturn(Optional.of(VoteType.UPVOTE));
+        when(externalVotingPort.removeVote(any(AlertId.class), any(UserId.class)))
+                .thenReturn(new ExternalVotingPort.VoteStats(0, 0, 0, 0))
+                .thenThrow(new IllegalStateException("No existing vote to remove."));
 
         // 1) create vote (UPVOTE)
         mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", alertId)
@@ -104,10 +106,11 @@ class AlertVoteControllerIntegrationTest extends PostgisSpringBootIntegrationTes
                 .andExpect(jsonPath("$.hasVoted").value(true))
                 .andExpect(jsonPath("$.voteType").value("UPVOTE"));
 
-        // 4) remove vote
+        // 4) remove vote — 200 with the resulting tallies, not 204
         mockMvc.perform(delete("/api/v1/alerts/{alertId}/votes", alertId)
                 .header("Authorization", "Bearer " + auth.accessToken()))
-            .andExpect(status().isNoContent());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.upvotes").value(0));
 
         // 5) duplicate remove still returns conflict
         mockMvc.perform(delete("/api/v1/alerts/{alertId}/votes", alertId)

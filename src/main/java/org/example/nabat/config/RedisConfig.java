@@ -42,8 +42,15 @@ public class RedisConfig {
         RedisConnectionFactory connectionFactory,
         @Value("${nabat.cache.nearby-ttl:15}") int nearbyTtlSeconds
     ) {
+        // Default typing is needed so `List<Alert>` round-trips with its element type,
+        // but the validator must be an allow-list. `allowIfBaseType(Object.class)` — the
+        // previous setting — permits instantiating *any* class named in the JSON, which is
+        // the classic Jackson deserialization-gadget RCE primitive: anything that can write
+        // to Redis then gets to pick classes to construct inside this JVM.
         var ptv = BasicPolymorphicTypeValidator.builder()
-            .allowIfBaseType(Object.class)
+            .allowIfSubType("org.example.nabat.")
+            .allowIfSubType("java.util.")
+            .allowIfSubType("java.time.")
             .build();
         ObjectMapper mapper = JsonMapper.builder()
             .addModule(new JavaTimeModule())

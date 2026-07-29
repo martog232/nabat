@@ -1,7 +1,11 @@
 namespace: nabat
 
 global:
-  jwtSecret: "nabat-local-docker-jwt-secret-key-min-256-bits-for-development-only-123456"
+  # REQUIRED, no default. Supply at install time so no signing key lives in git:
+  #   helm install nabat ./helm/nabat --set global.jwtSecret="$(openssl rand -base64 48)"
+  # Shared by nabat-app and nabat-voting — they must agree or cross-service JWT
+  # validation fails. Templating fails fast when this is empty.
+  jwtSecret: ""
 
 postgres:
   image: postgis/postgis:16-3.4

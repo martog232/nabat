@@ -5,23 +5,41 @@ import org.example.nabat.domain.model.UserId;
 import org.example.nabat.domain.model.VoteType;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Bridge to the nabat-voting service, which owns vote persistence.
+ *
+ * <p>The mutating operations return the resulting {@link VoteStats} rather than
+ * requiring a follow-up {@link #getVoteStats} call. That is not just an
+ * optimisation: {@code getVoteStats} is served from an asynchronously-maintained
+ * projection, so reading it immediately after a write returned the *pre-write*
+ * counts.
+ */
 public interface ExternalVotingPort {
 
-    VoteReceipt vote(AlertId alertId, UserId userId, VoteType voteType);
+    VoteResult vote(AlertId alertId, UserId userId, VoteType voteType);
 
-    void removeVote(AlertId alertId, UserId userId);
+    /** @return the tallies after removal */
+    VoteStats removeVote(AlertId alertId, UserId userId);
 
-    VoteType hasUserVoted(AlertId alertId, UserId userId);
+    /** The user's current vote, or empty when they have not voted on this alert. */
+    Optional<VoteType> findUserVote(AlertId alertId, UserId userId);
 
+    /** Eventually-consistent aggregate stats. */
     VoteStats getVoteStats(AlertId alertId);
 
-    record VoteReceipt(
+    /**
+     * @param stats tallies as of the write, read from the voting service's write
+     *              model inside its own transaction
+     */
+    record VoteResult(
             UUID id,
             AlertId alertId,
             VoteType voteType,
-            Instant createdAt
+            Instant createdAt,
+            VoteStats stats
     ) {
     }
 
@@ -31,5 +49,6 @@ public interface ExternalVotingPort {
             int confirmations,
             int credibilityScore
     ) {
+        public static final VoteStats EMPTY = new VoteStats(0, 0, 0, 0);
     }
 }

@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
+import org.example.nabat.domain.exception.NotAuthorizedException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -74,7 +74,7 @@ class SubscriptionServiceTest {
                 Location.of(0, 0), 1.0, true, Instant.now());
         when(repository.findById(id)).thenReturn(Optional.of(s));
 
-        assertThrows(AccessDeniedException.class,
+        assertThrows(NotAuthorizedException.class,
                 () -> service.unsubscribe(id, UserId.generate()));
         verify(repository, never()).deleteById(any());
     }

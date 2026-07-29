@@ -2,20 +2,36 @@ package org.example.nabat.adapter.out.persistence;
 
 import jakarta.persistence.*;
 import lombok.Getter;
-import lombok.Setter;
 import org.example.nabat.domain.model.*;
 
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * JPA mapping for {@code alerts}.
+ *
+ * <p>No {@code @Setter}: a blanket setter on every field let callers mutate an alert's
+ * {@code status} directly, bypassing {@link Alert#resolve()} — the state transition
+ * AGENTS.md names as the only supported one. State changes go through the domain
+ * record and then {@link #from(Alert)}.
+ */
 @Entity
 @Getter
-@Setter
 @Table(name = "alerts")
 public class AlertJpaEntity {
 
     @Id
     private UUID id;
+
+    /**
+     * Optimistic locking. {@code save()} writes every column, so two concurrent
+     * writers — say a resolve and a vote-count sync — would otherwise silently
+     * overwrite each other's changes. With a version column the loser gets an
+     * {@code OptimisticLockException} instead.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 
     @Column(nullable = false)
     private String title;
@@ -84,7 +100,8 @@ public class AlertJpaEntity {
         entity.upvoteCount = alert.upvoteCount();
         entity.downvoteCount = alert.downvoteCount();
         entity.confirmationCount = alert.confirmationCount();
-        entity.credibilityScore = alert.getCredibilityScore();
+        // Carried through, never recomputed — the voting service owns this value.
+        entity.credibilityScore = alert.credibilityScore();
         entity.resolvedAt = alert.resolvedAt();
         entity.photoUrl = alert.photoUrl();
         return entity;
@@ -104,6 +121,7 @@ public class AlertJpaEntity {
                 upvoteCount,
                 downvoteCount,
                 confirmationCount,
+                credibilityScore,
                 resolvedAt,
                 photoUrl
         );

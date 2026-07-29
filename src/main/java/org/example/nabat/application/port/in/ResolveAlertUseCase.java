@@ -9,7 +9,7 @@ public interface ResolveAlertUseCase {
     /**
      * Marks the alert as RESOLVED. Only the original reporter or an ADMIN may resolve.
      * @throws org.example.nabat.domain.exception.AlertNotFoundException if no such alert
-     * @throws org.springframework.security.access.AccessDeniedException if {@code actor}
+     * @throws org.example.nabat.domain.exception.NotAuthorizedException if {@code actor}
      *         is neither the reporter nor an ADMIN
      */
     Alert resolve(AlertId id, User actor);

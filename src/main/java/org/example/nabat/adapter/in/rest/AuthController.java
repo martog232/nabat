@@ -1,6 +1,7 @@
 package org.example.nabat.adapter.in.rest;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.example.nabat.application.port.in.ForgotPasswordUseCase;
 import org.example.nabat.application.port.in.LoginUserUseCase;
 import org.example.nabat.application.port.in.RefreshTokenUseCase;
@@ -8,6 +9,8 @@ import org.example.nabat.application.port.in.RegisterUserUseCase;
 import org.example.nabat.application.port.in.ResetPasswordUseCase;
 import org.example.nabat.application.port.in.VerifyEmailUseCase;
 import org.example.nabat.domain.model.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUserUseCase loginUserUseCase;
@@ -47,19 +52,20 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        User user = registerUserUseCase.register(request.toCommand());
+        // Returns the session directly — no second round-trip through login() with the
+        // plaintext password, which used to re-run bcrypt for an identity just created.
+        RegisterUserUseCase.RegistrationResult result = registerUserUseCase.register(request.toCommand());
 
-        // Send verification email asynchronously — not a blocking failure
+        // Best-effort: a dead SMTP relay must not fail an otherwise-successful signup.
+        // The user can request a new verification email later.
         try {
-            verifyEmailUseCase.sendVerificationEmail(user.id());
-        } catch (Exception e) {
-            // Log but don't block registration if email fails
+            verifyEmailUseCase.sendVerificationEmail(result.user().id());
+        } catch (RuntimeException e) {
+            // Previously an empty catch block whose comment said "Log but don't block"
+            // while logging nothing at all, so a permanently broken mail setup was silent.
+            log.warn("Could not send verification email to the new account {}: {}",
+                result.user().id().value(), e.getMessage(), e);
         }
-
-        // Auto-login after registration
-        LoginUserUseCase.LoginResult result = loginUserUseCase.login(
-            new LoginUserUseCase.LoginCommand(request.email(), request.password())
-        );
 
         return ResponseEntity
             .status(HttpStatus.CREATED)
@@ -76,7 +82,7 @@ public class AuthController {
     public ResponseEntity<MessageResponse> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
         forgotPasswordUseCase.sendPasswordReset(request.email());
-        // Always return 200 to prevent user enumeration
+        // Always 200, whether or not the address is registered, to prevent enumeration.
         return ResponseEntity.ok(new MessageResponse(
                 "If that email is registered, a reset link has been sent"));
     }
@@ -85,7 +91,8 @@ public class AuthController {
     public ResponseEntity<MessageResponse> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
         resetPasswordUseCase.resetPassword(request.token(), request.newPassword());
-        return ResponseEntity.ok(new MessageResponse("Password reset successfully"));
+        return ResponseEntity.ok(new MessageResponse(
+                "Password reset successfully. Existing sessions have been signed out."));
     }
 
     @PostMapping("/login")
@@ -97,7 +104,7 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         RefreshTokenUseCase.AuthTokens tokens = refreshTokenUseCase.refresh(request.refreshToken());
-        
+
         return ResponseEntity.ok(new RefreshTokenResponse(
             tokens.accessToken(),
             tokens.refreshToken(),
@@ -105,16 +112,22 @@ public class AuthController {
         ));
     }
 
+    /**
+     * The authenticated user's own profile.
+     *
+     * <p>No null check on the principal: {@code /api/v1/**} requires authentication,
+     * so an unauthenticated caller is rejected by the filter chain and never reaches
+     * this method. The previous manual 401 was unreachable.
+     */
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal User user) {
-        if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         return ResponseEntity.ok(UserResponse.from(user));
     }
 
-    public record RefreshTokenRequest(String refreshToken) {}
-    
+    public record RefreshTokenRequest(
+        @NotBlank(message = "refreshToken is required") String refreshToken
+    ) {}
+
     public record RefreshTokenResponse(
         String accessToken,
         String refreshToken,

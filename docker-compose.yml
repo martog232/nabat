@@ -36,8 +36,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nabat_db
       SPRING_DATASOURCE_USERNAME: nabat_user
       SPRING_DATASOURCE_PASSWORD: nabat_password
-      # Local-development fallback only. Override with JWT_SECRET in your shell or .env.
-      JWT_SECRET: ${JWT_SECRET:-nabat-local-docker-jwt-secret-key-min-256-bits-for-development-only-123456}
+      # Required — compose fails fast if unset rather than falling back to a committed key.
+      # Generate one with `openssl rand -base64 48` and put it in .env (see .env.example).
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required. Generate one with `openssl rand -base64 48` and set it in .env}
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
       NABAT_BASE_URL: http://localhost:8080

@@ -7,7 +7,7 @@ import org.example.nabat.application.port.out.UserSubscriptionRepository;
 import org.example.nabat.domain.model.Location;
 import org.example.nabat.domain.model.UserId;
 import org.example.nabat.domain.model.UserSubscription;
-import org.springframework.security.access.AccessDeniedException;
+import org.example.nabat.domain.exception.NotAuthorizedException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -42,7 +42,8 @@ public class SubscriptionService implements SubscribeToAlertsUseCase {
         UserSubscription s = repository.findById(subscriptionId)
                 .orElseThrow(() -> new IllegalArgumentException("Subscription not found"));
         if (!s.userId().equals(actor)) {
-            throw new AccessDeniedException("Not the owner of this subscription");
+            // Domain exception, not Spring Security's — the handler maps it to the same 403.
+            throw new NotAuthorizedException("Not the owner of this subscription");
         }
         repository.deleteById(subscriptionId);
     }

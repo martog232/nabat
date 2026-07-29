@@ -4,10 +4,10 @@ import org.example.nabat.application.UseCase;
 import org.example.nabat.application.port.in.IssueWebSocketTicketUseCase;
 import org.example.nabat.application.port.in.RedeemWebSocketTicketUseCase;
 import org.example.nabat.application.port.out.WebSocketTicketRepository;
+import org.example.nabat.domain.exception.AuthenticationFailedException;
 import org.example.nabat.domain.model.UserId;
 import org.example.nabat.domain.model.WebSocketTicket;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.authentication.BadCredentialsException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -40,14 +40,14 @@ public class WebSocketTicketService implements IssueWebSocketTicketUseCase, Rede
     @Override
     public UserId redeem(String ticket) {
         if (ticket == null || ticket.isBlank()) {
-            throw new BadCredentialsException("Missing WebSocket ticket");
+            throw new AuthenticationFailedException("Missing WebSocket ticket");
         }
 
         WebSocketTicket issuedTicket = webSocketTicketRepository.consume(ticket.trim())
-            .orElseThrow(() -> new BadCredentialsException("Invalid WebSocket ticket"));
+            .orElseThrow(() -> new AuthenticationFailedException("Invalid WebSocket ticket"));
 
         if (issuedTicket.isExpiredAt(Instant.now())) {
-            throw new BadCredentialsException("Expired WebSocket ticket");
+            throw new AuthenticationFailedException("Expired WebSocket ticket");
         }
 
         return issuedTicket.userId();

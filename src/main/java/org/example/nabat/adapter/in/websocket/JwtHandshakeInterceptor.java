@@ -1,7 +1,7 @@
 package org.example.nabat.adapter.in.websocket;
 
-import org.example.nabat.adapter.in.security.JwtTokenProvider;
 import org.example.nabat.application.port.in.RedeemWebSocketTicketUseCase;
+import org.example.nabat.application.port.out.TokenProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -37,14 +37,15 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(JwtHandshakeInterceptor.class);
 
-    private final JwtTokenProvider jwtTokenProvider;
+    /** The port, not the concrete provider — nothing here needs the implementation. */
+    private final TokenProvider tokenProvider;
     private final RedeemWebSocketTicketUseCase redeemWebSocketTicketUseCase;
 
     public JwtHandshakeInterceptor(
-        JwtTokenProvider jwtTokenProvider,
+        TokenProvider tokenProvider,
         RedeemWebSocketTicketUseCase redeemWebSocketTicketUseCase
     ) {
-        this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenProvider = tokenProvider;
         this.redeemWebSocketTicketUseCase = redeemWebSocketTicketUseCase;
     }
 
@@ -90,18 +91,17 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
         return null;
     }
 
+    /**
+     * One signature verification, which also enforces that this is an access token and
+     * that the {@code userId} claim is a well-formed UUID.
+     */
     private UUID authenticateAccessToken(String token) {
-        if (!jwtTokenProvider.validateToken(token) || !jwtTokenProvider.isAccessToken(token)) {
-            log.warn("WS handshake rejected: invalid or non-access token");
-            return null;
-        }
-
-        try {
-            return UUID.fromString(jwtTokenProvider.getUserIdFromToken(token));
-        } catch (IllegalArgumentException ex) {
-            log.warn("WS handshake rejected: token has invalid userId claim");
-            return null;
-        }
+        return tokenProvider.parseAccessToken(token)
+            .map(TokenProvider.AccessTokenClaims::userId)
+            .orElseGet(() -> {
+                log.debug("WS handshake rejected: invalid or non-access token");
+                return null;
+            });
     }
 
     private UUID redeemTicket(String ticket) {

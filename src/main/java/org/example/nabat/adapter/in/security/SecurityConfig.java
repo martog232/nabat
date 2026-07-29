@@ -1,7 +1,7 @@
 package org.example.nabat.adapter.in.security;
 
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
+import org.example.nabat.config.AllowedOrigins;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -26,11 +26,11 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final List<String> allowedOrigins;
+    private final AllowedOrigins allowedOrigins;
 
     public SecurityConfig(
         JwtAuthenticationFilter jwtAuthenticationFilter,
-        @Value("${nabat.cors.allowed-origins:}") List<String> allowedOrigins
+        AllowedOrigins allowedOrigins
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.allowedOrigins = allowedOrigins;
@@ -51,7 +51,9 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/api/v1/**").authenticated()
-                .anyRequest().permitAll()
+                // Fail closed. Previously `permitAll()`, which meant any endpoint added
+                // outside /api/v1 — or any typo in a @RequestMapping — was silently public.
+                .anyRequest().denyAll()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(ex -> ex
@@ -65,16 +67,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Driven by `nabat.cors.allowed-origins` (comma-separated). When unset, fall back to a
-        // safe localhost-only allow-list so frontend dev servers (Vite 5173, CRA 3000) work
-        // out of the box without leaking access to public origins.
-        List<String> effective = allowedOrigins.isEmpty()
-            ? List.of(
-                "http://localhost:5173", "http://127.0.0.1:5173",
-                "http://localhost:3000", "http://127.0.0.1:3000"
-            )
-            : allowedOrigins;
-        configuration.setAllowedOriginPatterns(effective);
+        // Resolved once by AllowedOrigins, shared with the WebSocket handshake config.
+        configuration.setAllowedOriginPatterns(allowedOrigins.patterns());
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));

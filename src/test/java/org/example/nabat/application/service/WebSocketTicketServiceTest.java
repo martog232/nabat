@@ -1,11 +1,11 @@
 package org.example.nabat.application.service;
 
-import org.example.nabat.adapter.out.memory.InMemoryWebSocketTicketRepository;
+import org.example.nabat.testsupport.FakeWebSocketTicketRepository;
 import org.example.nabat.domain.model.UserId;
 import org.example.nabat.domain.model.WebSocketTicket;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.example.nabat.domain.exception.AuthenticationFailedException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -18,12 +18,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WebSocketTicketServiceTest {
 
-    private InMemoryWebSocketTicketRepository repository;
+    private FakeWebSocketTicketRepository repository;
     private WebSocketTicketService service;
 
     @BeforeEach
     void setUp() {
-        repository = new InMemoryWebSocketTicketRepository();
+        repository = new FakeWebSocketTicketRepository();
         service = new WebSocketTicketService(repository, Duration.ofMinutes(2));
     }
 
@@ -43,7 +43,7 @@ class WebSocketTicketServiceTest {
         var issued = service.issueTicket(new org.example.nabat.application.port.in.IssueWebSocketTicketUseCase.IssueWebSocketTicketCommand(userId));
 
         assertEquals(userId, service.redeem(issued.ticket()));
-        assertThrows(BadCredentialsException.class, () -> service.redeem(issued.ticket()));
+        assertThrows(AuthenticationFailedException.class, () -> service.redeem(issued.ticket()));
     }
 
     @Test
@@ -51,12 +51,12 @@ class WebSocketTicketServiceTest {
         UserId userId = UserId.of(UUID.randomUUID());
         repository.save(new WebSocketTicket("expired-ticket", userId, Instant.now().minusSeconds(5)));
 
-        assertThrows(BadCredentialsException.class, () -> service.redeem("expired-ticket"));
+        assertThrows(AuthenticationFailedException.class, () -> service.redeem("expired-ticket"));
     }
 
     @Test
     void rejectsBlankTicket() {
-        assertThrows(BadCredentialsException.class, () -> service.redeem("  "));
+        assertThrows(AuthenticationFailedException.class, () -> service.redeem("  "));
     }
 }
 

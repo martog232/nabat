@@ -6,7 +6,7 @@ import org.example.nabat.application.port.in.CreateAlertUseCase;
 import org.example.nabat.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.application.port.in.ResolveAlertUseCase;
-import org.example.nabat.application.port.out.AlertRepository;
+import org.example.nabat.application.port.in.ListAlertsUseCase;
 import org.example.nabat.application.port.out.UserRepository;
 import org.example.nabat.domain.model.Alert;
 import org.example.nabat.domain.model.AlertId;
@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -59,8 +60,13 @@ class AlertControllerTest {
     @MockitoBean
     private ResolveAlertUseCase resolveAlertUseCase;
 
+    /**
+     * Replaces the {@code AlertRepository} out-port this test used to mock: the
+     * controller now depends on an in-port for the admin listing instead of reaching
+     * into the repository directly.
+     */
     @MockitoBean
-    private AlertRepository alertRepository;
+    private ListAlertsUseCase listAlertsUseCase;
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
@@ -80,6 +86,8 @@ class AlertControllerTest {
                 AlertStatus.ACTIVE,
                 UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 0, 0, 0,
+
+                0,
                 null,
                 null
         );
@@ -106,7 +114,9 @@ class AlertControllerTest {
                 null,
                 null,
                 null
-        );
+        ,
+
+                0);
 
         CreateAlertRequest request = new CreateAlertRequest(
                 "Test Alert",
@@ -209,12 +219,13 @@ class AlertControllerTest {
         User mockUser = new User(
                 UserId.of(UUID.randomUUID()),
                 "test@example.com", "p", "n",
-                Role.USER, true, false, now, now, 5, null, null, null);
+                Role.USER, true, false, now, now, 5, null, null, null,
+        0);
         var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                 mockUser, null, java.util.List.of());
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
 
-        mockMvc.perform(post("/api/v1/alerts/{id}/resolve", resolved.id().value()))
+        mockMvc.perform(patch("/api/v1/alerts/{id}/resolve", resolved.id().value()))
                 .andExpect(status().isOk());
     }
 }

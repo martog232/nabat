@@ -68,6 +68,8 @@ class CreateAlertServiceTest {
                 AlertStatus.ACTIVE,
                 UUID.randomUUID(),
                 0, 0, 0,
+
+                0,
                 null,
                 null
         );

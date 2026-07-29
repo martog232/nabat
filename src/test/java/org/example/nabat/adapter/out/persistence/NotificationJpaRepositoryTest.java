@@ -1,8 +1,11 @@
 package org.example.nabat.adapter.out.persistence;
 
+import org.example.nabat.domain.model.Alert;
+import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.AlertSeverity;
 import org.example.nabat.domain.model.AlertStatus;
 import org.example.nabat.domain.model.AlertType;
+import org.example.nabat.domain.model.Location;
 import org.example.nabat.domain.model.NotificationType;
 import org.example.nabat.domain.model.Role;
 import org.example.nabat.PostgresTestSupport;
@@ -86,18 +89,24 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
     }
 
     private UUID saveAlert(UUID reportedBy) {
-        AlertJpaEntity alert = new AlertJpaEntity();
-        alert.setId(UUID.randomUUID());
-        alert.setTitle("Related alert");
-        alert.setDescription("desc");
-        alert.setType(AlertType.HAZARD);
-        alert.setSeverity(AlertSeverity.HIGH);
-        alert.setLatitude(42.6977);
-        alert.setLongitude(23.3219);
-        alert.setCreatedAt(Instant.now());
-        alert.setStatus(AlertStatus.ACTIVE);
-        alert.setReportedBy(reportedBy);
-        return alertRepository.saveAndFlush(alert).getId();
+        // Built through the domain factory rather than field setters: AlertJpaEntity no
+        // longer exposes a blanket @Setter, which had allowed callers to change an
+        // alert's status without going through Alert.resolve().
+        Alert alert = new Alert(
+                AlertId.generate(),
+                "Related alert",
+                "desc",
+                AlertType.HAZARD,
+                AlertSeverity.HIGH,
+                Location.of(42.6977, 23.3219),
+                Instant.now(),
+                AlertStatus.ACTIVE,
+                reportedBy,
+                0, 0, 0, 0,
+                null,
+                null
+        );
+        return alertRepository.saveAndFlush(AlertJpaEntity.from(alert)).getId();
     }
 
     private NotificationJpaEntity notification(

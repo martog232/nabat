@@ -6,6 +6,7 @@ import org.example.nabat.application.port.in.GetNotificationUseCase;
 import org.example.nabat.application.port.in.SendNotificationUseCase;
 import org.example.nabat.application.port.out.NotificationRepository;
 import org.example.nabat.application.port.out.NotificationSender;
+import org.example.nabat.domain.exception.NotificationNotFoundException;
 import org.example.nabat.domain.model.Notification;
 import org.example.nabat.domain.model.NotificationId;
 import org.example.nabat.domain.model.NotificationType;
@@ -45,11 +46,13 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
     @Override
     @Transactional
     public Notification markAsRead(NotificationId notificationId, UserId userId) {
+        // Absent and not-yours are reported identically, as a 404. Reporting them
+        // differently — which the two distinct IllegalArgumentException messages here
+        // used to do, both surfacing as 400 — let a caller probe which notification ids
+        // exist, and mapped an authorization failure to "bad request".
         Notification found = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
-        if (!found.recipientId().equals(userId)) {
-            throw new IllegalArgumentException("Notification does not belong to user");
-        }
+                .filter(notification -> notification.recipientId().equals(userId))
+                .orElseThrow(() -> new NotificationNotFoundException(notificationId));
 
         if (found.isRead()) {
             return found;

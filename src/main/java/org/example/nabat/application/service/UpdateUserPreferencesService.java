@@ -3,17 +3,13 @@ package org.example.nabat.application.service;
 import org.example.nabat.application.UseCase;
 import org.example.nabat.application.port.in.UpdateUserPreferencesUseCase;
 import org.example.nabat.application.port.out.UserRepository;
+import org.example.nabat.domain.exception.UserNotFoundException;
+import org.example.nabat.domain.model.NotificationRadius;
 import org.example.nabat.domain.model.User;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.Set;
 
 @UseCase
 public class UpdateUserPreferencesService implements UpdateUserPreferencesUseCase {
-
-    private static final Set<Integer> ALLOWED_RADII = Set.of(1, 5, 10, 25, 50);
 
     private final UserRepository userRepository;
 
@@ -24,39 +20,20 @@ public class UpdateUserPreferencesService implements UpdateUserPreferencesUseCas
     @Override
     @Transactional
     public User updatePreferences(UpdatePreferencesCommand command) {
-        validateRadius(command.notificationRadiusKm());
+        // Validated against the same allow-list the users table CHECK constraint uses,
+        // so an out-of-range value fails as a 400 rather than a constraint violation.
+        NotificationRadius.requireSupported(command.notificationRadiusKm());
 
         User user = userRepository.findById(command.userId())
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + command.userId().value()));
+            .orElseThrow(() -> new UserNotFoundException(command.userId()));
 
-        User updatedUser = command.lastKnownLat() != null && command.lastKnownLng() != null
+        boolean hasLocation = command.lastKnownLat() != null && command.lastKnownLng() != null;
+        User updatedUser = hasLocation
             ? user.withLocation(command.lastKnownLat(), command.lastKnownLng(), command.notificationRadiusKm())
-            : withNotificationRadius(user, command.notificationRadiusKm());
+            // Was a hand-inlined 13-argument copy of the User record — the seventh such
+            // copy in the codebase. User now exposes this directly.
+            : user.withNotificationRadius(command.notificationRadiusKm());
 
         return userRepository.save(updatedUser);
-    }
-
-    private void validateRadius(int notificationRadiusKm) {
-        if (!ALLOWED_RADII.contains(notificationRadiusKm)) {
-            throw new IllegalArgumentException("Unsupported notification radius: " + notificationRadiusKm);
-        }
-    }
-
-    private User withNotificationRadius(User user, int notificationRadiusKm) {
-        return new User(
-            user.id(),
-            user.email(),
-            user.password(),
-            user.displayName(),
-            user.role(),
-            user.enabled(),
-            user.emailVerified(),
-            user.createdAt(),
-            Instant.now(),
-            notificationRadiusKm,
-            user.lastKnownLat(),
-            user.lastKnownLng(),
-            user.locationUpdatedAt()
-        );
     }
 }

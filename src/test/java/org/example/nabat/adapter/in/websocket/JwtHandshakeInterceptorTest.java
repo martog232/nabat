@@ -1,7 +1,7 @@
 package org.example.nabat.adapter.in.websocket;
 
 import org.example.nabat.adapter.in.security.JwtTokenProvider;
-import org.example.nabat.adapter.out.memory.InMemoryWebSocketTicketRepository;
+import org.example.nabat.testsupport.FakeWebSocketTicketRepository;
 import org.example.nabat.application.port.in.IssueWebSocketTicketUseCase;
 import org.example.nabat.application.service.WebSocketTicketService;
 import org.example.nabat.domain.model.Role;
@@ -32,7 +32,7 @@ class JwtHandshakeInterceptorTest {
         "ws-handshake-secret-key-min-256-bits-for-testing-purposes-only-not-for-prod";
 
     private JwtTokenProvider tokenProvider;
-    private InMemoryWebSocketTicketRepository ticketRepository;
+    private FakeWebSocketTicketRepository ticketRepository;
     private WebSocketTicketService webSocketTicketService;
     private JwtHandshakeInterceptor interceptor;
     private User user;
@@ -41,13 +41,14 @@ class JwtHandshakeInterceptorTest {
     @BeforeEach
     void setUp() {
         tokenProvider = new JwtTokenProvider(SECRET, 3_600_000L, 86_400_000L);
-        ticketRepository = new InMemoryWebSocketTicketRepository();
+        ticketRepository = new FakeWebSocketTicketRepository();
         webSocketTicketService = new WebSocketTicketService(ticketRepository, java.time.Duration.ofMinutes(2));
         interceptor = new JwtHandshakeInterceptor(tokenProvider, webSocketTicketService);
         user = new User(
             UserId.of(UUID.randomUUID()), "ws@example.com", "h", "WS User",
             Role.USER, true, false, Instant.now(), Instant.now(), 5, null, null, null
-        );
+        ,
+        0);
     }
 
     @Test

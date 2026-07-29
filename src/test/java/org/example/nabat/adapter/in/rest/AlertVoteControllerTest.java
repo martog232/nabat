@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -68,7 +69,8 @@ class AlertVoteControllerTest {
                 5,
                 null,
                 null,
-                null
+                null,
+                                 0
         );
     }
 
@@ -89,7 +91,8 @@ class AlertVoteControllerTest {
                 UUID.randomUUID(),
                 AlertId.of(ALERT_ID),
                 VoteType.UPVOTE,
-                Instant.now());
+                Instant.now(),
+                new VoteAlertUseCase.VoteStats(4, 1, 2, 7));
         when(voteAlertUseCase.vote(any())).thenReturn(vote);
 
         String requestBody = objectMapper.writeValueAsString(
@@ -101,30 +104,40 @@ class AlertVoteControllerTest {
                         .content(requestBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.alertId").value(ALERT_ID.toString()))
-                .andExpect(jsonPath("$.voteType").value("UPVOTE"));
+                .andExpect(jsonPath("$.voteType").value("UPVOTE"))
+                // Tallies come back with the vote, so the client needs no follow-up call
+                // to the eventually-consistent stats endpoint.
+                .andExpect(jsonPath("$.stats.upvotes").value(4))
+                .andExpect(jsonPath("$.stats.credibilityScore").value(7));
     }
 
     @Test
-    void shouldRemoveVote() throws Exception {
+    void shouldRemoveVoteAndReturnResultingStats() throws Exception {
         User user = buildTestUser();
         authenticateAs(user);
 
-        doNothing().when(voteAlertUseCase).removeVote(any(), any());
+        when(voteAlertUseCase.removeVote(any(), any()))
+                .thenReturn(new VoteAlertUseCase.VoteStats(3, 1, 0, 2));
 
+        // 200 with the new tallies rather than 204, so the caller learns the new state.
         mockMvc.perform(delete("/api/v1/alerts/{alertId}/votes", ALERT_ID))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.upvotes").value(3))
+                .andExpect(jsonPath("$.credibilityScore").value(2));
     }
 
     @Test
     void shouldReturnVoteStats() throws Exception {
-        VoteAlertUseCase.VoteStats stats = VoteAlertUseCase.VoteStats.of(10, 2, 3);
+        // The score is supplied by the voting service, not derived here.
+        VoteAlertUseCase.VoteStats stats = new VoteAlertUseCase.VoteStats(10, 2, 3, 14);
         when(voteAlertUseCase.getVoteStats(any())).thenReturn(stats);
 
         mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/stats", ALERT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.upvotes").value(10))
                 .andExpect(jsonPath("$.downvotes").value(2))
-                .andExpect(jsonPath("$.confirmations").value(3));
+                .andExpect(jsonPath("$.confirmations").value(3))
+                .andExpect(jsonPath("$.credibilityScore").value(14));
     }
 
     @Test
@@ -132,7 +145,7 @@ class AlertVoteControllerTest {
         User user = buildTestUser();
         authenticateAs(user);
 
-        when(voteAlertUseCase.hasUserVoted(any(), any())).thenReturn(VoteType.UPVOTE);
+        when(voteAlertUseCase.findUserVote(any(), any())).thenReturn(Optional.of(VoteType.UPVOTE));
 
         mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/me", ALERT_ID))
                 .andExpect(status().isOk())
@@ -145,7 +158,7 @@ class AlertVoteControllerTest {
         User user = buildTestUser();
         authenticateAs(user);
 
-        when(voteAlertUseCase.hasUserVoted(any(), any())).thenReturn(null);
+        when(voteAlertUseCase.findUserVote(any(), any())).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/me", ALERT_ID))
                 .andExpect(status().isOk())

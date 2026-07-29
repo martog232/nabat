@@ -40,7 +40,8 @@ class EmailVerificationServiceTest {
 
     private User user(boolean verified) {
         return new User(userId, email, "hash", "Alice", Role.USER, true, verified,
-                Instant.now(), Instant.now(), 5, null, null, null);
+                Instant.now(), Instant.now(), 5, null, null, null,
+        0);
     }
 
     @BeforeEach
@@ -49,12 +50,13 @@ class EmailVerificationServiceTest {
         service = new EmailVerificationService(userRepository, tokenRepository, emailSender, passwordEncoder);
     }
 
-    // ── sendVerificationEmail ────────────────────────────────────────────────
+    // в”Ђв”Ђ sendVerificationEmail в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     @Test
     void sendVerificationEmail_createsTokenAndSendsEmail() {
         when(userRepository.findById(userId)).thenReturn(Optional.of(user(false)));
-        VerificationToken saved = VerificationToken.createEmailVerification(userId);
+        VerificationToken.Issued issuedPair = VerificationToken.createEmailVerification(userId);
+        VerificationToken saved = issuedPair.token();
         when(tokenRepository.save(any())).thenReturn(saved);
 
         service.sendVerificationEmail(userId);
@@ -73,18 +75,19 @@ class EmailVerificationServiceTest {
         verifyNoInteractions(tokenRepository, emailSender);
     }
 
-    // ── verifyEmail ──────────────────────────────────────────────────────────
+    // в”Ђв”Ђ verifyEmail в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     @Test
     void verifyEmail_marksUserVerified() {
-        VerificationToken token = VerificationToken.createEmailVerification(userId);
+        VerificationToken.Issued issued = VerificationToken.createEmailVerification(userId);
+        VerificationToken token = issued.token();
         when(tokenRepository.findByIdAndType(token.id(), VerificationTokenType.EMAIL_VERIFICATION))
                 .thenReturn(Optional.of(token));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user(false)));
         when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(tokenRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        service.verifyEmail(token.id());
+        service.verifyEmail(issued.rawValue());
 
         ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(savedUser.capture());
@@ -103,31 +106,33 @@ class EmailVerificationServiceTest {
 
     @Test
     void verifyEmail_throwsForAlreadyUsedToken() {
-        VerificationToken used = VerificationToken.createEmailVerification(userId).markUsed();
+        VerificationToken.Issued usedPair = VerificationToken.createEmailVerification(userId);
+        VerificationToken used = usedPair.token().markUsed();
         when(tokenRepository.findByIdAndType(used.id(), VerificationTokenType.EMAIL_VERIFICATION))
                 .thenReturn(Optional.of(used));
-        assertThrows(IllegalArgumentException.class, () -> service.verifyEmail(used.id()));
+        assertThrows(IllegalArgumentException.class, () -> service.verifyEmail(usedPair.rawValue()));
     }
 
     @Test
     void verifyEmail_throwsForExpiredToken() {
         // Construct an already-expired token by creating a verification token and replacing its
         // expiresAt with a past instant via the copy constructor
-        VerificationToken fresh = VerificationToken.createEmailVerification(userId);
+        VerificationToken.Issued freshPair = VerificationToken.createEmailVerification(userId);
+        VerificationToken fresh = freshPair.token();
         Instant past = Instant.now().minus(2, ChronoUnit.HOURS);
         VerificationToken expired = new VerificationToken(
                 fresh.id(), fresh.userId(), fresh.type(), past, false, fresh.createdAt());
         when(tokenRepository.findByIdAndType(expired.id(), VerificationTokenType.EMAIL_VERIFICATION))
                 .thenReturn(Optional.of(expired));
-        assertThrows(IllegalArgumentException.class, () -> service.verifyEmail(expired.id()));
+        assertThrows(IllegalArgumentException.class, () -> service.verifyEmail(freshPair.rawValue()));
     }
 
-    // ── sendPasswordReset ────────────────────────────────────────────────────
+    // в”Ђв”Ђ sendPasswordReset в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     @Test
     void sendPasswordReset_sendsEmailForKnownUser() {
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user(false)));
-        VerificationToken resetToken = VerificationToken.createPasswordReset(userId);
+        VerificationToken resetToken = VerificationToken.createPasswordReset(userId).token();
         when(tokenRepository.save(any())).thenReturn(resetToken);
 
         service.sendPasswordReset(email);
@@ -145,18 +150,19 @@ class EmailVerificationServiceTest {
         verifyNoInteractions(tokenRepository, emailSender);
     }
 
-    // ── resetPassword ────────────────────────────────────────────────────────
+    // в”Ђв”Ђ resetPassword в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
     @Test
     void resetPassword_updatesUserPassword() {
-        VerificationToken token = VerificationToken.createPasswordReset(userId);
+        VerificationToken.Issued issued = VerificationToken.createPasswordReset(userId);
+        VerificationToken token = issued.token();
         when(tokenRepository.findByIdAndType(token.id(), VerificationTokenType.PASSWORD_RESET))
                 .thenReturn(Optional.of(token));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user(false)));
         when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(tokenRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        service.resetPassword(token.id(), "newSecurePass");
+        service.resetPassword(issued.rawValue(), "newSecurePass");
 
         ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(savedUser.capture());
@@ -167,13 +173,14 @@ class EmailVerificationServiceTest {
 
     @Test
     void resetPassword_throwsForExpiredToken() {
-        VerificationToken fresh = VerificationToken.createPasswordReset(userId);
+        VerificationToken.Issued freshPair = VerificationToken.createPasswordReset(userId);
+        VerificationToken fresh = freshPair.token();
         Instant past = Instant.now().minus(2, ChronoUnit.HOURS);
         VerificationToken expired = new VerificationToken(
                 fresh.id(), fresh.userId(), fresh.type(), past, false, fresh.createdAt());
         when(tokenRepository.findByIdAndType(expired.id(), VerificationTokenType.PASSWORD_RESET))
                 .thenReturn(Optional.of(expired));
         assertThrows(IllegalArgumentException.class,
-                () -> service.resetPassword(expired.id(), "pass"));
+                () -> service.resetPassword(freshPair.rawValue(), "pass"));
     }
 }

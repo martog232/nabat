@@ -98,7 +98,9 @@ class UserSubscriptionJpaRepositoryPostgisIntegrationTest extends PostgisIntegra
             null,
             null,
             null
-        );
+        ,
+
+            0);
         userRepository.saveAndFlush(UserJpaEntity.from(user));
     }
 

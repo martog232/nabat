@@ -1,5 +1,6 @@
 package org.example.nabat.application.service;
 
+import org.example.nabat.domain.exception.NotificationNotFoundException;
 import org.example.nabat.application.port.in.SendNotificationUseCase;
 import org.example.nabat.application.port.out.NotificationRepository;
 import org.example.nabat.application.port.out.NotificationSender;
@@ -96,8 +97,7 @@ class NotificationServiceTest {
         Notification n = existing(false);
         when(notificationRepository.findById(n.id())).thenReturn(Optional.of(n));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> service.markAsRead(n.id(), UserId.generate()));
+        assertThrows(NotificationNotFoundException.class, () -> service.markAsRead(n.id(), UserId.generate()));
     }
 
     @Test
@@ -105,7 +105,7 @@ class NotificationServiceTest {
         NotificationId id = NotificationId.generate();
         when(notificationRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class, () -> service.markAsRead(id, user));
+        assertThrows(NotificationNotFoundException.class, () -> service.markAsRead(id, user));
     }
 
     @Test

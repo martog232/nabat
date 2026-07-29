@@ -61,6 +61,10 @@ public class UserJpaEntity {
     @Column(name = "location_updated_at")
     private Instant locationUpdatedAt;
 
+    /** See {@link User#tokenVersion()} — bumped to invalidate issued tokens. */
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion;
+
     protected UserJpaEntity() {
     }
 
@@ -79,6 +83,7 @@ public class UserJpaEntity {
         entity.lastKnownLat = user.lastKnownLat();
         entity.lastKnownLng = user.lastKnownLng();
         entity.locationUpdatedAt = user.locationUpdatedAt();
+        entity.tokenVersion = user.tokenVersion();
         return entity;
     }
 
@@ -96,7 +101,8 @@ public class UserJpaEntity {
             notificationRadiusKm,
             lastKnownLat,
             lastKnownLng,
-            locationUpdatedAt
+            locationUpdatedAt,
+            tokenVersion
         );
     }
 }

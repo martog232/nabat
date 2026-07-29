@@ -6,7 +6,9 @@ import org.example.nabat.domain.model.AlertId;
 import org.example.nabat.domain.model.AlertStatus;
 import org.example.nabat.domain.model.Location;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,28 +42,45 @@ public class AlertRepositoryAdapter implements AlertRepository {
         List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
                 ? jpaRepository.findActiveAlertsWithinRadius(center.latitude(), center.longitude(), radiusKm)
                 : jpaRepository.findActiveAlertsWithinRadiusHaversine(center.latitude(), center.longitude(), radiusKm);
-        return results.stream()
-                .map(AlertJpaEntity::toDomain)
-                .toList();
+        return toDomain(results);
+    }
+
+    @Override
+    public List<Alert> findActiveAlertsWithinRadiusSince(Location center, double radiusKm, Instant since) {
+        List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
+                ? jpaRepository.findActiveAlertsWithinRadiusSince(
+                    center.latitude(), center.longitude(), radiusKm, since)
+                : jpaRepository.findActiveAlertsWithinRadiusSinceHaversine(
+                    center.latitude(), center.longitude(), radiusKm, since);
+        return toDomain(results);
     }
 
     @Override
     public List<Alert> findByStatus(AlertStatus status) {
-        return jpaRepository.findByStatus(status)
-            .stream()
-            .map(AlertJpaEntity::toDomain)
-            .toList();
+        return toDomain(jpaRepository.findByStatus(status));
     }
 
+    /**
+     * Transactional here rather than relying on an ambient transaction, because the
+     * callers deliberately do <em>not</em> wrap the surrounding vote flow in one —
+     * that flow makes network calls to the voting service, and holding a database
+     * transaction across them exhausted the connection pool under load.
+     */
     @Override
-    public void updateVoteCounts(AlertId alertId, int upvotes, int downvotes, int confirmations, int credibilityScore) {
-        jpaRepository.updateVoteCounts(
-            alertId.value(),
-            upvotes,
-            downvotes,
-            confirmations,
-            credibilityScore
-        );
+    @Transactional
+    public Optional<Alert> applyVoteCounts(
+        AlertId alertId, int upvotes, int downvotes, int confirmations, int credibilityScore) {
+
+        int updated = jpaRepository.updateVoteCounts(
+            alertId.value(), upvotes, downvotes, confirmations, credibilityScore);
+
+        if (updated == 0) {
+            return Optional.empty();
+        }
+
+        // The @Modifying query clears the persistence context, so this re-reads the
+        // freshly written row rather than a cached copy.
+        return findById(alertId);
     }
 
     @Override
@@ -73,5 +92,11 @@ public class AlertRepositoryAdapter implements AlertRepository {
                         stats.getConfirmationCount(),
                         stats.getCredibilityScore()
                 ));
+    }
+
+    private static List<Alert> toDomain(List<AlertJpaEntity> entities) {
+        return entities.stream()
+                .map(AlertJpaEntity::toDomain)
+                .toList();
     }
 }
