@@ -1,7 +1,7 @@
 package org.example.nabat.testsupport;
 
-import org.example.nabat.application.port.out.WebSocketTicketRepository;
-import org.example.nabat.domain.model.WebSocketTicket;
+import org.example.nabat.realtime.application.port.out.WebSocketTicketRepository;
+import org.example.nabat.realtime.domain.WebSocketTicket;
 
 import java.util.Map;
 import java.util.Optional;

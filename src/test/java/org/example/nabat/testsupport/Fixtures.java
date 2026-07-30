@@ -1,17 +1,17 @@
 package org.example.nabat.testsupport;
 
-import org.example.nabat.domain.model.Alert;
-import org.example.nabat.domain.model.AlertId;
-import org.example.nabat.domain.model.AlertSeverity;
-import org.example.nabat.domain.model.AlertStatus;
-import org.example.nabat.domain.model.AlertType;
-import org.example.nabat.domain.model.Location;
-import org.example.nabat.domain.model.Notification;
-import org.example.nabat.domain.model.NotificationId;
-import org.example.nabat.domain.model.NotificationType;
-import org.example.nabat.domain.model.Role;
-import org.example.nabat.domain.model.User;
-import org.example.nabat.domain.model.UserId;
+import org.example.nabat.incident.domain.Alert;
+import org.example.nabat.incident.domain.AlertId;
+import org.example.nabat.incident.domain.AlertSeverity;
+import org.example.nabat.incident.domain.AlertStatus;
+import org.example.nabat.incident.domain.AlertType;
+import org.example.nabat.shared.domain.Location;
+import org.example.nabat.notification.domain.Notification;
+import org.example.nabat.notification.domain.NotificationId;
+import org.example.nabat.notification.domain.NotificationType;
+import org.example.nabat.identity.domain.Role;
+import org.example.nabat.identity.domain.User;
+import org.example.nabat.identity.domain.UserId;
 
 import java.time.Instant;
 import java.util.UUID;

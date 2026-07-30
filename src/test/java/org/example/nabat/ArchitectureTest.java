@@ -1,158 +1,128 @@
 package org.example.nabat;
 
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * Enforces the layering rules stated in AGENTS.md.
+ * Enforces the hexagonal layering rules stated in AGENTS.md, <em>within</em> each module.
  *
- * <h2>Why this replaced ModulithArchitectureTest</h2>
- * The previous test asserted that {@code ApplicationModules.of(...).getModuleByName("voting")}
- * was absent. Spring Modulith derives modules from the <em>direct</em> subpackages of
- * the application root — here {@code adapter}, {@code application}, {@code config} and
- * {@code domain} — so a module named "voting" could never exist and the assertion
- * passed vacuously. It gave the appearance of architecture enforcement while checking
- * nothing, and caught none of the four real violations that had accumulated:
+ * <p>Module boundaries themselves are checked by {@link ModularityTest}: Spring Modulith
+ * owns the question of which module may see which. This class owns the orthogonal
+ * question of how the layers inside a module relate — domain knows nothing of frameworks,
+ * application knows nothing of adapters, inbound adapters know nothing of outbound ones.
  *
- * <ul>
- *   <li>{@code AuthenticationService} (application) importing
- *       {@code adapter.in.security.LoginAttemptTracker} and {@code RequestContextHelper}</li>
- *   <li>{@code AlertController} injecting the {@code AlertRepository} out-port directly</li>
- *   <li>{@code AlertWebSocketHandler} (adapter.in) depending on
- *       {@code adapter.out.notification.RedisWsPublisher}, and vice versa</li>
- *   <li>Spring Security exceptions thrown from application and domain classes</li>
- * </ul>
- *
- * <p>Implemented by scanning imports rather than with ArchUnit, to avoid adding a
- * dependency for four rules. If more rules are wanted, ArchUnit is the better tool.
+ * <h2>Why ArchUnit</h2>
+ * The previous version scanned import statements with a regex over four fixed directory
+ * paths ({@code domain}, {@code application}, {@code adapter/in}). Those paths stopped
+ * existing when the codebase moved from layer-first to feature-first packages: every
+ * module now has its own {@code domain} and {@code application}. Expressing that needs a
+ * matcher over packages rather than a directory walk, and ArchUnit is already on the test
+ * classpath through {@code spring-modulith-test}.
  */
 class ArchitectureTest {
 
-    private static final Path SOURCE_ROOT = Path.of("src/main/java/org/example/nabat");
-    private static final Pattern IMPORT = Pattern.compile("^import\\s+(?:static\\s+)?([\\w.]+);", Pattern.MULTILINE);
+    /**
+     * Production classes only. Tests deliberately cross layers — a controller slice test
+     * names the controller and its use case together — and are not subject to these rules.
+     */
+    private static final JavaClasses CLASSES = new ClassFileImporter()
+        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+        .importPackages("org.example.nabat");
 
     @Test
-    @DisplayName("domain does not depend on Spring, JPA, Jackson or any adapter")
+    @DisplayName("domain does not depend on Spring, JPA, Jackson or Lombok")
     void domainIsFrameworkFree() {
-        assertNoImportsMatching(
-            "domain",
-            List.of(
-                "org.springframework.",
-                "jakarta.persistence.",
-                "com.fasterxml.jackson.",
-                "lombok.",
-                "org.example.nabat.adapter.",
-                "org.example.nabat.application."
-            ));
+        // package-info carries @NamedInterface, which is Spring Modulith metadata on the
+        // package declaration rather than a dependency of any domain type.
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("..domain..")
+            .and().haveSimpleNameNotContaining("package-info")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "org.springframework..",
+                "jakarta.persistence..",
+                "com.fasterxml.jackson..",
+                "lombok.."
+            );
+
+        rule.check(CLASSES);
     }
 
     @Test
-    @DisplayName("application layer does not depend on any adapter")
+    @DisplayName("domain does not depend on the application or adapter layers")
+    void domainDoesNotDependOnOuterLayers() {
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "org.example.nabat..application..",
+                "org.example.nabat..adapter.."
+            );
+
+        rule.check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("the application layer does not depend on any adapter")
     void applicationDoesNotDependOnAdapters() {
-        assertNoImportsMatching("application", List.of("org.example.nabat.adapter."));
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("..application..")
+            .should().dependOnClassesThat().resideInAPackage("org.example.nabat..adapter..");
+
+        rule.check(CLASSES);
     }
 
     @Test
-    @DisplayName("application layer does not import servlet or Spring Security types")
+    @DisplayName("the application layer does not import servlet or Spring Security web types")
     void applicationDoesNotUseWebOrSecurityFrameworks() {
         // Spring Security's PasswordEncoder is the one deliberate exception: it is an
         // abstraction over hashing with no servlet or filter-chain coupling, and giving it
-        // a bespoke port would add indirection for no gain.
-        assertNoImportsMatching(
-            "application",
-            List.of(
-                "jakarta.servlet.",
-                "org.springframework.web.",
-                "org.springframework.security.core.",
-                "org.springframework.security.authentication.",
-                "org.springframework.security.access."
-            ));
+        // a bespoke port would add indirection for no gain. It lives in
+        // org.springframework.security.crypto, which is not listed below.
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("..application..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "jakarta.servlet..",
+                "org.springframework.web..",
+                "org.springframework.security.core..",
+                "org.springframework.security.authentication..",
+                "org.springframework.security.access.."
+            );
+
+        rule.check(CLASSES);
     }
 
     @Test
     @DisplayName("domain does not throw Spring Security exceptions")
     void domainDoesNotUseSecurityFrameworkExceptions() {
-        assertNoImportsMatching("domain", List.of("org.springframework.security."));
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAPackage("org.springframework.security..");
+
+        rule.check(CLASSES);
     }
 
     @Test
-    @DisplayName("inbound adapters do not depend on outbound adapters, or the reverse")
-    void adaptersDoNotDependOnEachOther() {
-        // Both directions are checked. adapter.out.notification legitimately implements
-        // interfaces *declared* in adapter.in.websocket (WsClusterRelay, LocalWsDelivery),
-        // which is the dependency-inversion fix for the previous mutual coupling — so
-        // that package is allowed to see those two types and nothing else.
-        assertNoImportsMatching("adapter/in", List.of("org.example.nabat.adapter.out."));
+    @DisplayName("inbound adapters do not depend on outbound adapters")
+    void inboundAdaptersDoNotDependOnOutboundAdapters() {
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("..adapter.in..")
+            .should().dependOnClassesThat().resideInAPackage("org.example.nabat..adapter.out..");
+
+        rule.check(CLASSES);
     }
 
     @Test
     @DisplayName("REST controllers depend on in-ports, not on out-ports")
     void controllersDoNotUseOutPorts() {
-        assertNoImportsMatching("adapter/in/rest", List.of("org.example.nabat.application.port.out.AlertRepository",
-            "org.example.nabat.application.port.out.UserRepository",
-            "org.example.nabat.application.port.out.NotificationRepository",
-            "org.example.nabat.application.port.out.UserSubscriptionRepository"));
-    }
+        ArchRule rule = noClasses()
+            .that().resideInAPackage("..adapter.in.rest..")
+            .should().dependOnClassesThat().resideInAPackage("org.example.nabat..application.port.out..");
 
-    private void assertNoImportsMatching(String relativePackagePath, List<String> forbiddenPrefixes) {
-        Path root = SOURCE_ROOT.resolve(relativePackagePath);
-        assertThat(root).as("source directory %s should exist", root).exists();
-
-        try (Stream<Path> files = Files.walk(root)) {
-            List<String> violations = files
-                .filter(path -> path.toString().endsWith(".java"))
-                .flatMap(path -> violationsIn(path, forbiddenPrefixes))
-                .toList();
-
-            assertThat(violations)
-                .as("forbidden dependencies from %s", relativePackagePath)
-                .isEmpty();
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not scan " + root, e);
-        }
-    }
-
-    private Stream<String> violationsIn(Path file, List<String> forbiddenPrefixes) {
-        String source;
-        try {
-            source = Files.readString(file);
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not read " + file, e);
-        }
-
-        Matcher matcher = IMPORT.matcher(source);
-        Stream.Builder<String> violations = Stream.builder();
-        while (matcher.find()) {
-            String imported = matcher.group(1);
-            for (String forbidden : forbiddenPrefixes) {
-                if (imported.startsWith(forbidden) && !isAllowedException(file, imported)) {
-                    violations.add(file.getFileName() + " imports " + imported);
-                }
-            }
-        }
-        return violations.build();
-    }
-
-    /**
-     * Sanctioned exceptions, kept narrow and explicit so they cannot quietly widen.
-     *
-     * <p>Spring Modulith's {@code @NamedInterface} in {@code package-info.java} files:
-     * these are compile-time module metadata on the package declaration itself, not a
-     * runtime dependency — no domain type touches Spring because of them, and removing
-     * them would change the module boundaries Modulith enforces.
-     */
-    private boolean isAllowedException(Path file, String imported) {
-        return "package-info.java".equals(String.valueOf(file.getFileName()))
-            && imported.startsWith("org.springframework.modulith.");
+        rule.check(CLASSES);
     }
 }

@@ -1,0 +1,62 @@
+package org.example.nabat.realtime.application;
+
+import org.example.nabat.testsupport.FakeWebSocketTicketRepository;
+import org.example.nabat.identity.domain.UserId;
+import org.example.nabat.realtime.domain.WebSocketTicket;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.example.nabat.identity.domain.AuthenticationFailedException;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class WebSocketTicketServiceTest {
+
+    private FakeWebSocketTicketRepository repository;
+    private WebSocketTicketService service;
+
+    @BeforeEach
+    void setUp() {
+        repository = new FakeWebSocketTicketRepository();
+        service = new WebSocketTicketService(repository, Duration.ofMinutes(2));
+    }
+
+    @Test
+    void issuesShortLivedTicketForAuthenticatedUser() {
+        UserId userId = UserId.of(UUID.randomUUID());
+
+        var issued = service.issueTicket(new org.example.nabat.realtime.application.port.in.IssueWebSocketTicketUseCase.IssueWebSocketTicketCommand(userId));
+
+        assertNotNull(issued.ticket());
+        assertTrue(issued.expiresAt().isAfter(Instant.now()));
+    }
+
+    @Test
+    void redeemsIssuedTicketExactlyOnce() {
+        UserId userId = UserId.of(UUID.randomUUID());
+        var issued = service.issueTicket(new org.example.nabat.realtime.application.port.in.IssueWebSocketTicketUseCase.IssueWebSocketTicketCommand(userId));
+
+        assertEquals(userId, service.redeem(issued.ticket()));
+        assertThrows(AuthenticationFailedException.class, () -> service.redeem(issued.ticket()));
+    }
+
+    @Test
+    void rejectsExpiredTicket() {
+        UserId userId = UserId.of(UUID.randomUUID());
+        repository.save(new WebSocketTicket("expired-ticket", userId, Instant.now().minusSeconds(5)));
+
+        assertThrows(AuthenticationFailedException.class, () -> service.redeem("expired-ticket"));
+    }
+
+    @Test
+    void rejectsBlankTicket() {
+        assertThrows(AuthenticationFailedException.class, () -> service.redeem("  "));
+    }
+}
+
