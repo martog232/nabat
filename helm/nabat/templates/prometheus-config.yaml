@@ -8,11 +8,28 @@ data:
     global:
       scrape_interval: 15s
     scrape_configs:
+    # metrics_path matters: Spring Boot serves Micrometer at /actuator/prometheus. Without
+    # it Prometheus scrapes the default /metrics and gets a 404 from both apps on every
+    # single scrape — which is what this chart did, so nothing was ever collected.
     - job_name: nabat-app
+      metrics_path: /actuator/prometheus
       static_configs:
       - targets:
         - {{ include "nabat.fullname" . }}-app:{{ .Values.nabatApp.port }}
+    - job_name: nabat-voting
+      metrics_path: /actuator/prometheus
+      static_configs:
+      - targets:
         - {{ include "nabat.fullname" . }}-voting-app:{{ .Values.votingApp.port }}
+    {{- if .Values.kong.enabled }}
+    # Kong's status listener, not its Admin API. Both serve /metrics; only one of them can
+    # also replace the gateway's entire configuration via POST /config.
+    - job_name: kong-gateway
+      metrics_path: /metrics
+      static_configs:
+      - targets:
+        - {{ include "nabat.fullname" . }}-kong:{{ .Values.kong.statusPort }}
+    {{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment

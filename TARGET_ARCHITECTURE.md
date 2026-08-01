@@ -42,8 +42,8 @@
 
 | Твърдение | Реалност |
 |---|---|
-| Kong API gateway | Документиран в пет раздела на `ARCHITECTURE.md`. Няма `kong.yml`, липсва и в двата compose файла, и в Helm chart-а; config repo-то не съществува. |
-| Rate limiting / защита от brute force | `RateLimitingFilter` и bucket4j са изтрити *защото* Kong щял да поеме това. Kong не съществува. `LoginAttemptTracker` само логва — никога не блокира, и е in-memory за всяка реплика поотделно. **Няма защита на никакво ниво, в никаква среда.** |
+| Kong API gateway | **Съществува и работи, но само на една машина и не е във version control.** Няма `kong.yml` в нито едно от трите repo-та, липсва в двата compose файла и в Helm chart-а; config repo-то, което `ARCHITECTURE.md:234` обещава, не е качено. Значи никоя среда, възпроизводима от git, няма Kong — включително Kubernetes deploy-ът, където Ingress-ът сочи право към `nabat-app:8080`. |
+| Rate limiting / защита от brute force | `RateLimitingFilter` и bucket4j са изтрити, защото Kong поема това. Работи там, където Kong работи. **Липсва във всяка среда, която може да се вдигне от repo-то** — compose, Helm, CI, машината на всеки друг разработчик. `LoginAttemptTracker` само наблюдава и логва; това е умишлено при gateway, но означава, че без Kong пред себе си приложението не блокира нищо. |
 | Събиране на метрики | Prometheus в Helm няма `metrics_path`, така че scrape-ва `/metrics`, а Spring сервира `/actuator/prometheus` → 404 при всеки scrape. В compose се използва label-based discovery, но нито една услуга не декларира labels и docker socket-ът не е mount-нат. Никъде не се събира нищо. |
 | CD pipeline | CI строи images върху runner-а и ги хвърля — няма registry, няма push. `deploy.yml` реферира `nabat-app:${sha}` с `imagePullPolicy: IfNotPresent`, никога не подава задължителния `global.jwtSecret`, и deploy-ва nabat-voting с *SHA на nabat-app*. Не може да успее на чист кластер. |
 | Readiness gating | Нула `readinessProbe` в трите repo-та, при `nabatApp.replicas: 2`. Liveness удря агрегатния `/actuator/health`, така че кратък проблем с Postgres рестартира здрави pod-ове. Health groups на Spring не са включени никъде. |
@@ -52,7 +52,7 @@
 | Структурирано логване | Няма logback конфигурация в нито една от двете услуги. Promtail изпраща ANSI-оцветен свободен текст към Loki без парсване; trace ID-тата не могат да се извлекат като labels. |
 | Event-driven комуникация между услугите | **nabat-app изобщо няма Kafka.** Topic-ът `vote.cast` е self-loop: nabat-voting сам публикува и сам консумира своите събития, за да поддържа собствената си проекция. Cross-service поток от събития не съществува. |
 | Resilience | Няма Resilience4j никъде. Извикването nabat-app → nabat-voting има connect/read timeout и нищо друго — без circuit breaker, retry или bulkhead. |
-| Автоматизация на фронтенда | nabat-fe няма CI, няма запис в compose, няма Kubernetes манифест. `VITE_API_BASE_URL` се вгражда по време на build и по подразбиране сочи към порта на Kong, на който нищо не слуша. |
+| Автоматизация на фронтенда | nabat-fe няма CI, няма запис в compose, няма Kubernetes манифест. `VITE_API_BASE_URL` се вгражда по време на build; `.env.example` сочи порт 8000 (Kong), а `vite.config.ts` по подразбиране го заобикаля към 8080 — двата default-а си противоречат, защото Kong не е в compose. |
 
 ### Бъгове в коректността, открити при одита
 
@@ -202,7 +202,7 @@ Strangler fig. Всяка фаза оставя системата deploy-вае
 
 ### Фаза 1 — Платформата да стане реална
 
-Registry и push на images. Поправен scrape път за Prometheus. Readiness/liveness health groups. Структурирано JSON логване с парсване на trace-id. Истински gateway (декларативен Kong или Spring Cloud Gateway) с rate limiting — възстановяване на защита, която в момента не съществува никъде. Изтриване на `k8s/`. Трайно съхранение за мониторинг стека. `securityContext` и non-root image за voting. CI за nabat-fe.
+Registry и push на images. Поправен scrape път за Prometheus. Readiness/liveness health groups. Структурирано JSON логване с парсване на trace-id. **Декларативната Kong конфигурация влиза в git**, влиза в compose и в Helm chart-а, а Ingress-ът сочи към Kong вместо право към приложението — така rate limiting-ът съществува във всяка среда, не само на една машина. Изтриване на `k8s/`. Трайно съхранение за мониторинг стека. `securityContext` и non-root image за voting. CI за nabat-fe.
 
 **Критерий:** един commit deploy-ва на чист кластер без ръчна намеса; trace на заявка се вижда от край до край в Grafana; ограничен по rate клиент получава 429; описанието в ARCHITECTURE.md отговаря на реалността.
 
@@ -256,4 +256,4 @@ Identity е последна: четири входящи FK-а и най-стр
 | Театър със saga-и | Има точно една истинска saga. Измислянето на още, за да се покаже pattern-ът, изгражда грешен инстинкт. |
 | Kafka като вътрешнопроцесен message bus | Сегашният self-loop на `vote.cast`: latency и dual-write риск за нулево decoupling. |
 | Event sourcing по подразбиране | Таблицата `votes` е коректна като текущо състояние. Event sourcing там, където историята е изискване, не като украса. |
-| Документиране на инфраструктура, която не съществува | Случаят с Kong. Стремежите се пишат в този файл и се маркират като предложения. |
+| Инфраструктура извън version control | Случаят с Kong: работи на една машина, но нито едно repo не може да го вдигне, така че всяка друга среда тихо остава без gateway и без rate limiting. Конфигурацията на нещо, което стои пред всички услуги, е код. |

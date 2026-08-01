@@ -1,0 +1,118 @@
+{{- if .Values.kong.enabled }}
+{{/*
+The API gateway. Until now the chart deployed none, and the Ingress routed straight to
+nabat-app:8080 — so a Kubernetes deploy had no gateway, and therefore no rate limiting,
+regardless of what ran on a developer's machine.
+
+The declarative config comes from kong/kong.yml at the chart root via .Files, so the
+cluster and docker-compose read the same file and cannot drift.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nabat.fullname" . }}-kong-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kong
+data:
+  kong.yml: |
+{{ .Files.Get "kong/kong.yml" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nabat.fullname" . }}-kong
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kong
+spec:
+  replicas: {{ .Values.kong.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: kong
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: kong
+        {{- include "nabat.labels" . | nindent 8 }}
+      annotations:
+        # Rolls the pods when the declarative config changes. Without this a `helm upgrade`
+        # that only edits kong.yml updates the ConfigMap and leaves Kong running the old
+        # routes, because DB-less Kong reads the file once at boot.
+        checksum/config: {{ .Files.Get "kong/kong.yml" | sha256sum }}
+    spec:
+      containers:
+      - name: kong
+        image: {{ .Values.kong.image }}
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: /kong/kong.yml
+        - name: KONG_PROXY_LISTEN
+          value: 0.0.0.0:{{ .Values.kong.proxyPort }}
+        # Loopback only: the Admin API is a control surface even in DB-less mode, where
+        # POST /config replaces the whole configuration.
+        - name: KONG_ADMIN_LISTEN
+          value: 127.0.0.1:8001
+        - name: KONG_STATUS_LISTEN
+          value: 0.0.0.0:{{ .Values.kong.statusPort }}
+        - name: KONG_PROXY_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_PROXY_ERROR_LOG
+          value: /dev/stderr
+        ports:
+        - name: proxy
+          containerPort: {{ .Values.kong.proxyPort }}
+        - name: status
+          containerPort: {{ .Values.kong.statusPort }}
+        volumeMounts:
+        - name: config
+          mountPath: /kong
+          readOnly: true
+        # /status/ready reports whether Kong has loaded a configuration and is willing to
+        # proxy, which is exactly what readiness means here. The rest of this chart has no
+        # readinessProbe at all; this is the first.
+        readinessProbe:
+          httpGet:
+            path: /status/ready
+            port: {{ .Values.kong.statusPort }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: {{ .Values.kong.statusPort }}
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        resources:
+          {{- toYaml .Values.kong.resources | nindent 10 }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "nabat.fullname" . }}-kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nabat.fullname" . }}-kong
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kong
+spec:
+  selector:
+    app.kubernetes.io/component: kong
+  ports:
+  - name: proxy
+    port: {{ .Values.kong.proxyPort }}
+    targetPort: proxy
+  - name: status
+    port: {{ .Values.kong.statusPort }}
+    targetPort: status
+  # ClusterIP: the Ingress is the only thing that should reach the proxy from outside, and
+  # the status port must never be published.
+  type: ClusterIP
+{{- end }}

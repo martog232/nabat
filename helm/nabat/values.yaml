@@ -17,12 +17,36 @@ postgres:
 redis:
   image: redis:7-alpine
 
+# The API gateway. Its routing, CORS and rate-limiting rules are not here — they live in
+# kong/kong.yml at the chart root, which docker-compose mounts as well, so the two cannot
+# drift. Disabling this sends the Ingress straight at the application, which is how the
+# chart behaved before Kong was added: no gateway, and therefore no rate limiting.
+kong:
+  enabled: true
+  image: kong:3.9
+  replicas: 1
+  proxyPort: 8000
+  # /status and /metrics. Deliberately distinct from the Admin API on 8001, which is bound
+  # to loopback: even in DB-less mode POST /config replaces the whole configuration.
+  statusPort: 8100
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 nabatApp:
   image: nabat-app:latest
   imagePullPolicy: IfNotPresent
   replicas: 2
   port: 8080
-  baseUrl: http://localhost:8080
+  # Left empty on purpose: the deployment template derives http://<ingress.host> so emailed
+  # verification links match how a browser actually reaches the API. Set it only to override
+  # that. It used to be hardcoded http://localhost:8080 even in-cluster, which made every
+  # emailed link wrong and bypassed the gateway.
+  baseUrl: ""
   votingServiceUrl: http://nabat-voting-app:8081
   mailHost: mailhog
   mailPort: 1025

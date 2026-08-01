@@ -231,7 +231,11 @@ Browser → GET /api/v1/alerts/nearby?lat=...&lng=...&radius=...
 
 ## Kong routing
 
-The declarative Kong config lives in its own repository, not here.
+The declarative Kong config is `helm/nabat/kong/kong.yml`. It used to live in a separate
+repository that was never pushed, which meant Kong ran on one developer machine and nowhere
+else — docker-compose, the Helm chart and CI all came up with no gateway, and so with no
+rate limiting. Both environments now mount that one file; it sits under the chart because
+Helm's `.Files.Get` cannot read outside a chart directory.
 
 | Path pattern | Upstream       | Strip path |
 |--------------|----------------|------------|
@@ -249,6 +253,16 @@ and forwards the caller's own access token.
 
 Rate limiting and brute-force protection are Kong's responsibility. nabat-app's
 `LoginAttemptTracker` only observes and logs failed logins; it does not block.
+
+That division only became true once the `rate-limiting` plugin was added. The config had
+`prometheus`, `cors` and `request-transformer` and nothing else, so `POST /api/v1/auth/login`
+was unlimited in every environment — while `RateLimitingFilter` and `bucket4j` had already
+been deleted from the application *because* Kong was supposed to cover it. There are now two
+limits: a baseline on the service, and a tighter one on a dedicated route matching
+`login|register|forgot-password|reset-password`.
+
+`policy: local` counts per Kong node. Running more than one Kong replica needs
+`policy: redis` and a shared Redis, or each node enforces the limit on its own.
 
 ## Kafka topics
 
