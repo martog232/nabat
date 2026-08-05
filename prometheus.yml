@@ -1,21 +1,54 @@
+# Prometheus scrape configuration for the local compose stack.
+#
+# The previous version used docker_sd_configs and kept only containers labelled
+# `prometheus.enable=true`. No service in docker-compose.yml declared that label, and
+# /var/run/docker.sock was never mounted into this container, so it discovered nothing and
+# scraped nothing — while looking like a working configuration. Static targets are less
+# elegant but they are verifiable by reading them.
+#
+# Note what the two Spring services serve: Micrometer is exposed at /actuator/prometheus,
+# not /metrics. Omitting metrics_path is why the Helm chart's Prometheus 404s on every
+# scrape.
+
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'microservices'
-    docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 5s
-    relabel_configs:
-      - source_labels: [__meta_docker_container_label_prometheus_enable]
-        regex: 'true'
-        action: keep
-      - source_labels: [__address__, __meta_docker_container_label_prometheus_port]
-        regex: '([^:]+):\d+;(.+)'
-        replacement: '$1:$2'
-        target_label: __address__
-      - source_labels: [__meta_docker_container_label_prometheus_job]
-        target_label: job
-      - source_labels: [__meta_docker_container_label_prometheus_path]
-        target_label: __metrics_path__
+  # Gateway metrics from the status listener, not the Admin API on 8001. The prometheus
+  # plugin serves /metrics on both; only one of them is also a control surface capable of
+  # replacing Kong's entire configuration.
+  - job_name: 'kong-gateway'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['kong:8100']
+        labels:
+          component: gateway
+
+  # nabat-app. Includes `nabat_usecase_duration_*`, the one piece of bespoke instrumentation
+  # in the codebase (UseCaseMetricsAspect times every @UseCase method with a success/error
+  # outcome tag). Nothing collected it before this file changed.
+  - job_name: 'nabat-app'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['nabat-app:8080']
+        labels:
+          component: nabat-app
+
+  # nabat-voting lives in its own compose stack, on its own default network, so this target
+  # does not resolve from here without joining the two. Left in place and left failing
+  # visibly: a target shown as DOWN is honest, whereas silently not scraping it — which is
+  # what the discovery-based config did for everything — is not.
+  #
+  # To make it resolve, create a shared network once:
+  #   docker network create nabat-net
+  # then in each compose file put the services on it:
+  #   networks: [nabat-net]
+  # and declare it:
+  #   networks: {nabat-net: {external: true}}
+  - job_name: 'nabat-voting'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['nabat-voting-app:8081']
+        labels:
+          component: nabat-voting

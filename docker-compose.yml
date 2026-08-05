@@ -16,6 +16,19 @@ services:
       timeout: 5s
       retries: 5
 
+  # Required, not optional: WebSocket ticket redemption and the nearby-alerts cache both go
+  # through Redis. This stack omitted it, so `docker compose up` produced an app that could
+  # not issue a WebSocket ticket — the browser's only way to open the realtime connection.
+  redis:
+    image: redis:7-alpine
+    container_name: nabat-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   mailhog:
     image: mailhog/mailhog:latest
     container_name: nabat-mailhog
@@ -32,16 +45,24 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nabat_db
       SPRING_DATASOURCE_USERNAME: nabat_user
       SPRING_DATASOURCE_PASSWORD: nabat_password
-      # Local-development fallback only. Override with JWT_SECRET in your shell or .env.
-      JWT_SECRET: ${JWT_SECRET:-nabat-local-docker-jwt-secret-key-min-256-bits-for-development-only-123456}
+      SPRING_DATA_REDIS_HOST: redis
+      # Required — compose fails fast if unset rather than falling back to a committed key.
+      # Generate one with `openssl rand -base64 48` and put it in .env (see .env.example).
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required. Generate one with `openssl rand -base64 48` and set it in .env}
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
-      NABAT_BASE_URL: http://localhost:8080
+      # Through the gateway, so emailed verification links match how a browser reaches the
+      # API. Pointing at :8080 bypassed Kong and therefore its CORS and rate limits.
+      NABAT_BASE_URL: http://localhost:8000
     ports:
+      # Published for direct access during development and for Prometheus. Browser traffic
+      # should go through Kong on :8000 so local behaviour matches deployed behaviour.
       - "8080:8080"
     restart: unless-stopped
     volumes:
@@ -53,6 +74,42 @@ services:
       retries: 3
       start_period: 40s
 
+  # The gateway. DB-less: kong/kong.yml is the entire configuration, so a routing or
+  # rate-limit change is a reviewable commit rather than an Admin API call on one machine.
+  kong:
+    image: kong:3.9
+    container_name: nabat-kong
+    depends_on:
+      nabat-app:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      # Loopback only. The Admin API is a control surface even in DB-less mode, where
+      # `POST /config` replaces the whole configuration — anything that can reach it owns
+      # the gateway. Reach it with `docker exec` when you genuinely need it.
+      KONG_ADMIN_LISTEN: 127.0.0.1:8001
+      # Status listener: /status and, with the prometheus plugin, /metrics. This is what
+      # Prometheus scrapes. Scraping the Admin API port for metrics works but exposes the
+      # control surface to do it.
+      KONG_STATUS_LISTEN: 0.0.0.0:8100
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+    volumes:
+      # The canonical config, shared with the Helm chart rather than copied. It lives under
+      # the chart because Helm's .Files.Get cannot read outside a chart directory, and one
+      # file that both environments load is worth more than a tidier path plus drift.
+      - ./helm/nabat/kong/kong.yml:/kong/kong.yml:ro
+    ports:
+      - "8000:8000"   # proxy — the address browsers and the frontend should use
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:latest
     container_name: nabat-prometheus
@@ -63,6 +120,7 @@ services:
       - "9090:9090"
     depends_on:
       - nabat-app
+      - kong
     restart: unless-stopped
 
   grafana:

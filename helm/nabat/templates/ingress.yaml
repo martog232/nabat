@@ -1,10 +1,28 @@
+{{/*
+Routes to Kong when the gateway is enabled, and only falls back to the application
+directly when it is not.
+
+Two things changed here. The backend was {{ "{{ fullname }}" }}-app:8080, so every request
+reached the application without passing a gateway — no rate limiting, no gateway CORS, and
+`.env.example`'s claim that the frontend talks to Kong on :8000 was true nowhere.
+
+And `rewrite-target: /` is gone. Paired with `path: /` Prefix it rewrote every request to
+the root, and ARCHITECTURE.md is explicit that these routes must not strip paths: Kong's
+own routes are declared with `strip_path: false`, and the application is mapped under
+/api/v1. It happened to be survivable only because nginx's rewrite of a bare `/` prefix is
+close to a no-op; it would have broken the moment a real capture group appeared.
+*/}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "nabat.fullname" . }}-ingress
   namespace: {{ .Values.namespace }}
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    # WebSocket connections are long-lived and idle most of the time. nginx's default
+    # 60s read timeout closes them every minute; the realtime module sends no
+    # application-level ping, so there is no traffic to keep them open.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   ingressClassName: nginx
   rules:
@@ -15,6 +33,12 @@ spec:
         pathType: Prefix
         backend:
           service:
+          {{- if .Values.kong.enabled }}
+            name: {{ include "nabat.fullname" . }}-kong
+            port:
+              number: {{ .Values.kong.proxyPort }}
+          {{- else }}
             name: {{ include "nabat.fullname" . }}-app
             port:
               number: {{ .Values.nabatApp.port }}
+          {{- end }}

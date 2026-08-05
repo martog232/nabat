@@ -1,0 +1,144 @@
+# Kong declarative (DB-less) configuration for the Nabat platform.
+#
+# This is the gateway that sits in front of every environment. It used to live only on a
+# developer machine and outside version control, which meant docker-compose, the Helm
+# chart, CI and every other developer silently ran with no gateway at all — and therefore
+# with none of the protection this file provides.
+#
+# Apply with KONG_DATABASE=off and KONG_DECLARATIVE_CONFIG pointing here. Nothing is
+# configured through the Admin API: this file is the whole configuration, so a change is a
+# commit rather than a POST somebody has to remember.
+#
+# It sits inside the Helm chart rather than at the repository root because Helm's
+# .Files.Get cannot read outside a chart directory. docker-compose mounts this same path,
+# so both environments load one file and cannot drift.
+#
+# Upstream hostnames are `nabat-app` deliberately: that is both the docker-compose service
+# name and the Kubernetes Service name the Helm chart renders (for release `nabat`), so one
+# file works in both. Never `host.docker.internal` — that resolves only on Docker Desktop,
+# needs `extra_hosts: host-gateway` on Linux, and means nothing at all inside a cluster.
+
+_format_version: "3.0"
+_transform: true
+
+services:
+  # The only upstream. Vote traffic is deliberately NOT routed to nabat-voting directly —
+  # see the `routes` note below.
+  - name: nabat-service
+    host: nabat-app
+    port: 8080
+    protocol: http
+    connect_timeout: 5000
+    write_timeout: 60000
+    # 60s (the default) closes an idle WebSocket every minute: the realtime module sends no
+    # application-level ping, so a quiet connection carries no traffic for Kong to see. The
+    # frontend reconnects with backoff and catches up via `?since`, so the symptom was a
+    # reconnect cycle on every client rather than lost data — but on an alerting product
+    # most clients are idle most of the time, so that was most clients, every minute.
+    read_timeout: 3600000
+
+    routes:
+      # Tight limits on the credential endpoints, as a separate route so the plugin below
+      # can attach to it. Higher regex_priority than `nabat-all` so it wins.
+      - name: nabat-auth-credentials
+        regex_priority: 100
+        paths:
+          - ~/api/v1/auth/(login|register|forgot-password|reset-password)$
+        strip_path: false
+        path_handling: "v0"
+
+      # Everything else, including votes.
+      #
+      # There was a higher-priority regex route sending
+      # `~/api/v1/alerts/[^/]+/votes(/stats|/me)?$` straight to nabat-voting-app:8081, plus
+      # a request-transformer stripping `userId` to dodge the 400 that route provoked.
+      # Both are gone. ARCHITECTURE.md forbids that shortcut for good reason: it bypasses
+      # ExternalVoteService, and with it the denormalised vote counts on `alerts`, the
+      # owner and milestone notifications, and the ALERT_UPDATED WebSocket broadcast.
+      # Nothing would have repaired that afterwards — nabat-app has no Kafka, and
+      # nabat-voting's `vote.cast` topic is consumed only by nabat-voting itself. Worse,
+      # the local dev proxy bypasses Kong, so it worked everywhere except where it ran.
+      - name: nabat-all
+        regex_priority: 0
+        paths:
+          - /api/v1
+          - /ws
+        strip_path: false
+
+plugins:
+  # Kong's own metrics, served on the status listener (8100), not the Admin API (8001).
+  # Scraping 8001 exposes a control surface: even in DB-less mode `POST /config` replaces
+  # the entire declarative configuration, so whatever can reach it owns the gateway.
+  - name: prometheus
+    config:
+      per_consumer: false
+      status_code_metrics: true
+      latency_metrics: true
+
+  - name: cors
+    config:
+      origins:
+        - http://localhost:5173
+        - http://127.0.0.1:5173
+        - http://localhost:3000
+        - http://127.0.0.1:3000
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      exposed_headers:
+        - Authorization
+      credentials: true
+      preflight_continue: false
+
+  # Baseline limit for ordinary API traffic. `policy: local` counts per Kong node, which is
+  # correct for a single instance; running more than one Kong requires `policy: redis` and a
+  # Redis to share counters, or each node enforces the limit independently.
+  #
+  # `limit_by: ip` uses the client address Kong sees. Behind a load balancer or an ingress
+  # controller that is the proxy's address unless Kong is configured to trust
+  # X-Forwarded-For (`trusted_ips` / `real_ip_header`), in which case every caller shares
+  # one bucket. Check this when Kong moves behind the cluster ingress.
+  - name: rate-limiting
+    service: nabat-service
+    config:
+      minute: 300
+      hour: 6000
+      policy: local
+      limit_by: ip
+      fault_tolerant: true
+      hide_client_headers: false
+
+  # The reason bucket4j and RateLimitingFilter were deleted from nabat-app. Until now the
+  # protection they were removed in favour of did not exist: this file had no rate-limiting
+  # plugin at all, so `POST /api/v1/auth/login` was unlimited in every environment.
+  # nabat-app's LoginAttemptTracker only observes and logs — by design, but that design
+  # assumes something in front is doing the blocking.
+  - name: rate-limiting
+    route: nabat-auth-credentials
+    config:
+      minute: 10
+      hour: 60
+      policy: local
+      limit_by: ip
+      fault_tolerant: true
+
+  # Rejects oversized bodies before they reach the application. Matches
+  # spring.servlet.multipart.max-request-size (15MB); the app also caps the file itself at
+  # nabat.storage.max-file-size-bytes (10MB). Keep this in step with those two if either
+  # changes — a gateway cap below the app's makes valid uploads fail at the edge with a
+  # less useful error.
+  - name: request-size-limiting
+    service: nabat-service
+    config:
+      allowed_payload_size: 15
+      size_unit: megabytes
+      require_content_length: false

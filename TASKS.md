@@ -7,6 +7,13 @@ Each task has: a short rationale, the files to touch, and acceptance criteria
 Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core features,
 **P2** quality, **P3** nice-to-have.
 
+> **File paths in completed entries are historical.** They were written against the
+> layer-first package layout (`application/service/…`, `adapter/in/rest/…`) that existed
+> before the codebase moved to Spring Modulith modules with hexagonal layers inside each
+> (`incident/application/…`, `identity/adapter/in/rest/…`). The entries are left as
+> written — this is a log of what was done, not a map of where things are now. See
+> `AGENTS.md` for the current layout and `TARGET_ARCHITECTURE.md` for the direction.
+
 ---
 
 ## P1 — Core features still incomplete
@@ -306,13 +313,25 @@ Implement a ticket-based authentication flow for WebSockets, or parse the JWT fr
 Create a new @UseCase (e.g., IssueWebSocketTicketUseCase) in the application layer.
 Update adapter/in/websocket/AlertWebSocketHandler to validate the token/ticket before establishing the session. Trade-offs:
 Ticket-based vs JWT in Query Param: Passing JWTs in query params during WS handshake logs them in access logs (security risk). A short-lived ticket system requires an extra HTTP round-trip (higher latency) but keeps the JWT out of logs and URL history.
-2. Introduce Domain Events for Alert Notifications (Core Domain)
+2. Introduce Domain Events for Alert Notifications (Core Domain) — ✅ **DONE**
    Context: When an Alert is created or its credibility score changes, users need to be notified in real-time. Direct calls from the CreateAlertService to the WebSocket or Push Notification adapters tightly couples the domains. Task:
 
 Introduce an Event-Driven pattern. When Alert.create() happens, return a domain event (e.g., AlertCreatedEvent).
 Publish this event via Spring's ApplicationEventPublisher (acting as an in-memory message bus for now).
 Create an Event Listener in the application layer that triggers the AlertNotificationPort to broadcast to WebSockets. Trade-offs:
 Coupling vs Traceability: Event-driven decoupling makes the core domain pure and easy to test, but it makes the execution flow harder to trace sequentially. We trade cognitive simplicity for architectural flexibility.
+
+   **Implemented as designed**, with two refinements the original note did not anticipate:
+   - The event is `incident/domain/AlertCreated`, published by `CreateAlertService` through
+     `ApplicationEventPublisher`, and handled by `NewAlertFanout`.
+   - The listener is `@ApplicationModuleListener`, i.e. **after commit** and **async**, not
+     a plain `@EventListener`. That was the more valuable half: the push used to happen
+     inside the writing transaction, so a rollback could leave clients displaying an alert
+     that no longer existed, and the fan-out held a pooled DB connection across socket
+     writes.
+   - The audience lookup was inverted behind `AlertAudiencePort` rather than left in the
+     service, because `incident` querying `subscription` directly formed a module cycle.
+   - Known gap: the async listener is not durable. See the fan-out row in `AGENTS.md`.
 3. Optimize Spatial Queries for Proximity (Persistence Adapter)
    Context: The current system uses a native Haversine formula in PostgreSQL. As the platform grows, computing Haversine for every alert against the user's location on every request will cause severe CPU bottlenecks on the database. Task:
 

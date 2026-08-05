@@ -1,13 +1,27 @@
 name: CI
 
+# Runs on pull requests to any branch, not only those targeting main. Long-lived refactor
+# branches previously got no CI at all until they were pointed at main, which is precisely
+# when finding out something is broken is least useful. It also means the Testcontainers
+# tests — skipped wherever Docker is absent, so skipped on most developer machines — actually
+# execute against feature work.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+
+# Superseded runs on the same ref are pointless once a newer commit exists.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/nabat-app
 
 jobs:
-  build:
+  test:
+    name: Build and test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -19,6 +33,9 @@ jobs:
         distribution: temurin
         cache: maven
 
+    # Docker is present on GitHub runners, so the Testcontainers tests that
+    # @Testcontainers(disabledWithoutDocker = true) skips locally do run here. This is the
+    # only place the PostGIS spatial queries and the full auth REST flow are exercised.
     - name: Build and test
       run: ./mvnw verify -B
 
@@ -30,17 +47,16 @@ jobs:
         path: target/site/jacoco/index.html
         retention-days: 7
 
-    - name: Docker build
-      run: |
-        docker build -t nabat-app:${{ github.sha }} .
-        docker tag nabat-app:${{ github.sha }} nabat-app:latest
-
-    - name: Lint Dockerfile
-      uses: hadolint/hadolint-action@v3
+    - name: Upload surefire reports on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
       with:
-        dockerfile: Dockerfile
+        name: surefire-reports
+        path: target/surefire-reports/
+        retention-days: 7
 
   lint:
+    name: Static analysis
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -54,3 +70,129 @@ jobs:
 
     - name: Checkstyle
       run: ./mvnw checkstyle:check -B
+
+    - name: Lint Dockerfile
+      uses: hadolint/hadolint-action@v3
+      with:
+        dockerfile: Dockerfile
+
+  chart:
+    name: Validate Helm chart
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: v3.16.3
+
+    - name: helm lint
+      # global.jwtSecret is `required` in the chart, so linting needs a value. This one is
+      # deliberately throwaway and never leaves the runner — it only has to satisfy the
+      # template's own guard.
+      run: |
+        helm lint helm/nabat \
+          --set global.jwtSecret=ci-lint-only-not-a-real-secret-0123456789 \
+          --set postgres.password=ci-lint-only \
+          --set votingPostgres.password=ci-lint-only
+
+    - name: helm template
+      # Renders every manifest. Catches what reading cannot: an unbalanced block scalar in
+      # the Kong ConfigMap, a values key that does not exist, a .Files.Get that silently
+      # returns empty because the path is outside the chart.
+      run: |
+        helm template nabat helm/nabat \
+          --set global.jwtSecret=ci-lint-only-not-a-real-secret-0123456789 \
+          --set postgres.password=ci-lint-only \
+          --set votingPostgres.password=ci-lint-only \
+          > rendered.yaml
+        echo "rendered $(grep -c '^kind:' rendered.yaml) objects"
+
+    - name: Fail if the Kong config rendered empty
+      # .Files.Get returns "" for a path outside the chart directory rather than failing, so
+      # a moved kong.yml would produce a ConfigMap with an empty body and Kong would start
+      # with no routes at all. Cheaper to assert here than to debug in a cluster.
+      run: |
+        if ! grep -q "_format_version" rendered.yaml; then
+          echo "::error::Kong declarative config is missing from the rendered ConfigMap"
+          exit 1
+        fi
+
+    - name: Validate manifests against the Kubernetes schema
+      run: |
+        curl -sSL -o kubeconform.tar.gz \
+          https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+        tar -xzf kubeconform.tar.gz kubeconform
+        ./kubeconform -summary -strict -ignore-missing-schemas rendered.yaml
+
+    - name: Upload rendered manifests
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: rendered-manifests
+        path: rendered.yaml
+        retention-days: 7
+
+  image:
+    name: Build and publish image
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: docker/setup-buildx-action@v3
+
+    # Only authenticate when we intend to publish. Pull requests from forks have no write
+    # token, and a build-only run does not need one.
+    - name: Log in to GHCR
+      if: github.event_name == 'push'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        # The previous pipeline built the image on the runner and then threw it away.
+        # deploy.yml nevertheless referenced nabat-app:<sha> with imagePullPolicy
+        # IfNotPresent, so every rollout hit ImagePullBackOff and --atomic rolled it straight
+        # back. Nothing was ever published anywhere.
+        push: ${{ github.event_name == 'push' }}
+        load: ${{ github.event_name != 'push' }}
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        # Layer cache across runs. Without it every build re-resolved the whole Maven
+        # dependency tree inside the image, defeating the Dockerfile's own go-offline layering.
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Scan image for vulnerabilities
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+        # Reports without blocking, for now: a base-image CVE with no available fix should not
+        # stop an otherwise ready deploy. Flip to '1' once the findings have been triaged.
+        exit-code: '0'
+        format: table
+
+    - name: Record the published image
+      if: github.event_name == 'push'
+      run: |
+        {
+          echo "### Published image"
+          echo '```'
+          echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "digest: ${{ steps.build.outputs.digest }}"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
