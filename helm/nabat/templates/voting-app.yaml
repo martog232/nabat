@@ -17,6 +17,7 @@ spec:
         app.kubernetes.io/component: voting-app
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      {{- include "nabat.imagePullSecrets" . | nindent 6 }}
       initContainers:
       - name: wait-for-postgres
         image: busybox:1.36
