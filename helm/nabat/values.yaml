@@ -11,7 +11,10 @@ postgres:
   image: postgis/postgis:16-3.4
   database: nabat_db
   user: nabat_user
-  password: nabat_password
+  # REQUIRED, no default, same reasoning as global.jwtSecret. `nabat_password` used to be
+  # committed here, which meant the `required` guard in templates/secret.yaml could never
+  # fire — it read like the password was enforced while a known value shipped in git.
+  password: ""
   storage: 1Gi
 
 redis:
@@ -38,7 +41,11 @@ kong:
       memory: 512Mi
 
 nabatApp:
-  image: nabat-app:latest
+  # Fully qualified, so a cluster can actually pull it. This was a bare `nabat-app:latest`,
+  # which only ever resolved to an image that happened to be present on a node — and CI never
+  # pushed one anywhere, so on a clean cluster it never resolved at all. Deploy overrides the
+  # tag with the commit SHA it published.
+  image: ghcr.io/martog232/nabat-app:latest
   imagePullPolicy: IfNotPresent
   replicas: 2
   port: 8080
@@ -71,7 +78,12 @@ votingPostgres:
   image: postgres:16
   database: nabat_voting_db
   user: nabat_voting_user
-  password: nabat_voting_password
+  # No committed default, for the same reason as postgres.password. Note the remaining flaw:
+  # unlike the other two credentials this one is still injected as a plaintext env value in
+  # voting-app.yaml and voting-postgres.yaml rather than read from the Secret, so it is
+  # visible in `kubectl get deploy -o yaml`. Routing it through templates/secret.yaml like the
+  # others is a small chart fix that has not been made yet.
+  password: ""
   storage: 1Gi
 
 kafka:
@@ -80,7 +92,11 @@ kafka:
   clusterId: "DWKW8vl4RI6tPZGCbhhHVg"
 
 votingApp:
-  image: nabat-voting-app:latest
+  # Pinned deliberately and changed on purpose. deploy.yml used to override this with
+  # nabat-app's own commit SHA, which named no nabat-voting build that had ever existed. This
+  # repository cannot know which voting build is current; pass `voting_image_tag` to
+  # workflow_dispatch when a specific one is wanted.
+  image: ghcr.io/martog232/nabat-voting-app:latest
   imagePullPolicy: IfNotPresent
   replicas: 1
   port: 8081

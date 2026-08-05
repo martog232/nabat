@@ -6,37 +6,175 @@ on:
     branches: [main]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      app_image_tag:
+        description: 'nabat-app image tag to deploy. Defaults to the commit being deployed.'
+        required: false
+        type: string
+      voting_image_tag:
+        description: >-
+          nabat-voting-app image tag. Leave empty to keep whatever the chart pins — this
+          repository has no way to know which voting build is current.
+        required: false
+        type: string
+
+# One deploy at a time. Two concurrent workflow_dispatch runs raced on the same Helm release,
+# and `helm upgrade` against a release already in a pending state fails in a way that needs a
+# manual `helm rollback` to clear.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    # Attach required reviewers or a deployment branch rule to this environment in repository
+    # settings to get an approval gate. There is exactly one target namespace; when a staging
+    # tier exists it becomes a second environment with its own values file.
+    environment: production
     steps:
     - uses: actions/checkout@v4
+      with:
+        # Deploy the commit CI actually built and published, not whatever main points at by
+        # the time this runs. On workflow_run those differ whenever main has moved on.
+        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+    - name: Resolve image tag
+      id: tags
+      env:
+        APP_TAG_INPUT: ${{ inputs.app_image_tag }}
+        BUILT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      run: |
+        APP_TAG="${APP_TAG_INPUT:-$BUILT_SHA}"
+        echo "app_tag=$APP_TAG" >> "$GITHUB_OUTPUT"
+        echo "Deploying nabat-app tag: $APP_TAG"
 
     - name: Install Helm
       uses: azure/setup-helm@v4
       with:
-        version: latest
+        # Pinned. `latest` meant the deploy tool could change between two runs of the same
+        # commit, which is the one place reproducibility matters most.
+        version: v3.16.3
 
-    - name: Configure kubectl
+    - name: Install kubectl
       uses: azure/setup-kubectl@v4
+      with:
+        version: v1.31.3
 
-    - name: Set KUBECONFIG
+    - name: Configure cluster access
+      env:
+        KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
       run: |
-        mkdir -p $HOME/.kube
-        echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+        umask 077
+        mkdir -p "$HOME/.kube"
+        printf '%s' "$KUBECONFIG_CONTENT" > "$HOME/.kube/config"
+        # A long-lived kubeconfig in a repository secret is the weak point of this pipeline.
+        # Short-lived OIDC credentials (azure/login, aws-actions/configure-aws-credentials,
+        # google-github-actions/auth) are the proper fix and need `id-token: write`; that is a
+        # change to make once the target cloud is settled.
+        kubectl version --client=true
+
+    - name: Write release secrets
+      env:
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        VOTING_POSTGRES_PASSWORD: ${{ secrets.VOTING_POSTGRES_PASSWORD }}
+      run: |
+        umask 077
+        # Written to files and passed with --set-file rather than --set. A JWT secret is
+        # base64 or a passphrase; --set splits values on unescaped commas and would silently
+        # truncate one, producing a secret that then fails the app's own startup validation.
+        MISSING=""
+        [ -z "$JWT_SECRET" ] && MISSING="$MISSING JWT_SECRET"
+        [ -z "$POSTGRES_PASSWORD" ] && MISSING="$MISSING POSTGRES_PASSWORD"
+        [ -z "$VOTING_POSTGRES_PASSWORD" ] && MISSING="$MISSING VOTING_POSTGRES_PASSWORD"
+        if [ -n "$MISSING" ]; then
+          echo "::error::Missing repository secrets:$MISSING"
+          echo "::error::The chart marks all three as required and has no defaults, so helm fails at"
+          echo "::error::template time without them. The previous version of this workflow passed none"
+          echo "::error::of them, which is why it could never succeed on a clean cluster."
+          echo "::error::Generate the JWT secret with: openssl rand -base64 48"
+          echo "::error::It must be byte-identical to the one nabat-voting is given."
+          exit 1
+        fi
+        printf '%s' "$JWT_SECRET" > jwt.secret
+        printf '%s' "$POSTGRES_PASSWORD" > pg.secret
+        printf '%s' "$VOTING_POSTGRES_PASSWORD" > voting-pg.secret
 
     - name: Deploy with Helm
+      env:
+        REGISTRY: ghcr.io
+        OWNER: ${{ github.repository_owner }}
+        APP_TAG: ${{ steps.tags.outputs.app_tag }}
+        VOTING_TAG: ${{ inputs.voting_image_tag }}
       run: |
-        helm upgrade --install nabat ./helm/nabat \
-          --set nabatApp.image=nabat-app:${{ github.sha }} \
-          --set votingApp.image=nabat-voting-app:${{ github.sha }} \
-          --atomic \
-          --timeout 5m
+        set -euo pipefail
+        ARGS=(
+          upgrade --install nabat ./helm/nabat
+          --namespace nabat --create-namespace
+          --set-file global.jwtSecret=jwt.secret
+          --set "nabatApp.image=${REGISTRY}/${OWNER}/nabat-app:${APP_TAG}"
+          --atomic
+          --wait
+          --timeout 8m
+        )
 
-    - name: Verify deployment
+        ARGS+=(--set-file postgres.password=pg.secret)
+        ARGS+=(--set-file votingPostgres.password=voting-pg.secret)
+
+        # The voting image is overridden only when explicitly asked for. This used to be set to
+        # nabat-voting-app:${{ github.sha }} — nabat-app's commit SHA, which corresponds to no
+        # nabat-voting build that has ever existed, so the tag could not be pulled and --atomic
+        # rolled the whole release back. The voting image belongs to the other repository's
+        # pipeline; the chart pins a version and it is changed deliberately.
+        if [ -n "${VOTING_TAG}" ]; then
+          ARGS+=(--set "votingApp.image=${REGISTRY}/${OWNER}/nabat-voting-app:${VOTING_TAG}")
+        fi
+
+        helm "${ARGS[@]}"
+
+    - name: Remove secret material from the workspace
+      if: always()
+      run: rm -f jwt.secret pg.secret voting-pg.secret
+
+    - name: Verify rollout
       run: |
         kubectl rollout status deployment/nabat-app -n nabat --timeout=3m
         kubectl rollout status deployment/nabat-voting-app -n nabat --timeout=3m
-        kubectl get pods -n nabat
+        kubectl rollout status deployment/nabat-kong -n nabat --timeout=3m
+
+    - name: Smoke test through the gateway
+      # `kubectl get pods` proved only that Kubernetes had created objects. This asserts the
+      # app answers and that Kong routes to it — the two things a deploy is actually for.
+      run: |
+        set -euo pipefail
+        kubectl run "smoke-$GITHUB_RUN_ID" -n nabat --rm -i --restart=Never \
+          --image=curlimages/curl:8.11.0 --quiet -- \
+          curl -sS --fail-with-body --max-time 10 http://nabat-app:8080/actuator/health
+
+        # Through Kong: an unauthenticated call must be refused by the application rather than
+        # fail to route. 401 proves the whole path works; a connection error or a 404 means it
+        # does not.
+        STATUS=$(kubectl run "smokegw-$GITHUB_RUN_ID" -n nabat --rm -i --restart=Never \
+          --image=curlimages/curl:8.11.0 --quiet -- \
+          curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
+          'http://nabat-kong:8000/api/v1/alerts/nearby?latitude=42.7&longitude=23.3&radiusKm=1')
+        echo "gateway returned $STATUS"
+        if [ "$STATUS" != "401" ]; then
+          echo "::error::expected 401 through the gateway, got $STATUS"
+          exit 1
+        fi
+
+    - name: Report
+      if: always()
+      run: |
+        {
+          echo "### Deploy"
+          echo "- app image: \`ghcr.io/${{ github.repository_owner }}/nabat-app:${{ steps.tags.outputs.app_tag }}\`"
+          echo "- helm release: \`nabat\` in namespace \`nabat\`"
+          echo ""
+          echo '```'
+          kubectl get pods -n nabat 2>&1 || true
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
