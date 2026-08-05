@@ -1,5 +1,25 @@
 namespace: nabat
 
+# Names of docker-registry secrets in the target namespace, for pulling nabat-app and
+# nabat-voting-app from GHCR.
+#
+# Empty is correct when the GHCR packages are public, which is the simpler choice: the images
+# hold no credentials — JWT_SECRET and the database passwords arrive as environment variables
+# from the Kubernetes Secret at runtime — so publishing them discloses only the compiled
+# application. Packages pushed with GITHUB_TOKEN start out private, so this has to be a
+# deliberate one-time change in each package's settings.
+#
+# To keep them private instead:
+#   kubectl create namespace nabat
+#   kubectl create secret docker-registry ghcr -n nabat \
+#     --docker-server=ghcr.io \
+#     --docker-username=<github-user> \
+#     --docker-password=<PAT with read:packages>
+#   helm upgrade ... --set imagePullSecrets[0]=ghcr
+# The namespace has to exist first: deploy.yml passes --create-namespace, so on a clean
+# cluster Helm would otherwise create it and the secret could not already be inside.
+imagePullSecrets: []
+
 global:
   # REQUIRED, no default. Supply at install time so no signing key lives in git:
   #   helm install nabat ./helm/nabat --set global.jwtSecret="$(openssl rand -base64 48)"
