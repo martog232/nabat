@@ -72,7 +72,7 @@ jobs:
       run: ./mvnw checkstyle:check -B
 
     - name: Lint Dockerfile
-      uses: hadolint/hadolint-action@v3
+      uses: hadolint/hadolint-action@v3.4.0
       with:
         dockerfile: Dockerfile
 
@@ -176,7 +176,7 @@ jobs:
         cache-to: type=gha,mode=max
 
     - name: Scan image for vulnerabilities
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@v0.36.0
       with:
         image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         severity: HIGH,CRITICAL
