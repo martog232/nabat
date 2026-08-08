@@ -116,11 +116,18 @@ class AuthControllerIntegrationTest extends PostgresTestSupport {
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isCreated());
 
-        // Try to register again with same email
+        // Try to register again with same email.
+        //
+        // 409, not 400: a duplicate is a conflict with existing state, not a malformed
+        // request. This assertion said 400 because that is what the generic handler used to
+        // return before EmailAlreadyRegisteredException got a mapping of its own; the
+        // expectation was never updated, and nothing noticed because this whole class failed
+        // at context load in CI and skips without Docker locally.
         mockMvc.perform(post("/api/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_REGISTERED"));
     }
 
     @Test
