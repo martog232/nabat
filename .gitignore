@@ -90,3 +90,10 @@ logs/
 ### SSL certificates ###
 nginx/ssl/
 
+
+# The Maven Wrapper jar is committed on purpose, mirroring the exception already made
+# for gradle-wrapper.jar above. Without it, every CI run and every Docker build has to
+# fetch it from wrapperUrl first, and a failed or partial download surfaces as
+# "Could not find or load main class org.apache.maven.wrapper.MavenWrapperMain" — which
+# is exactly what took CI down on main. This negation must stay below the *.jar rule.
+!.mvn/wrapper/maven-wrapper.jar
