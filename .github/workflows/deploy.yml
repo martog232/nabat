@@ -1,10 +1,29 @@
 name: Deploy
 
+# Manual only, deliberately.
+#
+# The automatic `workflow_run` trigger is commented out rather than deleted. The target
+# cluster is a local minikube, and a GitHub-hosted runner cannot reach it: minikube's API
+# server listens on 127.0.0.1 or a Docker-internal address, which on the runner resolves to
+# the runner itself. Every merge to main therefore produced a red Deploy for a cluster that
+# is unreachable by construction — and a pipeline that fails by design teaches people to
+# ignore red.
+#
+# Restore the trigger when the cluster is reachable from the runner: a managed cluster with
+# a routable API server, or a self-hosted runner on the machine that hosts minikube. Until
+# then deploy from that machine with the same command this workflow runs:
+#
+#   helm upgrade --install nabat ./helm/nabat --namespace nabat --create-namespace \
+#     --set-file global.jwtSecret=jwt.secret \
+#     --set nabatApp.image=ghcr.io/martog232/nabat-app:<sha> \
+#     --atomic --wait --timeout 8m
+#
+# on:
+#   workflow_run:
+#     workflows: [CI]
+#     branches: [main]
+#     types: [completed]
 on:
-  workflow_run:
-    workflows: [CI]
-    branches: [main]
-    types: [completed]
   workflow_dispatch:
     inputs:
       app_image_tag:
@@ -27,6 +46,8 @@ concurrency:
 
 jobs:
   deploy:
+    # The `workflow_run.conclusion == 'success'` half of this guard is kept for when the
+    # automatic trigger above is restored; with dispatch-only it is always the left side.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     # Attach required reviewers or a deployment branch rule to this environment in repository
