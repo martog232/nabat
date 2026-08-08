@@ -10,7 +10,8 @@ target/
 *.class
 
 # Maven
-.mvn/
+# .mvn/ is NOT excluded: the Dockerfile builds with the Maven Wrapper rather than
+# installing Maven from apk, so .mvn/wrapper must be in the build context.
 
 # IDE
 .idea/
