@@ -52,13 +52,32 @@ kong:
   # /status and /metrics. Deliberately distinct from the Admin API on 8001, which is bound
   # to loopback: even in DB-less mode POST /config replaces the whole configuration.
   statusPort: 8100
+  # Kong starts one nginx worker per CPU core by default, each with its own Lua VM and a
+  # copy of the cached declarative config. On a 4-core node that overshot a 512Mi limit and
+  # the container was OOMKilled into CrashLoopBackOff — 137, not a configuration error, and
+  # invisible until the chart was actually installed. Pinning the worker count makes memory
+  # a property of this file rather than of whatever node it lands on.
+  workerProcesses: "2"
   resources:
     requests:
       cpu: 100m
-      memory: 256Mi
+      memory: 512Mi
     limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 1Gi
+  probes:
+    # Explicit, because the 1s default is tight for Kong: /status does real work, and under
+    # memory pressure the probe timed out and the liveness kill masked the OOM as a probe
+    # failure.
+    timeoutSeconds: 5
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 6
+    liveness:
+      initialDelaySeconds: 45
+      periodSeconds: 15
+      failureThreshold: 3
 
 nabatApp:
   # Fully qualified, so a cluster can actually pull it. This was a bare `nabat-app:latest`,
