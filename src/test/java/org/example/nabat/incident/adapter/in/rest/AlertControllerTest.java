@@ -18,6 +18,7 @@ import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.identity.domain.UserId;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -30,7 +31,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -158,7 +161,67 @@ class AlertControllerTest {
                         .param("longitude", "23.0")
                         .param("radiusKm", "5.0"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].title").value("Test Alert"));
+                .andExpect(jsonPath("$.alerts[0].title").value("Test Alert"))
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.limit").value(100))
+                .andExpect(jsonPath("$.truncated").value(false));
+    }
+
+    @Test
+    void shouldReportTruncationWhenTheLimitIsReached() throws Exception {
+        when(getNearbyAlertsUseCase.getNearbyAlerts(any()))
+            .thenReturn(List.of(buildAlert(), buildAlert()));
+
+        mockMvc.perform(get("/api/v1/alerts/nearby")
+                        .param("latitude", "42.0")
+                        .param("longitude", "23.0")
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(2))
+                .andExpect(jsonPath("$.truncated").value(true));
+    }
+
+    @Test
+    void shouldPassFiltersAndLimitToTheUseCase() throws Exception {
+        when(getNearbyAlertsUseCase.getNearbyAlerts(any())).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/v1/alerts/nearby")
+                        .param("latitude", "42.0")
+                        .param("longitude", "23.0")
+                        .param("type", "FIRE")
+                        .param("severity", "CRITICAL")
+                        .param("limit", "25"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<GetNearbyAlertsUseCase.NearbyAlertsQuery> captor =
+            ArgumentCaptor.forClass(GetNearbyAlertsUseCase.NearbyAlertsQuery.class);
+        verify(getNearbyAlertsUseCase).getNearbyAlerts(captor.capture());
+
+        assertEquals(AlertType.FIRE, captor.getValue().type());
+        assertEquals(AlertSeverity.CRITICAL, captor.getValue().severity());
+        assertEquals(25, captor.getValue().limit());
+    }
+
+    /**
+     * The ceiling is the whole protection: without it a caller sets limit=1000000 and the
+     * cap is decorative.
+     */
+    @Test
+    void shouldRejectALimitAboveTheCeiling() throws Exception {
+        mockMvc.perform(get("/api/v1/alerts/nearby")
+                        .param("latitude", "42.0")
+                        .param("longitude", "23.0")
+                        .param("limit", "501"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectAnUnknownAlertType() throws Exception {
+        mockMvc.perform(get("/api/v1/alerts/nearby")
+                        .param("latitude", "42.0")
+                        .param("longitude", "23.0")
+                        .param("type", "NOT_A_TYPE"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

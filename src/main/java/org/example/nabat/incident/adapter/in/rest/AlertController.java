@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
@@ -12,7 +14,9 @@ import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
+import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
+import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.identity.domain.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -84,21 +88,29 @@ public class AlertController {
      *              parameter, and it was being silently ignored.
      */
     @GetMapping("/nearby")
-    @Operation(summary = "Active alerts within a radius, optionally only those newer than `since`")
-    public ResponseEntity<List<AlertResponse>> getNearbyAlerts(
+    @Operation(summary = "Active alerts within a radius, optionally filtered and newer than `since`")
+    public ResponseEntity<NearbyAlertsResponse> getNearbyAlerts(
         @RequestParam @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") Double latitude,
         @RequestParam @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") Double longitude,
         @RequestParam(defaultValue = "5.0")
         @DecimalMin(value = "0.0", inclusive = false) @DecimalMax("100.0") Double radiusKm,
-        @RequestParam(required = false) Instant since
+        @RequestParam(required = false) Instant since,
+        @RequestParam(required = false) AlertType type,
+        @RequestParam(required = false) AlertSeverity severity,
+        @RequestParam(defaultValue = "100")
+        @Min(1) @Max(GetNearbyAlertsUseCase.NearbyAlertsQuery.MAX_LIMIT) Integer limit
     ) {
-        var query = new GetNearbyAlertsUseCase.NearbyAlertsQuery(latitude, longitude, radiusKm);
+        var query = new GetNearbyAlertsUseCase.NearbyAlertsQuery(
+            latitude, longitude, radiusKm, type, severity, limit);
 
         List<Alert> alerts = since == null
             ? getNearbyAlertsUseCase.getNearbyAlerts(query)
             : getNearbyAlertsUseCase.getAlertsSince(query, since);
 
-        return ResponseEntity.ok(alerts.stream().map(AlertResponse::from).toList());
+        return ResponseEntity.ok(NearbyAlertsResponse.of(
+            alerts.stream().map(AlertResponse::from).toList(),
+            limit
+        ));
     }
 
     @GetMapping("/{id}")

@@ -2,7 +2,9 @@ package org.example.nabat.incident.application.port.out;
 
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
+import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
+import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 
 import java.time.Instant;
@@ -15,7 +17,42 @@ public interface AlertRepository {
 
     Optional<Alert> findById(AlertId id);
 
-    List<Alert> findActiveAlertsWithinRadius(Location center, double radiusKm);
+    List<Alert> findActiveAlertsWithinRadius(NearbySearch search);
+
+    /**
+     * The circle, the optional filters and the cap, as one value.
+     *
+     * <p>Grouped rather than passed as six positional arguments, and grouped <em>here</em>
+     * rather than reusing the in-port's query record — an out-port that imports an in-port
+     * would point the dependency backwards.
+     *
+     * @param type     null means every type; likewise {@code severity}
+     * @param limit    hard cap on rows returned. Applied in SQL, not afterwards in Java:
+     *                 trimming a list still makes the database materialise and ship every
+     *                 row inside the radius, which is the cost being avoided.
+     */
+    record NearbySearch(
+        Location center,
+        double radiusKm,
+        AlertType type,
+        AlertSeverity severity,
+        int limit
+    ) {
+        public NearbySearch {
+            if (limit <= 0) {
+                throw new IllegalArgumentException("Limit must be positive");
+            }
+        }
+
+        /** The enum name the native queries compare against, or null for "no filter". */
+        public String typeName() {
+            return type == null ? null : type.name();
+        }
+
+        public String severityName() {
+            return severity == null ? null : severity.name();
+        }
+    }
 
     List<Alert> findByStatus(AlertStatus status);
 
@@ -34,8 +71,8 @@ public interface AlertRepository {
         AlertId alertId, int upvotes, int downvotes, int confirmations, int credibilityScore);
 
     /**
-     * Alerts created at or after {@code since} within {@code radiusKm} of
-     * {@code center}, newest first. Backs the WebSocket reconnect catch-up.
+     * Alerts created at or after {@code since} matching {@code search}, newest first.
+     * Backs the WebSocket reconnect catch-up.
      */
-    List<Alert> findActiveAlertsWithinRadiusSince(Location center, double radiusKm, Instant since);
+    List<Alert> findActiveAlertsWithinRadiusSince(NearbySearch search, Instant since);
 }

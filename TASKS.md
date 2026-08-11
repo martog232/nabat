@@ -204,9 +204,20 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 - Done part: `.env.example` exists and documents these variables.
 - Remaining part: explicit `env_file` wiring is still not present in `docker-compose.yml`.
 
-### T-41 📊 Pagination & filtering on list endpoints
-- `/alerts/nearby` returns an unbounded list. Add `Pageable`, max `radiusKm`,
-  optional `type` / `severity` filters.
+### T-41 📊 Pagination & filtering on list endpoints ✅ COMPLETED
+- `/alerts/nearby` returned an unbounded list. Now capped and filterable.
+- **Deviation from the task as written:** no `Pageable`. Nothing pages through a map, and
+  Spring Data's `Page` would put `pageable`/`sort` internals into a public HTTP contract.
+  The defect was the missing bound, not missing navigation, so the fix is `limit`
+  (default 100, max 500) plus a `truncated` flag — a cap the client cannot see is worse
+  than no cap, because the map silently goes partial.
+- **Breaking change:** the response is now `{ alerts, count, limit, truncated }` instead of
+  a bare JSON array. nabat-fe must read `$.alerts`.
+- `radiusKm` was already bounded at 100 km by `NearbyAlertsQuery`; unchanged.
+- Filters `type` and `severity` are optional and applied in SQL, as is the limit — trimming
+  in Java would still make PostGIS materialise and ship every row in the circle.
+- `cacheKey()` now includes the filters and the limit. Without that, a filtered request
+  could be served an unfiltered cached response from the same grid square.
 
 ### T-42 🗺️ Replace native Haversine with PostGIS ✅ COMPLETED
 - Added `V4__postgis_spatial_indexes.sql` — conditionally enables the `postgis` extension

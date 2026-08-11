@@ -39,20 +39,28 @@ public class AlertRepositoryAdapter implements AlertRepository {
     }
 
     @Override
-    public List<Alert> findActiveAlertsWithinRadius(Location center, double radiusKm) {
+    public List<Alert> findActiveAlertsWithinRadius(NearbySearch search) {
+        Location center = search.center();
         List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
-                ? jpaRepository.findActiveAlertsWithinRadius(center.latitude(), center.longitude(), radiusKm)
-                : jpaRepository.findActiveAlertsWithinRadiusHaversine(center.latitude(), center.longitude(), radiusKm);
+                ? jpaRepository.findActiveAlertsWithinRadius(
+                    center.latitude(), center.longitude(), search.radiusKm(),
+                    search.typeName(), search.severityName(), search.limit())
+                : jpaRepository.findActiveAlertsWithinRadiusHaversine(
+                    center.latitude(), center.longitude(), search.radiusKm(),
+                    search.typeName(), search.severityName(), search.limit());
         return toDomain(results);
     }
 
     @Override
-    public List<Alert> findActiveAlertsWithinRadiusSince(Location center, double radiusKm, Instant since) {
+    public List<Alert> findActiveAlertsWithinRadiusSince(NearbySearch search, Instant since) {
+        Location center = search.center();
         List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
                 ? jpaRepository.findActiveAlertsWithinRadiusSince(
-                    center.latitude(), center.longitude(), radiusKm, since)
+                    center.latitude(), center.longitude(), search.radiusKm(), since,
+                    search.typeName(), search.severityName(), search.limit())
                 : jpaRepository.findActiveAlertsWithinRadiusSinceHaversine(
-                    center.latitude(), center.longitude(), radiusKm, since);
+                    center.latitude(), center.longitude(), search.radiusKm(), since,
+                    search.typeName(), search.severityName(), search.limit());
         return toDomain(results);
     }
 

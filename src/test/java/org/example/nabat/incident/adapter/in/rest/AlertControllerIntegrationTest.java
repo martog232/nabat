@@ -135,8 +135,9 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                         .param("longitude", "23.329")
                         .param("radiusKm", "5.0"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].title").value("Nearby Alert"));
+                .andExpect(jsonPath("$.alerts", hasSize(1)))
+                .andExpect(jsonPath("$.alerts[0].title").value("Nearby Alert"))
+                .andExpect(jsonPath("$.truncated").value(false));
     }
 
     @Test

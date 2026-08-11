@@ -15,21 +15,44 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
 
     List<AlertJpaEntity> findByStatus(AlertStatus status);
 
+    /*
+     * The four spatial queries below share a shape: circle predicate, optional type and
+     * severity filters, newest first, LIMIT.
+     *
+     * On the filters — `CAST(:type AS text) IS NULL OR ...` rather than the obvious
+     * `:type IS NULL OR ...`. PostgreSQL infers parameter types from context, and in a
+     * bare `NULL` comparison there is no context, so it fails the statement with
+     * "could not determine data type of parameter". The cast supplies the type.
+     * `a.type` is compared as text because the column is a varchar holding the enum name.
+     *
+     * On the LIMIT — it belongs here rather than in Java. Trimming the list after the
+     * fact would still make the database materialise and ship every row in the radius,
+     * which is exactly the cost this is meant to avoid. Combined with ORDER BY
+     * created_at DESC it means a truncated response drops the *oldest* matches, which is
+     * the right end to lose for a live incident map.
+     */
+
     /** PostGIS path — used when the location_geog generated column exists. */
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
             :radius * 1000.0
         )
         ORDER BY a.created_at DESC
+        LIMIT :limit
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadius(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
-        @Param("radius") double radiusKm
+        @Param("radius") double radiusKm,
+        @Param("type") String type,
+        @Param("severity") String severity,
+        @Param("limit") int limit
     );
 
     /**
@@ -41,18 +64,24 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
         AND a.created_at >= :since
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
             :radius * 1000.0
         )
         ORDER BY a.created_at DESC
+        LIMIT :limit
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadiusSince(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("since") Instant since
+        @Param("since") Instant since,
+        @Param("type") String type,
+        @Param("severity") String severity,
+        @Param("limit") int limit
     );
 
     /** Haversine equivalent of {@link #findActiveAlertsWithinRadiusSince}. */
@@ -60,35 +89,47 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
         AND a.created_at >= :since
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
             + sin(radians(:lat)) * sin(radians(a.latitude)))
         )) <= :radius
         ORDER BY a.created_at DESC
+        LIMIT :limit
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadiusSinceHaversine(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("since") Instant since
+        @Param("since") Instant since,
+        @Param("type") String type,
+        @Param("severity") String severity,
+        @Param("limit") int limit
     );
 
     /** Haversine fallback — used when PostGIS is not installed on the server. */
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
             + sin(radians(:lat)) * sin(radians(a.latitude)))
         )) <= :radius
         ORDER BY a.created_at DESC
+        LIMIT :limit
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadiusHaversine(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
-        @Param("radius") double radiusKm
+        @Param("radius") double radiusKm,
+        @Param("type") String type,
+        @Param("severity") String severity,
+        @Param("limit") int limit
     );
 
     /**

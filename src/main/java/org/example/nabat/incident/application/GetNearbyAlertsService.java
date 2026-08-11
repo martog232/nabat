@@ -26,11 +26,21 @@ public class GetNearbyAlertsService implements GetNearbyAlertsUseCase {
     @Override
     @Cacheable(cacheNames = "nearbyAlerts", key = "#query.cacheKey()", sync = true)
     public List<Alert> getNearbyAlerts(NearbyAlertsQuery query) {
-        return alertRepository.findActiveAlertsWithinRadius(query.center(), query.radiusKm());
+        return alertRepository.findActiveAlertsWithinRadius(searchFor(query));
     }
 
     @Override
     public List<Alert> getAlertsSince(NearbyAlertsQuery query, Instant since) {
-        return alertRepository.findActiveAlertsWithinRadiusSince(query.center(), query.radiusKm(), since);
+        return alertRepository.findActiveAlertsWithinRadiusSince(searchFor(query), since);
+    }
+
+    private AlertRepository.NearbySearch searchFor(NearbyAlertsQuery query) {
+        return new AlertRepository.NearbySearch(
+            query.center(),
+            query.radiusKm(),
+            query.type(),
+            query.severity(),
+            query.limit()
+        );
     }
 }
