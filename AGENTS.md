@@ -117,6 +117,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - All HTTP routes are under `/api/v1`. The public set is **enumerated by method and path** in `SecurityConfig` — the six `POST /api/v1/auth/*` endpoints — and everything else requires `Authorization: Bearer <accessToken>`. Do not restore a `/api/v1/auth/**` wildcard: it also matched `GET /api/v1/auth/me`, which returns the caller's own profile, so an anonymous request reached `UserResponse.from(null)` and produced a 500 where a 401 was intended. Anything unmatched is `denyAll()`. The JWT filter sets authorities as `ROLE_<role>`.
 - **`POST /api/v1/alerts`** must extract `reportedBy` from the authenticated principal, **not** from the request body.
 - **`PATCH /api/v1/users/me/preferences`** updates the authenticated user's `notificationRadiusKm` (allow-list in `NotificationRadius`, mirroring the DB CHECK constraint) and optionally refreshes `lastKnownLat`/`lastKnownLng`.
+- **Tracing context crosses `@Async` only because `AsyncConfig` declares a `TaskDecorator`.** Spring Boot registers none on its own; it applies one if a single `TaskDecorator` bean exists. What propagates is an **Observation**, not a bare span — only `ObservationThreadLocalAccessor` is ServiceLoader-registered, so `tracer.withSpan(...)` outside an Observation travels nowhere. Spring MVC wraps every request in one, so request-initiated work is covered.
 - Config is env-var driven; **no Spring profiles**. Defaults in `application.properties`.
 - **`JWT_SECRET` has no default and the app refuses to start without it.** It must be ≥ 32 chars, have ≥ 16 distinct characters, and not look like a placeholder. nabat-app and nabat-voting must share the same value. Do not reintroduce a fallback: a committed default is a publicly-known signing key.
 - Access and refresh tokens carry a `tv` (token version) claim checked against `users.token_version`, so a password reset invalidates sessions already in flight. Refresh tokens are single-use, tracked by `jti` in Redis.
@@ -190,6 +191,10 @@ what lets it use package-private members instead of widening production visibili
   after commit, off the publishing thread. A handler unit test cannot catch a missing
   `@EnableAsync` or an unregistered listener; both were verified by removing them and
   watching this test fail.
+- **Trace propagation across `@Async`**: `FanoutTracePropagationIntegrationTest` asserts
+  the fan-out thread sees the publishing request's trace id, in the tracer *and* in the
+  MDC — they can disagree, and it is the MDC that the log pattern reads. Verified by
+  removing the `TaskDecorator` bean and watching it fail.
 - **Outbox durability**: `AlertCreatedOutboxIntegrationTest` asserts against the
   `event_publication` table directly. A crash is simulated by making the delivery port
   throw, which leaves the same state a crash would: an outstanding row. It also proves the
