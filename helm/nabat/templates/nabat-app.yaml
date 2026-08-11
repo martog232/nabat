@@ -97,16 +97,30 @@ spec:
         volumeMounts:
         - mountPath: /app/uploads
           name: uploads-storage
+        # Startup and liveness ask "is this process alive", so they use the liveness group,
+        # which carries no external dependency. They pointed at the aggregate /actuator/health,
+        # which meant a Postgres outage read as "this pod is dead" and Kubernetes restarted
+        # it in a loop — a restart does not repair a database, and it throws away whatever
+        # the pod was still serving.
         startupProbe:
           httpGet:
-            path: /actuator/health
+            path: /actuator/health/liveness
             port: {{ .Values.nabatApp.port }}
           {{- toYaml .Values.nabatApp.probes.startup | nindent 10 }}
         livenessProbe:
           httpGet:
-            path: /actuator/health
+            path: /actuator/health/liveness
             port: {{ .Values.nabatApp.port }}
           {{- toYaml .Values.nabatApp.probes.liveness | nindent 10 }}
+        # Readiness was missing entirely, so a pod joined the Service the moment its
+        # container started — before Flyway had migrated and before the context was up —
+        # and requests routed to it failed. It asks a different question than liveness:
+        # not "restart me" but "stop sending me traffic until I can serve it".
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: {{ .Values.nabatApp.port }}
+          {{- toYaml .Values.nabatApp.probes.readiness | nindent 10 }}
       volumes:
       - name: uploads-storage
         persistentVolumeClaim:

@@ -110,6 +110,8 @@ nabatApp:
       cpu: 512m
       memory: 1Gi
   probes:
+    # Generous: the startup probe holds the other two off until it first succeeds, so this
+    # is the budget for JVM start plus Flyway. 30 x 5s = 150s before the pod is given up on.
     startup:
       initialDelaySeconds: 15
       periodSeconds: 5
@@ -117,6 +119,12 @@ nabatApp:
     liveness:
       initialDelaySeconds: 60
       periodSeconds: 15
+    # Tighter than liveness on purpose. Being wrong about readiness costs one pod's share
+    # of traffic for a few seconds; being wrong about liveness costs a restart.
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 3
 
 votingPostgres:
   image: postgres:16
