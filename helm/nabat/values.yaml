@@ -96,6 +96,11 @@ nabatApp:
   votingServiceUrl: http://nabat-voting-app:8081
   mailHost: mailhog
   mailPort: 1025
+  # Boot 3.4's built-in ECS formatter. Set to "" to fall back to the human-readable
+  # pattern — worth doing when tailing a single pod by hand, since JSON is far harder to
+  # read than it is to query.
+  logFormat: ecs
+  environment: kubernetes
   uploadsStorage: 100Mi
   resources:
     requests:

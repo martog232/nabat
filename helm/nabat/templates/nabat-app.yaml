@@ -84,6 +84,12 @@ spec:
           value: {{ .Values.nabatApp.baseUrl | default (printf "http://%s" .Values.ingress.host) | quote }}
         - name: NABAT_VOTING_SERVICE_BASE_URL
           value: {{ .Values.nabatApp.votingServiceUrl }}
+        # JSON logs so Promtail ships structured fields to Loki and traceId is queryable
+        # in Grafana instead of being text inside a message.
+        - name: NABAT_LOG_FORMAT
+          value: {{ .Values.nabatApp.logFormat | quote }}
+        - name: NABAT_ENVIRONMENT
+          value: {{ .Values.nabatApp.environment | quote }}
         ports:
         - containerPort: {{ .Values.nabatApp.port }}
         resources:

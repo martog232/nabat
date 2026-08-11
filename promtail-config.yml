@@ -21,3 +21,33 @@ scrape_configs:
         target_label: container
       - source_labels: [__meta_docker_container_label_prometheus_job]
         target_label: job
+    pipeline_stages:
+      # The application emits ECS JSON (NABAT_LOG_FORMAT=ecs). Without this stage Loki
+      # stores each line as an opaque string, so traceId is only findable by substring
+      # search — which defeats the point of logging JSON in the first place.
+      #
+      # Non-JSON lines (Postgres, Redis, Kong, and the app's own pre-formatter startup
+      # output) simply do not match and pass through unchanged.
+      - json:
+          expressions:
+            # Keys containing dots are quoted: these are JMESPath expressions, and an
+            # unquoted log.level would be read as a nested object rather than a flat key.
+            level: '"log.level"'
+            logger: '"log.logger"'
+            traceId: traceId
+            service: '"service.name"'
+            ts: '"@timestamp"'
+      # A label, not just a field: this is what makes "show me every line from this trace"
+      # a label selector. Deliberately only traceId — labels are indexed and high
+      # cardinality is what makes Loki slow, so message and logger stay as content.
+      - labels:
+          level:
+          traceId:
+      # Use the application's own timestamp rather than ingestion time, so ordering
+      # survives a shipping delay.
+      # `source` names a field extracted by the json stage above, not a JMESPath
+      # expression — hence `ts` rather than "@timestamp".
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
+          action_on_failure: skip

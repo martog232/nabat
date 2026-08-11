@@ -60,6 +60,10 @@ services:
       # Through the gateway, so emailed verification links match how a browser reaches the
       # API. Pointing at :8080 bypassed Kong and therefore its CORS and rate limits.
       NABAT_BASE_URL: http://localhost:8000
+      # JSON logs, so Promtail ships fields rather than text and traceId is queryable in
+      # Grafana. Unset outside containers, where the human-readable pattern is better.
+      NABAT_LOG_FORMAT: ecs
+      NABAT_ENVIRONMENT: compose
     ports:
       # Published for direct access during development and for Prometheus. Browser traffic
       # should go through Kong on :8000 so local behaviour matches deployed behaviour.
