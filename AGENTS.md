@@ -187,6 +187,11 @@ what lets it use package-private members instead of widening production visibili
   after commit, off the publishing thread. A handler unit test cannot catch a missing
   `@EnableAsync` or an unregistered listener; both were verified by removing them and
   watching this test fail.
+- **Docker is not optional, and its absence is silent.** `PostgresTestSupport` is
+  `@Testcontainers(disabledWithoutDocker = true)`, so when Testcontainers cannot reach the
+  daemon every integration and persistence test *skips* and the build still passes. Check
+  `Skipped: 0` in the surefire summary, not just `BUILD SUCCESS`. `api.version` is pinned
+  to 1.41 in the surefire config for this reason — see the comment in `pom.xml`.
 - Build domain fixtures from `testsupport/Fixtures` and `User.toBuilder()` rather than
   calling record canonical constructors positionally, so adding a component does not
   break every test that builds one.

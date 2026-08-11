@@ -21,6 +21,14 @@
         <java.version>21</java.version>
         <jjwt.version>0.12.5</jjwt.version>
         <spring-modulith.version>1.3.1</spring-modulith.version>
+        <!--
+            Overrides the 1.20.4 that Boot 3.4.1 manages. Its bundled docker-java
+            negotiates Docker Engine API 1.32, which Engine 29 (min 1.40) rejects with an
+            empty 400 — Testcontainers reports that as "Could not find a valid Docker
+            environment" and, because the base class is @Testcontainers(disabledWithoutDocker),
+            every integration test then *skips* and the build still passes green.
+        -->
+        <testcontainers.version>1.21.3</testcontainers.version>
     </properties>
 
     <dependencyManagement>
@@ -234,6 +242,31 @@
                             <version>1.18.34</version>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!--
+                Testcontainers talks to the Docker daemon through docker-java, which
+                defaults to Engine API 1.32. Docker Engine 29 refuses anything below 1.40
+                with an empty 400, which Testcontainers reports as "Could not find a valid
+                Docker environment" — and since PostgresTestSupport is annotated
+                @Testcontainers(disabledWithoutDocker = true), every integration and
+                persistence test then *skips silently* and the build still goes green.
+                That is the dangerous shape of this bug: it does not fail, it stops testing.
+
+                1.41 is the floor supported by every Docker since 20.10 and is above
+                Engine 29's minimum, so it works on old and new daemons alike.
+
+                systemPropertyVariables rather than argLine: argLine is owned by JaCoCo
+                here, and setting it drops the coverage agent.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <api.version>1.41</api.version>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
 
