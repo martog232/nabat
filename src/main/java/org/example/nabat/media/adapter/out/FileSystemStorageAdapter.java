@@ -5,7 +5,6 @@ import org.example.nabat.media.domain.UnsupportedFileTypeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -25,11 +24,15 @@ import java.util.stream.Stream;
  *
  * <p><strong>Multi-instance caveat:</strong> local disk means a photo written by one
  * replica is not readable by another unless the volume is {@code ReadWriteMany}. With
- * {@code nabatApp.replicas: 2} in the Helm values, roughly half of photo reads will
- * miss. An S3/MinIO adapter is the real fix; this is called out in AGENTS.md as a
- * known gap.
+ * {@code nabatApp.replicas: 2} in the Helm values, roughly half of photo reads miss.
+ * {@link S3StorageAdapter} is the answer to that; select it with
+ * {@code nabat.storage.type=s3}. This adapter remains the default because it is the right
+ * choice for a single local process and needs nothing running alongside it.
+ *
+ * <p>Registered by {@code StorageConfig}, not by a stereotype annotation: exactly one
+ * {@link FileStoragePort} must exist, and putting both conditions in one class makes the
+ * choice readable in a single place.
  */
-@Component
 public class FileSystemStorageAdapter implements FileStoragePort {
 
     private static final Logger log = LoggerFactory.getLogger(FileSystemStorageAdapter.class);

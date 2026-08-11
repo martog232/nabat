@@ -29,6 +29,7 @@
             every integration test then *skips* and the build still passes green.
         -->
         <testcontainers.version>1.21.3</testcontainers.version>
+        <awssdk.version>2.52.0</awssdk.version>
     </properties>
 
     <dependencyManagement>
@@ -37,6 +38,13 @@
                 <groupId>org.springframework.modulith</groupId>
                 <artifactId>spring-modulith-bom</artifactId>
                 <version>${spring-modulith.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -124,6 +132,34 @@
         </dependency>
         <!-- H2 removed (T-43) — all tests use real PostgreSQL via Testcontainers. -->
 
+        <!--
+            Object storage for alert photos. The AWS SDK rather than the MinIO client,
+            because the S3 API is what both MinIO and S3 speak — this keeps a local MinIO
+            and a managed bucket on one code path instead of two.
+
+            apache-client is excluded: the SDK's default HTTP client pulls in httpclient4
+            alongside the one Spring Boot already manages. url-connection-client is enough
+            for object PUT/GET at this scale and has no transitive HTTP stack of its own.
+        -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>apache-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+        </dependency>
+
         <!-- Flyway Database Migrations -->
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -174,6 +210,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Real MinIO for the S3 adapter tests: mocking an object store proves nothing. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>minio</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

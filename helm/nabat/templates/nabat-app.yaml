@@ -96,6 +96,24 @@ spec:
           value: {{ .Values.nabatApp.orphanSweep.enabled | quote }}
         - name: NABAT_ORPHAN_GRACE
           value: {{ .Values.nabatApp.orphanSweep.grace | quote }}
+        - name: NABAT_STORAGE_TYPE
+          value: {{ .Values.nabatApp.storage.type | quote }}
+        {{- if eq .Values.nabatApp.storage.type "s3" }}
+        - name: NABAT_S3_ENDPOINT
+          value: {{ .Values.nabatApp.storage.endpoint | default (printf "http://%s-minio:9000" (include "nabat.fullname" .)) | quote }}
+        - name: NABAT_S3_BUCKET
+          value: {{ .Values.nabatApp.storage.bucket | quote }}
+        - name: NABAT_S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "nabat.fullname" . }}-secrets
+              key: minio-access-key
+        - name: NABAT_S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "nabat.fullname" . }}-secrets
+              key: minio-secret-key
+        {{- end }}
         ports:
         - containerPort: {{ .Values.nabatApp.port }}
         resources:
