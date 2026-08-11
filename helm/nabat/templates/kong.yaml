@@ -63,6 +63,10 @@ spec:
           value: /dev/stdout
         - name: KONG_PROXY_ERROR_LOG
           value: /dev/stderr
+        # See values.yaml: without this Kong scales workers to the node's core count and
+        # the memory limit becomes a function of the node rather than of this chart.
+        - name: KONG_NGINX_WORKER_PROCESSES
+          value: {{ .Values.kong.workerProcesses | quote }}
         ports:
         - name: proxy
           containerPort: {{ .Values.kong.proxyPort }}
@@ -79,14 +83,18 @@ spec:
           httpGet:
             path: /status/ready
             port: {{ .Values.kong.statusPort }}
-          initialDelaySeconds: 5
-          periodSeconds: 5
+          initialDelaySeconds: {{ .Values.kong.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.kong.probes.readiness.periodSeconds }}
+          failureThreshold: {{ .Values.kong.probes.readiness.failureThreshold }}
+          timeoutSeconds: {{ .Values.kong.probes.timeoutSeconds }}
         livenessProbe:
           httpGet:
             path: /status
             port: {{ .Values.kong.statusPort }}
-          initialDelaySeconds: 20
-          periodSeconds: 15
+          initialDelaySeconds: {{ .Values.kong.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.kong.probes.liveness.periodSeconds }}
+          failureThreshold: {{ .Values.kong.probes.liveness.failureThreshold }}
+          timeoutSeconds: {{ .Values.kong.probes.timeoutSeconds }}
         resources:
           {{- toYaml .Values.kong.resources | nindent 10 }}
       volumes:
