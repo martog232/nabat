@@ -198,7 +198,10 @@ Strangler fig. Всяка фаза оставя системата deploy-вае
 - Три цикъла, които достъпът в рамките на пакета беше скривал: `realtime ↔ incident/notification` (обърнат с `WsBroadcaster` — производителят строи frame-а, транспортът само маршрутизира), `notification ↔ voting` (преводът `VoteType → NotificationType` мина при извикващия), `incident ↔ subscription` (обърнат с `AlertAudiencePort`).
 - ArchUnit замени скенера на импорти. Седмото правило извади дупка: `UploadController` беше единственият контролер, инжектиращ outbound порт — media вече има application слой.
 - `NotificationMilestones` мина в `notification/domain`; два `@Deprecated(forRemoval = true)` тестови shim-а са премахнати.
-- **Остава от тази фаза:** Event Publication Registry (durability на fan-out-а) — иска `spring-modulith-events-jpa`, което не е налично локално. И `spring-modulith-docs` за генериране на C4 диаграми от кода.
+- **Event Publication Registry — готов.** `spring-modulith-events-jpa` (плюс `-events-jackson` за сериализатора) и таблицата `event_publication` (V11). Публикуването пише ред за всяка двойка (събитие, слушател) в транзакцията на записа и го маркира завършен чак когато слушателят се върне, така че outbox-ът и alert-ът commit-ват или се връщат заедно. Незавършените се преиграват при старт. Доставката става **at-least-once, не exactly-once**: краш след записа в socket-а, но преди завършването, преиграва push-а.
+
+  Това, което си струва да се запомни от упражнението: pattern-ът е един ред зависимост, но цената му е в payload-а. Преиграването десериализира съхранения JSON, така че всяко събитие трябва да преживее round-trip през Jackson — иначе всеки незавършен ред става вечна грешка, откриваема точно след краш. Тестът го проверява явно.
+- **Остава от тази фаза:** `spring-modulith-docs` за генериране на C4 диаграми от кода.
 
 ### Фаза 1 — Платформата да стане реална
 

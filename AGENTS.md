@@ -78,7 +78,9 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `NewAlertFanout` handles that event with **`@ApplicationModuleListener`** — after commit, async, in a new transaction. It asks `AlertAudiencePort` for recipients, drops the reporter, and broadcasts.
 - `AlertAudienceAdapter` (in `subscription`) implements that port, merging subscribers-by-type with users whose own notification radius covers the incident.
 - **Do not move the fan-out back inside `createAlert`.** It was there, in the transaction: it held a pooled connection across socket writes, and because the push preceded the commit, a rollback left clients displaying an alert that did not exist.
-- The listener is **not durable** — a crash between commit and delivery loses the push. Acceptable only because the frontend re-fetches with `GET /alerts/nearby?since` after a dropped socket. Do not extend this pattern to anything the client cannot re-derive; that needs Modulith's Event Publication Registry.
+- The listener **is durable**, via Modulith's Event Publication Registry (`spring-modulith-events-jpa`, table `event_publication`, V11). Publishing writes one row per (event, listener) in the publishing transaction; it is completed when the listener returns. Outstanding rows are replayed on startup — `spring.modulith.events.republish-outstanding-events-on-restart=true`. Delivery is therefore **at-least-once, not exactly-once**: a crash after the socket write but before completion replays the push, which is safe only because the frontend upserts by alert id.
+- The registry needs an `EventSerializer`; `spring-modulith-events-jpa` ships none, so `spring-modulith-events-jackson` is a required companion dependency. Without it the context fails at startup.
+- Anything added to an event payload must survive a **Jackson round-trip**, because replay deserialises the stored JSON. A payload that serialises but does not deserialise turns every outstanding row into a permanent failure, discovered only after a crash.
 
 ### Real-time alert updates (WebSocket broadcast)
 - Three frame types, all wrapped in `WsFrame`:
@@ -136,6 +138,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V8 | Add photo_url column to alerts |
 | V9 | `users.token_version` — session invalidation on credential change |
 | V10 | `alerts.version` — optimistic locking |
+| V11 | `event_publication` — Modulith Event Publication Registry (transactional outbox) |
 
 ---
 
@@ -187,6 +190,10 @@ what lets it use package-private members instead of widening production visibili
   after commit, off the publishing thread. A handler unit test cannot catch a missing
   `@EnableAsync` or an unregistered listener; both were verified by removing them and
   watching this test fail.
+- **Outbox durability**: `AlertCreatedOutboxIntegrationTest` asserts against the
+  `event_publication` table directly. A crash is simulated by making the delivery port
+  throw, which leaves the same state a crash would: an outstanding row. It also proves the
+  stored payload round-trips back into an equal `Alert`, since replay depends on that.
 - **Docker is not optional, and its absence is silent.** `PostgresTestSupport` is
   `@Testcontainers(disabledWithoutDocker = true)`, so when Testcontainers cannot reach the
   daemon every integration and persistence test *skips* and the build still passes. Check
@@ -205,7 +212,7 @@ what lets it use package-private members instead of widening production visibili
 | `Role.ADMIN` enforcement | 🟡 Partial | `@PreAuthorize("hasRole('ADMIN')")` on `GET /api/v1/alerts` and on nabat-voting's projection rebuild. No other admin-only endpoints exist yet. |
 | Notification REST API | ✅ Done | `NotificationController` exposes the 5 `GetNotificationUseCase` methods. There is deliberately no create endpoint. |
 | Photo upload storage (multi-instance) | 🟡 Local FS only | `FileSystemStorageAdapter` uses local disk, so with `replicas: 2` a photo written by one pod is unreadable from the other unless the volume is RWX. Needs an S3/MinIO adapter. |
-| Alert fan-out durability | 🟡 Known | `NewAlertFanout` is an async after-commit listener, so a crash between commit and delivery loses the push. Survivable only because the frontend catches up via `?since` on reconnect. The fix is Modulith's Event Publication Registry (`spring-modulith-events-jpa` + a table), which turns the same annotation into a transactional outbox. |
+| Alert fan-out durability | ✅ Done | Event Publication Registry (V11). Outstanding publications replay on startup; delivery is at-least-once. |
 | Orphaned uploads | 🟡 Known | A photo uploaded for an alert whose creation then fails is never referenced or reclaimed. The frontend reuses the URL on retry; there is no server-side sweeper. |
 | Kafka dual write | 🟡 Known | The vote commit and the `vote.cast` publish are not atomic. Failures are logged and the projection is rebuildable; a transactional outbox is the proper fix. |
 | Shared JWT secret | 🟡 Known | Symmetric HS256 means nabat-voting could also *mint* tokens nabat-app trusts. RS256 with a published public key would let it verify without signing power. |

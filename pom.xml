@@ -73,6 +73,29 @@
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-api</artifactId>
         </dependency>
+        <!--
+            Event Publication Registry: turns @ApplicationModuleListener into a
+            transactional outbox. Writes a row per (event, listener) in the publishing
+            transaction and completes it once the listener returns, so a crash between
+            commit and delivery leaves an incomplete row that is replayed on startup.
+            Runtime scope: nothing in main/ imports it, it is picked up by
+            auto-configuration. The table is owned by Flyway (V11), not by Hibernate.
+        -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-events-jpa</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!--
+            The registry stores events as text, so it needs an EventSerializer; the JPA
+            module deliberately ships none. Without this the context fails at startup with
+            "No qualifying bean of type EventSerializer".
+        -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-events-jackson</artifactId>
+            <scope>runtime</scope>
+        </dependency>
 
         <!-- JWT -->
         <dependency>
