@@ -90,6 +90,12 @@ spec:
           value: {{ .Values.nabatApp.logFormat | quote }}
         - name: NABAT_ENVIRONMENT
           value: {{ .Values.nabatApp.environment | quote }}
+        # Reclaims photos whose alert was never submitted. The uploads PVC is fixed-size,
+        # so without this it fills with files nothing will ever request.
+        - name: NABAT_ORPHAN_SWEEP_ENABLED
+          value: {{ .Values.nabatApp.orphanSweep.enabled | quote }}
+        - name: NABAT_ORPHAN_GRACE
+          value: {{ .Values.nabatApp.orphanSweep.grace | quote }}
         ports:
         - containerPort: {{ .Values.nabatApp.port }}
         resources:

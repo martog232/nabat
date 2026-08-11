@@ -101,6 +101,15 @@ nabatApp:
   # read than it is to query.
   logFormat: ecs
   environment: kubernetes
+  orphanSweep:
+    enabled: true
+    # ISO-8601. How long a photo may sit unreferenced before it is reclaimed. Long on
+    # purpose — being late costs disk, being early costs a user's photo.
+    #
+    # Note for the multi-replica case: storage is a per-pod volume today, so each replica
+    # only ever sees and sweeps its own files. On a ReadWriteMany volume both would sweep
+    # the same directory, which is safe (deletion is idempotent) but does duplicate work.
+    grace: PT24H
   uploadsStorage: 100Mi
   resources:
     requests:

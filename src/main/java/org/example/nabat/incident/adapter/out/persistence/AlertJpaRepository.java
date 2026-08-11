@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> {
@@ -131,6 +132,39 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("severity") String severity,
         @Param("limit") int limit
     );
+
+    /**
+     * Of the given storage names, those that are the last path segment of some alert's
+     * {@code photo_url}.
+     *
+     * <p>Backs the orphaned-upload sweep. Alerts store a serving URL while the caller holds
+     * bare filenames, so the two have to be related somehow; passing whole URLs instead
+     * would make {@code incident} responsible for knowing how {@code media} builds them.
+     *
+     * <p>The comparison is on the final segment rather than {@code LIKE '%' || name}. A
+     * plain suffix match reports {@code graph.jpg} as referenced whenever any alert points
+     * at {@code photograph.jpg}, because the URL does end with those characters. Here that
+     * errs safe — an orphan is kept, not a live photo deleted — but it means files quietly
+     * never get reclaimed, which is the bug this job exists to fix.
+     *
+     * <p>Not indexable, deliberately: a few hundred names at a time, once an hour, against
+     * a column holding a URL rather than a key. Reshaping the schema so a housekeeping job
+     * can use an index would be the wrong trade.
+     */
+    @Query(value = """
+        SELECT DISTINCT f.name FROM unnest(CAST(:filenames AS text[])) AS f(name)
+        WHERE EXISTS (
+            SELECT 1 FROM alerts a
+            WHERE a.photo_url IS NOT NULL
+            AND substring(a.photo_url from '[^/]+$') = f.name
+        )
+        """, nativeQuery = true)
+    Set<String> findReferencedPhotoFilenames(@Param("filenames") String[] filenames);
+
+    /** Convenience over the array form, so callers can pass the set they already have. */
+    default Set<String> findReferencedPhotoFilenames(Set<String> filenames) {
+        return findReferencedPhotoFilenames(filenames.toArray(String[]::new));
+    }
 
     /**
      * {@code flushAutomatically} so pending changes are not lost, and

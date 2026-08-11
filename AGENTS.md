@@ -101,6 +101,8 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `UploadController` → `StorePhotoUseCase` / `LoadPhotoUseCase` → `PhotoStorageService` → `FileStoragePort`. The controller was wired straight to `FileStoragePort` and was the only controller in the codebase naming an outbound port; `ArchitectureTest` now forbids that.
 - `FileSystemStorageAdapter` saves to `nabat.storage.upload-dir` (default `./uploads`). Uploads are validated by **magic bytes** (`ImageContentType`), stored under a generated UUID name with a canonical extension, and served as `Content-Disposition: attachment` with `nosniff` and a locked-down CSP. Never trust the client's filename or `Content-Type`.
 - `CreateAlertRequest` / `CreateAlertCommand` / `Alert` include optional `photoUrl` field.
+- **Orphan reclamation** (`OrphanedPhotoReclaimService`): the two-step upload means a photo whose alert is never submitted has nothing referencing it. The sweep deletes from the *absence* of a reference, which makes two rules non-negotiable. **A failure to determine references must propagate, never degrade to an empty set** — the caller deletes everything not in that set, so "the database is down" would otherwise read as "nothing is referenced" and erase the volume. And **only files older than the grace period are candidates**, because a fresh upload is usually sitting in an unsubmitted form.
+- `media` declares `PhotoReferencePort`; `incident` implements it (`AlertPhotoReferenceAdapter`) because it owns `alerts.photo_url`. Same direction as `AlertAudiencePort`. The SQL matches the **last path segment**, not a `LIKE '%' || name` suffix — the latter reports `graph.jpg` as referenced whenever some alert points at `photograph.jpg`, so orphans are never reclaimed.
 - `V8__add_photo_url_to_alerts.sql` adds `photo_url VARCHAR(500)` to the `alerts` table.
 
 ---
@@ -224,7 +226,7 @@ what lets it use package-private members instead of widening production visibili
 | Notification REST API | ✅ Done | `NotificationController` exposes the 5 `GetNotificationUseCase` methods. There is deliberately no create endpoint. |
 | Photo upload storage (multi-instance) | 🟡 Local FS only | `FileSystemStorageAdapter` uses local disk, so with `replicas: 2` a photo written by one pod is unreadable from the other unless the volume is RWX. Needs an S3/MinIO adapter. |
 | Alert fan-out durability | ✅ Done | Event Publication Registry (V11). Outstanding publications replay on startup; delivery is at-least-once. |
-| Orphaned uploads | 🟡 Known | A photo uploaded for an alert whose creation then fails is never referenced or reclaimed. The frontend reuses the URL on retry; there is no server-side sweeper. |
+| Orphaned uploads | ✅ Done | `OrphanedPhotoSweeper` → `ReclaimOrphanedPhotosUseCase`, hourly, behind `nabat.storage.orphan-sweep.enabled` (on in compose and Helm). Only files older than `nabat.storage.orphan-grace` (24h) are candidates. |
 | Kafka dual write | 🟡 Known | The vote commit and the `vote.cast` publish are not atomic. Failures are logged and the projection is rebuildable; a transactional outbox is the proper fix. |
 | Shared JWT secret | 🟡 Known | Symmetric HS256 means nabat-voting could also *mint* tokens nabat-app trusts. RS256 with a published public key would let it verify without signing power. |
 | Spring Boot version drift | 🟡 Known | nabat-app 3.4.1 (past OSS support, Jackson 2) vs nabat-voting 4.0.6 (Jackson 3). Worth aligning. |
