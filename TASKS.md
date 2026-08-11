@@ -285,9 +285,20 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
   Externalize to `messages.properties` so future locales drop in.
 - Implemented: notification text keys moved to `src/main/resources/messages.properties` and resolved in `NotificationService` via `MessageSource` + request locale.
 
-### T-50 🎚️ Minimum password policy
-- `RegisterRequest.password` is `@Size(min = 6)`. Bump to ≥ 10, require
-  mix of letters/digits, surface a clear validation error.
+### T-50 🎚️ Minimum password policy ✅ COMPLETED
+- `identity/domain/PasswordPolicy` holds the rules; `@StrongPassword` applies them.
+- ≥ 10 characters, at least one letter and one digit, as asked.
+- **Added beyond the task:** an upper bound of 72 UTF-8 bytes. Passwords are BCrypt-hashed
+  and BCrypt reads only the first 72 bytes, discarding the rest without complaint — so a
+  long passphrase was being silently truncated, and any string sharing its first 72 bytes
+  opened the account. Counted in bytes rather than characters because that is the unit
+  BCrypt truncates on; a 40-character Cyrillic passphrase is already 80 bytes.
+- **`ResetPasswordRequest` had its own duplicate `@Size(min = 6)`.** Raising the bar on
+  registration alone would have left "forgot password" as a supported route to a password
+  registration refuses. Both now share one annotation.
+- Errors name the single rule that was broken rather than listing the policy, so the user
+  is sent to the fix instead of working out which part they failed.
+- Login deliberately does not apply the policy — existing accounts keep working.
 
 ---
 
