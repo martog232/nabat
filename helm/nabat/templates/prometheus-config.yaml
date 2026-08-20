@@ -22,6 +22,16 @@ data:
   prometheus.yml: |
     global:
       scrape_interval: 15s
+      # Stated, not defaulted: rule evaluation and Alertmanager's resolve_timeout have to
+      # be reasoned about together, and a default that is invisible here cannot be.
+      evaluation_interval: 15s
+    alerting:
+      alertmanagers:
+      - static_configs:
+        - targets:
+          - {{ include "nabat.fullname" . }}-alertmanager:9093
+    rule_files:
+    - /etc/prometheus/rules/rules.yml
     scrape_configs:
     # metrics_path matters: Spring Boot serves Micrometer at /actuator/prometheus. Without
     # it Prometheus scrapes the default /metrics and gets a 404 from both apps on every
@@ -66,6 +76,12 @@ spec:
     type: Recreate
   template:
     metadata:
+      annotations:
+        # Rolls the pod when the shared rules file changes. Prometheus reads rule files at
+        # startup and on SIGHUP only, so without this an upgrade that edits rules.yml
+        # updates the ConfigMap and leaves the old rules evaluating — the failure mode
+        # being an alert you believe you deployed.
+        checksum/rules: {{ .Files.Get "prometheus/rules.yml" | sha256sum }}
       labels:
         app.kubernetes.io/component: prometheus
         {{- include "nabat.labels" . | nindent 8 }}
@@ -81,12 +97,20 @@ spec:
         volumeMounts:
         - mountPath: /etc/prometheus
           name: config
+        # Separate mount, not a second key in the same ConfigMap: the rules come from a
+        # shared file via .Files.Get, and keeping them apart means a rule change does not
+        # rewrite the scrape config.
+        - mountPath: /etc/prometheus/rules
+          name: rules
         - mountPath: /prometheus
           name: storage
       volumes:
       - name: config
         configMap:
           name: {{ include "nabat.fullname" . }}-prometheus-config
+      - name: rules
+        configMap:
+          name: {{ include "nabat.fullname" . }}-prometheus-rules
       - name: storage
         persistentVolumeClaim:
           claimName: {{ include "nabat.fullname" . }}-prometheus-data

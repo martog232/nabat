@@ -1,0 +1,119 @@
+{{/*
+Alerting: the rules Prometheus evaluates, and the Alertmanager that turns a firing rule
+into a notification someone receives.
+
+Both configuration files are shared verbatim with the compose stack — `prometheus/rules.yml`
+and `alertmanager/alertmanager.yml` — for the same reason kong/kong.yml is: two copies of an
+alerting policy drift, and the copy that drifts is the one you find out about during an
+incident.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nabat.fullname" . }}-prometheus-rules
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+data:
+  rules.yml: |
+{{ .Files.Get "prometheus/rules.yml" | indent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nabat.fullname" . }}-alertmanager-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alertmanager
+data:
+  alertmanager.yml: |
+{{ .Files.Get "alertmanager/alertmanager.yml" | indent 4 }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "nabat.fullname" . }}-alertmanager-data
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Notification state and silences. Small, but not disposable: losing it re-notifies
+      # everything still firing and discards every silence someone set.
+      storage: {{ .Values.monitoring.alertmanager.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nabat.fullname" . }}-alertmanager
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: alertmanager
+  # Recreate: ReadWriteOnce PVC, so the outgoing pod must release it first.
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        # Alertmanager reloads on SIGHUP, not on file change, so a routing edit that only
+        # rewrites the ConfigMap would leave the old routes in force.
+        checksum/config: {{ .Files.Get "alertmanager/alertmanager.yml" | sha256sum }}
+      labels:
+        app.kubernetes.io/component: alertmanager
+        {{- include "nabat.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: alertmanager
+        image: {{ .Values.monitoring.alertmanager.image }}
+        args:
+        - --config.file=/etc/alertmanager/alertmanager.yml
+        - --storage.path=/alertmanager
+        ports:
+        - containerPort: 9093
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        volumeMounts:
+        - mountPath: /etc/alertmanager
+          name: config
+        - mountPath: /alertmanager
+          name: storage
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "nabat.fullname" . }}-alertmanager-config
+      - name: storage
+        persistentVolumeClaim:
+          claimName: {{ include "nabat.fullname" . }}-alertmanager-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nabat.fullname" . }}-alertmanager
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alertmanager
+spec:
+  selector:
+    app.kubernetes.io/component: alertmanager
+  ports:
+  - port: 9093

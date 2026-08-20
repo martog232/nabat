@@ -188,12 +188,31 @@ services:
     container_name: nabat-prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      # The rules live under the chart because Helm's .Files.Get cannot read outside it,
+      # and one file loaded by both environments beats two that drift apart.
+      - ./helm/nabat/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     depends_on:
       - nabat-app
       - kong
+      - alertmanager
+    restart: unless-stopped
+
+  # Turns firing rules into a notification. Without it Prometheus evaluates rules and the
+  # result is visible only to whoever thinks to open the Alerts tab — which is not alerting.
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: nabat-alertmanager
+    volumes:
+      - ./helm/nabat/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    # Delivery target: alerts are emailed to MailHog, where they are actually readable.
+    depends_on:
+      - mailhog
     restart: unless-stopped
 
   grafana:
@@ -205,6 +224,11 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/prometheus.yml
+      # Dashboards as code. The provider and the JSON live under the chart so both
+      # environments load the same files — only the datasource URLs differ per
+      # environment, which is why datasources stay outside.
+      - ./helm/nabat/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/nabat.yml:ro
+      - ./helm/nabat/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "3000:3000"
     # All three datasources, not just Prometheus. Grafana was provisioned with Loki and
@@ -276,6 +300,10 @@ volumes:
   grafana_data:
     driver: local
   loki_data:
+    driver: local
+  # Silences and notification state. Without it every restart re-notifies everything that
+  # is still firing, and any silence a person set is gone.
+  alertmanager_data:
     driver: local
   promtail_positions:
     driver: local

@@ -227,3 +227,16 @@ monitoring:
     image: grafana/promtail:latest
   zipkin:
     image: openzipkin/zipkin:latest
+  alertmanager:
+    image: prom/alertmanager:latest
+    # Silences and notification state, not metrics — small, but losing it re-notifies
+    # everything still firing and discards every silence someone set.
+    storage: 1Gi
+
+# SMTP catcher for verification mail and for Alertmanager delivery. The application has
+# always been configured to send mail to a host called `mailhog`, which this chart did not
+# deploy — so every verification email in Kubernetes failed. Set enabled: false when
+# nabatApp.mailHost points at a real relay.
+mailhog:
+  enabled: true
+  image: mailhog/mailhog:latest

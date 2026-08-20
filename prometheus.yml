@@ -14,6 +14,17 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Where firing alerts go. Rules without an Alertmanager are visible only in the Alerts tab
+# of a UI nobody has open, which is monitoring, not alerting.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Shared with the Helm chart — see the header of the file itself for why it lives there.
+rule_files:
+  - /etc/prometheus/rules.yml
+
 scrape_configs:
   # Gateway metrics from the status listener, not the Admin API on 8001. The prometheus
   # plugin serves /metrics on both; only one of them is also a control surface capable of

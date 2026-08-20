@@ -1,0 +1,145 @@
+# Alerting rules, shared by the compose stack and the Helm chart.
+#
+# Lives under the chart for the same reason kong/kong.yml does: Helm's .Files.Get cannot
+# read outside the chart directory, and one file both environments load is worth more than
+# a tidier path plus two copies that drift.
+#
+# Two rules of thumb applied throughout:
+#
+#   * Every alert has a `for:` long enough that a scrape blip cannot fire it. An alert that
+#     fires on a single missed scrape teaches people to ignore alerts, which is worse than
+#     having none.
+#   * Every alert names the action in its annotation. "Error rate is high" is a fact;
+#     "check <what> because <consequence>" is an alert. Anything with no action belongs on
+#     a dashboard instead.
+groups:
+  - name: availability
+    rules:
+      # Deliberately excludes nabat-voting, which has its own rule below at a lower
+      # severity: in the compose stack that service lives in a separate stack and its
+      # target is expected to be down. A critical alert that is always firing is
+      # indistinguishable from a broken alerting setup.
+      - alert: ServiceDown
+        expr: up{job!="nabat-voting"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} has been unreachable for 2 minutes"
+          description: >-
+            Prometheus cannot scrape {{ $labels.job }} at {{ $labels.instance }}.
+            Either the process is gone or it is no longer serving /actuator/prometheus.
+            Check the container or pod first; if it is running, check whether the
+            management endpoint is still exposed.
+
+      - alert: VotingServiceUnreachable
+        expr: up{job="nabat-voting"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "nabat-voting is unreachable — voting returns 503 while it is"
+          description: >-
+            Every vote goes through nabat-voting; V7 dropped the local alert_votes table,
+            so there is no fallback path and the API answers 503. In the compose stack
+            this alert is expected: nabat-voting runs from its own compose file and this
+            target cannot resolve. In Kubernetes it means the deployment is down.
+
+  - name: http
+    rules:
+      - alert: HighServerErrorRate
+        # Ratio, not a count: absolute error counts scale with traffic, so a threshold on
+        # them either misses a real outage at low traffic or screams during a busy hour.
+        # The right-hand clause keeps this quiet when almost nothing is being served, where
+        # one error is 100 % and means nothing.
+        expr: >-
+          sum(rate(http_server_requests_seconds_count{job="nabat-app",status=~"5.."}[5m]))
+          /
+          sum(rate(http_server_requests_seconds_count{job="nabat-app"}[5m]))
+          > 0.05
+          and
+          sum(rate(http_server_requests_seconds_count{job="nabat-app"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Over 5 % of requests are failing with 5xx"
+          description: >-
+            Group the same metric by uri to find which endpoint is failing, then read the
+            application logs for that trace window in Loki. A 5xx is the application's own
+            fault by definition — a rejected or malformed request is a 4xx.
+
+      - alert: HighRequestLatency
+        # p95 from the bucket series, which is why percentiles-histogram is enabled for
+        # this meter in application.properties. Excludes the actuator endpoints: their
+        # timing says nothing about user-facing behaviour and Prometheus scrapes them
+        # constantly, which drags the aggregate around.
+        expr: >-
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_server_requests_seconds_bucket{job="nabat-app",uri!~"/actuator.*"}[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95th percentile request latency is above 1s"
+          description: >-
+            Check the nearby-alerts query first — it is the only user-facing path that
+            touches PostGIS and the one whose cost grows with data. Then check
+            hikaricp_connections_pending: latency that rises with no CPU change is usually
+            a connection pool queue, not slow SQL.
+
+  - name: use-cases
+    rules:
+      - alert: UseCaseErrorRate
+        # The bespoke timer from UseCaseMetricsAspect, which tags every @UseCase call with
+        # an outcome. This catches failures that never reach an HTTP status: scheduled
+        # sweeps, event listeners, the fan-out.
+        expr: >-
+          sum by (usecase) (rate(nabat_usecase_duration_seconds_count{outcome="error"}[10m]))
+          /
+          sum by (usecase) (rate(nabat_usecase_duration_seconds_count[10m]))
+          > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.usecase }} is failing more than 10 % of the time"
+          description: >-
+            Not every failure here is an incident — AuthenticationService counts a wrong
+            password as an error outcome, so a brute-force attempt shows up as a spike.
+            Check which exception dominates in Loki before treating it as a defect.
+
+  - name: resources
+    rules:
+      - alert: ConnectionPoolSaturated
+        # Pending means threads are queued waiting for a connection: the pool is the
+        # bottleneck, and every request behind the queue is paying for it.
+        expr: hikaricp_connections_pending{job="nabat-app"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connection pool has been saturated for 5 minutes"
+          description: >-
+            Look for work holding a connection while doing something slow — the fan-out
+            used to do exactly this by writing to sockets inside the transaction. Raising
+            the pool size hides the cause and moves the queue into Postgres.
+
+      - alert: HeapNearlyFull
+        expr: >-
+          sum by (instance) (jvm_memory_used_bytes{job="nabat-app",area="heap"})
+          /
+          sum by (instance) (jvm_memory_max_bytes{job="nabat-app",area="heap"})
+          > 0.9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Heap has been above 90 % for 15 minutes"
+          description: >-
+            Sustained, not spiky: a full heap after GC is a leak or an undersized limit,
+            while a brief peak is normal. The S3 upload path buffers whole files in memory
+            by design, bounded by max-file-size-bytes — check upload volume before
+            assuming a leak.
