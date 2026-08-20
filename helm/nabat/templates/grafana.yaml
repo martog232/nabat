@@ -1,4 +1,19 @@
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "nabat.fullname" . }}-grafana-data
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Datasources are provisioned from the ConfigMap below and survive without this, but
+      # anything a person builds in the UI — a dashboard, an explore query, a preference —
+      # lived in an emptyDir and died with the pod.
+      storage: {{ .Values.monitoring.grafana.storage }}
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "nabat.fullname" . }}-grafana-datasources
@@ -34,6 +49,9 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/component: grafana
+  # Recreate: ReadWriteOnce PVC, so the outgoing pod must release it first.
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -60,7 +78,8 @@ spec:
         configMap:
           name: {{ include "nabat.fullname" . }}-grafana-datasources
       - name: storage
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: {{ include "nabat.fullname" . }}-grafana-data
 ---
 apiVersion: v1
 kind: Service

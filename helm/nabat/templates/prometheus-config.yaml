@@ -1,4 +1,19 @@
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "nabat.fullname" . }}-prometheus-data
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # monitoring.prometheus.storage used to be set here and read by nothing — the
+      # deployment mounted an emptyDir, so every metric vanished with the pod and the
+      # value in values.yaml documented durability the chart did not provide.
+      storage: {{ .Values.monitoring.prometheus.storage }}
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "nabat.fullname" . }}-prometheus-config
@@ -44,6 +59,11 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/component: prometheus
+  # Recreate, not RollingUpdate: the PVC below is ReadWriteOnce, so a replacement pod
+  # cannot mount it while the outgoing one still holds it. The default strategy waits for
+  # a volume that will not be released until it stops waiting.
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -68,7 +88,8 @@ spec:
         configMap:
           name: {{ include "nabat.fullname" . }}-prometheus-config
       - name: storage
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: {{ include "nabat.fullname" . }}-prometheus-data
 ---
 apiVersion: v1
 kind: Service

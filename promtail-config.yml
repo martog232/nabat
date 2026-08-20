@@ -3,10 +3,12 @@ server:
   grpc_listen_port: 0
 
 positions:
-  filename: /tmp/positions.yaml
+  # /run, where a named volume is mounted, so a restart resumes where it stopped instead
+  # of re-shipping every log still on disk. The container's own /tmp does not survive.
+  filename: /run/positions.yaml
 
 clients:
-  - url: http://nabat-loki:3100/loki/api/v1/push
+  - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
   - job_name: docker

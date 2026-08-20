@@ -90,6 +90,15 @@ spec:
           value: {{ .Values.nabatApp.logFormat | quote }}
         - name: NABAT_ENVIRONMENT
           value: {{ .Values.nabatApp.environment | quote }}
+        # Rendered from the release name rather than left to the application default.
+        # That default is the literal host `nabat-zipkin`, which resolves only while the
+        # release happens to be named `nabat`; under any other release name spans were
+        # posted into a DNS failure, and a tracing backend that silently receives nothing
+        # looks exactly like a system with no traffic.
+        - name: ZIPKIN_ENDPOINT
+          value: http://{{ include "nabat.fullname" . }}-zipkin:9411/api/v2/spans
+        - name: NABAT_TRACING_SAMPLING_PROBABILITY
+          value: {{ .Values.nabatApp.tracing.samplingProbability | quote }}
         # Reclaims photos whose alert was never submitted. The uploads PVC is fixed-size,
         # so without this it fills with files nothing will ever request.
         - name: NABAT_ORPHAN_SWEEP_ENABLED

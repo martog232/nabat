@@ -63,7 +63,12 @@ services:
   # create one either — a service that makes its own bucket will happily make one from a
   # typo and write into it. One-shot job instead, so the bucket is a property of the stack.
   minio-init:
-    image: minio/mc:RELEASE.2024-08-26T22-27-06Z
+    # Re-pinned: RELEASE.2024-08-26T22-27-06Z no longer exists on Docker Hub, and MinIO
+    # prunes old `mc` tags, so `docker compose up` failed for everyone with an image that
+    # could not be resolved. Still pinned rather than `latest` — a one-shot job that
+    # creates the bucket every other service depends on is the last place to want a
+    # silently changing image — but the pin needs refreshing when it disappears again.
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     container_name: nabat-minio-init
     depends_on:
       minio:
@@ -93,6 +98,10 @@ services:
       # away from being created.
       minio-init:
         condition: service_completed_successfully
+      # Ordering only, no condition: the span exporter buffers and retries, so a late
+      # Zipkin costs nothing but a page of resolution warnings during startup.
+      zipkin:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nabat_db
       SPRING_DATASOURCE_USERNAME: nabat_user
@@ -110,6 +119,10 @@ services:
       # Grafana. Unset outside containers, where the human-readable pattern is better.
       NABAT_LOG_FORMAT: ecs
       NABAT_ENVIRONMENT: compose
+      # Stated explicitly, by compose service name. The application's default happens to
+      # be `nabat-zipkin`, which resolves here only because the zipkin service also
+      # carries that container_name — a coincidence to depend on for tracing.
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       # Reclaim photos whose alert was never submitted. Off by default in the application;
       # switched on here because this stack owns a volume that would otherwise only grow.
       NABAT_ORPHAN_SWEEP_ENABLED: "true"
@@ -194,8 +207,65 @@ services:
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/prometheus.yml
     ports:
       - "3000:3000"
+    # All three datasources, not just Prometheus. Grafana was provisioned with Loki and
+    # Zipkin datasources while neither service existed in this file, so two of the three
+    # panels a developer would open were dead on arrival.
     depends_on:
       - prometheus
+      - loki
+      - zipkin
+    restart: unless-stopped
+
+  # Log aggregation. The single-binary image ships a working config at
+  # /etc/loki/local-config.yaml; anything more is a distributed-mode concern this stack
+  # does not have.
+  loki:
+    image: grafana/loki:latest
+    container_name: nabat-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    ports:
+      # Published like Prometheus and Zipkin, so `curl localhost:3100/loki/api/v1/labels`
+      # can answer "did any log actually arrive" without going through Grafana. Grafana
+      # itself talks to it over the compose network.
+      - "3100:3100"
+    restart: unless-stopped
+
+  # Ships container logs into Loki. `promtail-config.yml` existed in this repository and
+  # was referenced by nothing — the parsing it describes (ECS JSON into fields, traceId
+  # as a label) simply never ran anywhere.
+  promtail:
+    image: grafana/promtail:latest
+    container_name: nabat-promtail
+    command: -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/promtail.yml:ro
+      # Docker service discovery reads the container list and log streams from the daemon.
+      # Read-only: the socket is root on the host, and a writable mount is a container
+      # escape, not a log shipper.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Named volume so a promtail restart resumes where it stopped instead of re-shipping
+      # every log it can still see.
+      - promtail_positions:/run
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # Tracing backend. The application has always been configured to send spans here
+  # (`ZIPKIN_ENDPOINT`, defaulting to this host name), but the service was missing from
+  # this file, so every export failed DNS resolution and no trace was ever viewable.
+  #
+  # STORAGE_TYPE is stated rather than left to the default: `mem` is a ring buffer that
+  # dies with the container. That is right for local work and wrong for anything else, so
+  # it should be visible rather than implied.
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: nabat-zipkin
+    environment:
+      STORAGE_TYPE: mem
+    ports:
+      - "9411:9411"
     restart: unless-stopped
 
 volumes:
@@ -204,6 +274,10 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+  promtail_positions:
     driver: local
   # Retained: NABAT_STORAGE_TYPE can be set back to `filesystem` and the app still has
   # somewhere to write.

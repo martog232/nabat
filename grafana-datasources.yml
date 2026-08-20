@@ -1,22 +1,29 @@
 apiVersion: 1
 
+# Datasources for the compose stack only — the Helm chart templates its own from the
+# release name (see templates/grafana.yaml).
+#
+# Addressed by compose *service* name rather than by container_name. Both resolve on the
+# default network, but the service name is the alias compose guarantees; container_name is
+# an optional field, so relying on it makes these URLs break the moment one is renamed or
+# dropped. Loki and Zipkin were pointed at hosts that did not exist in docker-compose.yml
+# at all, which is what made two of these three panels dead.
 datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://nabat-prometheus:9090
+    url: http://prometheus:9090
     isDefault: true
     editable: true
 
   - name: Loki
     type: loki
     access: proxy
-    url: http://nabat-loki:3100
+    url: http://loki:3100
     editable: true
 
   - name: Zipkin
     type: zipkin
     access: proxy
-    url: http://nabat-zipkin:9411
+    url: http://zipkin:9411
     editable: true
-
