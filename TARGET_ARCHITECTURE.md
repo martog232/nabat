@@ -1,6 +1,6 @@
 # Целева архитектура
 
-**Статус:** предложение. **Фаза 0 е завършена** (виж раздел 8); останалите фази не са започвани.
+**Статус:** предложение. **Фаза 0 е завършена; Фаза 1 е до голяма степен изпълнена и остатъкът ѝ е блокиран от инфраструктура, не от код** (виж раздел 8). Фази 2–7 не са започвани, но част от предпоставките им вече са налице. **Последно сверено с кода: 2026-08-20.**
 **Цел:** Nabat да се превърне в microservice платформа, която е коректна по професионални стандарди и е направена, за да се *учи* от нея. Оптимизирана за учебна стойност и честност, не за скорост на доставяне.
 
 Този документ умишлено е отделен от [`ARCHITECTURE.md`](ARCHITECTURE.md), който описва как системата е *замислена* да работи днес. Прочети раздел „Изходна точка“ по-долу, преди да се довериш на онзи файл — няколко от компонентите, които той документира, не са deploy-нати никъде.
@@ -26,12 +26,18 @@
 
 | Какво | Къде |
 |---|---|
-| Хексагонални слоеве с домейн без framework зависимости, наложени чрез тестове | `ArchitectureTest.java:44-57` |
-| Fail-closed авторизация (`anyRequest().denyAll()`) в двете услуги | `SecurityConfig.java:56` |
+| Хексагонални слоеве с домейн без framework зависимости, наложени чрез тестове | `ArchitectureTest` (ArchUnit, 7 правила) |
+| Fail-closed авторизация (`anyRequest().denyAll()`) в двете услуги | `SecurityConfig.java:78` |
 | Валидация на JWT secret: дължина, ентропия, blocklist за placeholder-и, без default | `JwtTokenProvider.java:95-118` |
-| Отнемане на токени през `tv` (token-version) claim | `JwtAuthenticationFilter.java:87` |
+| Отнемане на токени през `tv` (token-version) claim, с едно решение за всички входни точки | `SessionAuthenticationService` зад `AuthenticateSessionUseCase` |
 | Еднократна ротация на refresh токени с `jti`, върху Redis | `RedisRefreshTokenStore` |
-| WebSocket автентикация с краткоживеещ ticket, а не bearer токен в query string-а | `WebSocketTicketController`, `JwtHandshakeInterceptor` |
+| WebSocket автентикация с краткоживеещ ticket, а не bearer токен в query string-а — и двата пътя минават през същата проверка на сесията като HTTP филтъра | `WebSocketTicketController`, `JwtHandshakeInterceptor` |
+| Transactional outbox в рамките на процеса, с преиграване на незавършените публикации при старт | `event_publication` (V11), `NewAlertFanout` |
+| Обектно съхранение за снимки, избирано с конфигурация, плюс изчистване на осиротели файлове | `S3StorageAdapter`, `StorageConfig`, `OrphanedPhotoReclaimService` |
+| Разделени liveness/readiness health groups, така че отпадане на базата да не рестартира здрави pod-ове | `application.properties`, `HealthProbesIntegrationTest` |
+| Декларативна Kong конфигурация във version control, споделена от compose и Helm | `helm/nabat/kong/kong.yml` |
+| Структурирани JSON логове с `traceId`, пренасян и през `@Async` границата | `logging.structured.format.console`, `AsyncConfig`, `StructuredLoggingIntegrationTest` |
+| Testcontainers за PostGIS **и** Redis, споделени за целия JVM | `PostgresTestSupport` |
 | Kafka хигиена при producer/consumer: `acks=all`, идемпотентност, error handler с ограничен backoff, `commitRecovered` | nabat-voting `KafkaConfig.java:122-198` |
 | Идемпотентен rebuild на проекцията, с отделна транзакция за всеки alert | nabat-voting `CredibilityProjectionUpdater.java:77-98` |
 | Собствени метрики по use-case с тагове за success/error | `UseCaseMetricsAspect.java:43-61` |
@@ -42,24 +48,24 @@
 
 | Твърдение | Реалност |
 |---|---|
-| Kong API gateway | **Съществува и работи, но само на една машина и не е във version control.** Няма `kong.yml` в нито едно от трите repo-та, липсва в двата compose файла и в Helm chart-а; config repo-то, което `ARCHITECTURE.md:234` обещава, не е качено. Значи никоя среда, възпроизводима от git, няма Kong — включително Kubernetes deploy-ът, където Ingress-ът сочи право към `nabat-app:8080`. |
-| Rate limiting / защита от brute force | `RateLimitingFilter` и bucket4j са изтрити, защото Kong поема това. Работи там, където Kong работи. **Липсва във всяка среда, която може да се вдигне от repo-то** — compose, Helm, CI, машината на всеки друг разработчик. `LoginAttemptTracker` само наблюдава и логва; това е умишлено при gateway, но означава, че без Kong пред себе си приложението не блокира нищо. |
-| Събиране на метрики | Prometheus в Helm няма `metrics_path`, така че scrape-ва `/metrics`, а Spring сервира `/actuator/prometheus` → 404 при всеки scrape. В compose се използва label-based discovery, но нито една услуга не декларира labels и docker socket-ът не е mount-нат. Никъде не се събира нищо. |
-| CD pipeline | ✅ Поправен. Images се публикуват в GHCR с immutable SHA таг; `deploy.yml` подава задължителните secrets през `--set-file`, deploy-ва точно commit-а, който CI е публикувал, има `concurrency` и `environment: production`, и завършва със smoke тест през gateway-а вместо `kubectl get pods`. Спря да презаписва voting image-а със SHA на nabat-app. `helm lint` + `helm template` + `kubeconform` вече вървят в CI. Остава: OIDC вместо дълготраен `KUBECONFIG` secret, и staging tier. |
-| Readiness gating | Нула `readinessProbe` в трите repo-та, при `nabatApp.replicas: 2`. Liveness удря агрегатния `/actuator/health`, така че кратък проблем с Postgres рестартира здрави pod-ове. Health groups на Spring не са включени никъде. |
+| Kong API gateway | ✅ **Вече е във version control и в двете среди.** `helm/nabat/kong/kong.yml` е каноничният декларативен конфиг — `docker-compose.yml` го mount-ва, chart-ът го рендерира (`kong.yaml`), а Ingress-ът сочи към Kong вместо към `nabat-app:8080`. Файлът живее под chart-а, защото `.Files.Get` на Helm не чете извън директорията на chart-а, и един файл за двете среди струва повече от по-подреден път плюс дрифт. CI чупи build-а, ако конфигът се рендерира празен. |
+| Rate limiting / защита от brute force | ✅ **Съществува навсякъде, където има Kong.** `kong.yml` носи два `rate-limiting` плъгина и `request-size-limiting`; Kong е и в compose, и в chart-а. `LoginAttemptTracker` продължава само да наблюдава и логва — умишлено, когато gateway стои отпред. Остава: `mvnw spring-boot:run` без gateway не ограничава нищо, тоест защитата е свойство на топологията, не на приложението. |
+| Събиране на метрики | ✅ **Поправено в двете среди.** И `prometheus.yml` (compose), и `prometheus-config.yaml` (Helm) задават `metrics_path: /actuator/prometheus` за двете услуги, а метриките на Kong се взимат от status listener-а на 8100, не от Admin API — двата пътя сервират `/metrics`, но само единият е и control surface, способен да замени цялата конфигурация на gateway-а. Остава: target-ът `nabat-voting` в compose не се решава, защото услугата е в отделен compose stack; оставен е нарочно видимо DOWN, вместо да бъде тихо премълчан. |
+| CD pipeline | 🟡 **Работи, но е ръчен по конструкция.** Images се публикуват в GHCR с immutable SHA таг; `helm lint`, `helm template`, `kubeconform` и проверката за празен Kong конфиг вървят в CI. `deploy.yml` обаче е **само `workflow_dispatch`**: целевият кластер е локален minikube, а GitHub-hosted runner не може да го достигне — API server-ът слуша на `127.0.0.1` или на Docker-вътрешен адрес, който на runner-а се решава до самия runner. Всеки merge даваше червен Deploy за кластер, недостижим по конструкция, а pipeline, който се чупи по замисъл, учи хората да игнорират червено. Остава: достижим кластер (managed или self-hosted runner), OIDC вместо дълготраен `KUBECONFIG`, staging tier, Trivy/CodeQL/SBOM, contract тестове. |
+| Readiness gating | ✅ **Има го за nabat-app.** `/actuator/health/liveness` и `/actuator/health/readiness` са отделни групи: liveness не носи външна зависимост, защото рестартът не поправя Postgres, а readiness добавя `db`. Redis нарочно **не** е в readiness — всички реплики ползват една инстанция, така че включването му превръща частична деградация в едновременно излизане на всички pod-ове от балансировчика. Пинато от `HealthProbesIntegrationTest`. Остава: `voting-app` има само `livenessProbe`. |
 | `k8s/` манифести | ✅ Изтрити. Бяха мъртви, дрифтнали и нереферирани, и колидираха с chart-а по Namespace, `nabat-secrets`, `nabat-uploads` и Deployment/Service `nabat-app` — прилагането им върху Helm release изтриваше JWT secret-а. Историята им е в git, ако някога потрябват. |
-| Трайност на мониторинга | Prometheus, Loki и Grafana ползват `emptyDir`; Zipkin няма `STORAGE_TYPE`. Стойностите `storage:` в `values.yaml` са мъртви — не се създава PVC. Няма Alertmanager, няма правила за алармиране, няма дашборди. |
-| Структурирано логване | Няма logback конфигурация в нито една от двете услуги. Promtail изпраща ANSI-оцветен свободен текст към Loki без парсване; trace ID-тата не могат да се извлекат като labels. |
-| Event-driven комуникация между услугите | **nabat-app изобщо няма Kafka.** Topic-ът `vote.cast` е self-loop: nabat-voting сам публикува и сам консумира своите събития, за да поддържа собствената си проекция. Cross-service поток от събития не съществува. |
-| Resilience | Няма Resilience4j никъде. Извикването nabat-app → nabat-voting има connect/read timeout и нищо друго — без circuit breaker, retry или bulkhead. |
-| Автоматизация на фронтенда | nabat-fe няма CI, няма запис в compose, няма Kubernetes манифест. `VITE_API_BASE_URL` се вгражда по време на build; `.env.example` сочи порт 8000 (Kong), а `vite.config.ts` по подразбиране го заобикаля към 8080 — двата default-а си противоречат, защото Kong не е в compose. |
+| Трайност на мониторинга | 🟡 **Разделено.** Postgres, voting-postgres, MinIO и uploads-ът вече имат истински PVC. Prometheus, Loki и Grafana си остават на `emptyDir`, Zipkin няма `STORAGE_TYPE`. Няма Alertmanager, няма правила за алармиране, няма дашборди като код. **Ново при това сверяване:** в compose Grafana се provision-ва с datasource-и за Loki (`nabat-loki:3100`) и Zipkin (`nabat-zipkin:9411`), а такива услуги в `docker-compose.yml` няма — два от три datasource-а сочат в нищото. `promtail-config.yml` е написан за compose (`docker_sd_configs`), но не е рефериран от нито един compose service. Тоест локално има метрики, но няма нито логове, нито tracing backend. |
+| Структурирано логване | 🟡 **Готово в приложението, недовършено в Kubernetes.** `logging.structured.format.console=${NABAT_LOG_FORMAT:}` дава ECS JSON в deployment-ите и плосък текст локално; Boot 3.4 носи формата вграден, така че `logstash-logback-encoder` не е нужен. `promtail-config.yml` има `json` stage и вдига само `traceId` като label. Но `promtail.yaml` в chart-а няма нито един `pipeline_stages` — в Kubernetes логовете стигат до Loki като неразпарсван JSON низ. Пинато от `StructuredLoggingIntegrationTest`. Две подробности, които спестяват час: ECS ключовете са плоски с точки (`service.name`), а tracing идва като `traceId`/`spanId`, не като каноничния `trace.id` — MDC се излъчва като динамични двойки, така че `logging.structured.json.rename.*` не го достига. |
+| Event-driven комуникация между услугите | ❌ **Непроменено.** `pom.xml` на nabat-app няма нито Kafka, нито Resilience4j — проверено. `kafka.yaml` в chart-а е за nabat-voting. Topic-ът `vote.cast` остава self-loop: nabat-voting сам публикува и сам консумира. Спечеленото междувременно е pattern-ът, не транспортът — Event Publication Registry (V11) е transactional outbox в рамките на един процес, тоест Фаза 2 подменя носителя, а не идеята. |
+| Resilience | ❌ Няма Resilience4j никъде. Извикването nabat-app → nabat-voting има connect/read timeout и нищо друго — без circuit breaker, retry или bulkhead. Отказите се превеждат коректно (503 при timeout/5xx), но не се поглъщат. |
+| Автоматизация на фронтенда | 🟡 nabat-fe все още няма CI, няма запис в compose и няма Kubernetes манифест. Противоречието в default-ите обаче е решено: `.env.example` документира двата режима (Kong на 8000 срещу приложението право на 8080), а `vite.config.ts` derive-ва proxy target-а от `VITE_API_BASE_URL` с default 8080 и обяснение защо. |
 
 ### Бъгове в коректността, открити при одита
 
 1. ✅ **`GET /api/v1/auth/me` не беше автентикиран.** `permitAll` върху `/api/v1/auth/**` се оценяваше преди `authenticated()`, а `AuthController` твърди обратното и заради това няма null проверка — анонимна заявка стигаше до `UserResponse.from(null)` и връщаше **500 с `NullPointerException`** вместо 401. Публичният списък вече е изброен по метод и път. Покрито от `AuthEndpointSecurityTest`, който не иска Docker — съществуващият Testcontainers тест очакваше 401, но се пропускаше точно там, където човек би забелязал.
 2. ✅ **WebSocket push се случваше вътре в транзакция.** Сега `CreateAlertService` само записва и публикува `AlertCreated`; `NewAlertFanout` работи след commit, асинхронно, в собствена транзакция.
 3. ✅ **Мъртва port surface:** `AlertRepository.findVoteStats`, съответният JPA projection и `NotificationSender.isUserOnline` са премахнати.
-4. 🟡 **Непокрити с тестове области.** media модулът вече има 23 теста (magic bytes, service, controller headers). Остават без покритие Redis адаптерите, `NabatVotingRestClientAdapter` и `SmtpEmailSender`; няма Redis Testcontainer никъде.
+4. 🟡 **Непокрити с тестове области.** media модулът има 23 теста (magic bytes, service, controller headers). **Redis Testcontainer вече съществува** — `PostgresTestSupport` вдига Redis до PostGIS, така че Redis-зависимите пътища (тикети, refresh токени, кеш, relay) най-накрая се изпълняват срещу истински Redis, а не срещу отказана връзка; преди това мълчаливо се проваляха на CI, а локално се пропускаха. Остават без **собствени** тестове `RedisWebSocketTicketRepository`, `RedisRefreshTokenStore`, `NabatVotingRestClientAdapter` и `SmtpEmailSender`, и няма нито един тест, който вдига истинско nabat-voting — интеграцията с единствената извадена услуга е проверена само с мокове.
 5. 🟡 **Дублирана политика за fan-out.** Логиката severity→радиус се премести в `NewAlertFanout`, но все още е кодирана твърдо и отделно от `NotificationRadius`. Обединява се във Фаза 6, когато notification поеме абонаментите.
 
 ---
@@ -97,7 +103,7 @@ flowchart TB
 | **identity-service** | `users`, `verification_tokens`, състояние на refresh токените | Единственият издател на токени в системата. Подписва с RS256, публикува JWKS. Скалира се независимо (пикове при login) и е най-строгата граница по сигурност. |
 | **incident-service** | `alerts` (write model) | Ядрото на домейна. Това остава от nabat-app, след като отпадне всичко останало. |
 | **feed-service** | гео read model (Redis GEO / PostGIS реплика) | Единственото място, където CQRS е оправдан: заявки по радиус при висок QPS нямат нищо общо с пътя на записване. Сервира картата с вече присъединени тallies от гласуването и URL на снимката — без fan-out по време на заявка. |
-| **voting-service** | `votes`, `alert_credibility` | Вече е извадена. Най-висок процент на записи в системата; независимото скалиране е реално. |
+| **voting-service** | `votes`, `alert_credibility` | Вече е извадена — но само като код. Има свое repo, минал CI и образ в GHCR, и **е единственият път за гласуване**, откакто `V7__` изтри локалната таблица `alert_votes`. Не върви никъде, което е възпроизводимо: липсва в `docker-compose.yml` на nabat-app, а Helm пътят не се deploy-ва. Значи гласуването връща 503 във всяка среда, която реално се вдига. Изваждане преди платформата да е реална — точно грешката, която редът на фазите в раздел 8 се опитва да предотврати. |
 | **notification-service** | `notifications`, `user_subscriptions`, предпочитания за нотификации | Чист event consumer. Притежава *цялата* политика „кой за какво трябва да чуе“ — което решава и дублираната логика за радиуса. |
 | **realtime-service** | регистър на връзките (Redis) | 50k неактивни socket-а и 50 записа/сек са несвързани проблеми на скалиране. Redis relay индирекцията вече съществува. |
 | **media-service** | метаданни за object storage | Издава presigned URL-и, така че байтовете никога не минават през услугата; заменя адаптера върху локална файлова система, който не може да работи при `replicas: 2`. |
@@ -125,7 +131,7 @@ flowchart TB
 - **`alerts.upvote_count / downvote_count / confirmation_count / credibility_score`** — денормализирана проекция на състоянието на voting услугата, в момента записвана синхронно от HTTP отговора на гласуването през `AlertRepositoryAdapter.applyVoteCounts`. **В целевата архитектура това е Kafka consumer на събитията за гласове.** Именно тази промяна превръща сегашния self-loop в истински cross-service поток и е стъпката с най-висока учебна стойност в цялата миграция.
 - **`users.notification_radius_km / last_known_lat / last_known_lng`** — данни за маршрутизиране на нотификации, живеещи върху identity агрегата, заявявани само от fan-out при създаване на alert (`findUsersNearLocation`). Местят се в notification-service, захранвани от събитие `user.location_updated`.
 - **`alerts.photo_url`** — media данни върху incident ред, подавани от клиента без каквато и да е серверна връзка към съхранения файл и без път за изчистване. В целевата архитектура media-service притежава обекта и излъчва `media.attached`.
-- **`users.token_version`** — чете се от Postgres при **всяка** автентикирана заявка (`JwtAuthenticationFilter.java:75-90`). Това не издържа изваждане: cross-service извикване при всяка заявка е недопустимо. Цел: краткоживеещи access токени (≈15 мин) плюс списък за отнемане, разпространяван чрез събитие, така че всяка услуга да проверява локално.
+- **`users.token_version`** — чете се от Postgres при **всяка** автентикирана заявка и при всеки WebSocket handshake. Проверката вече живее на едно място (`SessionAuthenticationService` зад `AuthenticateSessionUseCase`) вместо вградена във филтъра; докато беше там, handshake-ът я нямаше и приемаше отнети токени. Това пак не издържа изваждане: cross-service извикване при всяка заявка е недопустимо. Цел: краткоживеещи access токени (≈15 мин) плюс списък за отнемане, разпространяван чрез събитие, така че всяка услуга да проверява локално.
 
 ---
 
@@ -203,11 +209,22 @@ Strangler fig. Всяка фаза оставя системата deploy-вае
   Това, което си струва да се запомни от упражнението: pattern-ът е един ред зависимост, но цената му е в payload-а. Преиграването десериализира съхранения JSON, така че всяко събитие трябва да преживее round-trip през Jackson — иначе всеки незавършен ред става вечна грешка, откриваема точно след краш. Тестът го проверява явно.
 - **Остава от тази фаза:** `spring-modulith-docs` за генериране на C4 диаграми от кода.
 
-### Фаза 1 — Платформата да стане реална
+### Фаза 1 — Платформата да стане реална 🟡 В ХОД
 
 Registry и push на images. Поправен scrape път за Prometheus. Readiness/liveness health groups. Структурирано JSON логване с парсване на trace-id. **Декларативната Kong конфигурация влиза в git**, влиза в compose и в Helm chart-а, а Ingress-ът сочи към Kong вместо право към приложението — така rate limiting-ът съществува във всяка среда, не само на една машина. Изтриване на `k8s/`. Трайно съхранение за мониторинг стека. `securityContext` и non-root image за voting. CI за nabat-fe.
 
 **Критерий:** един commit deploy-ва на чист кластер без ръчна намеса; trace на заявка се вижда от край до край в Grafana; ограничен по rate клиент получава 429; описанието в ARCHITECTURE.md отговаря на реалността.
+
+**Свършено (сверено 2026-08-20):** registry и push с immutable SHA таг; Prometheus scrape път в двете среди; разделени health groups, пинати с тест; JSON логване с `traceId`, включително през `@Async` границата; Kong конфигът в git, в compose, в chart-а, с Ingress към него; `k8s/` изтрито; PVC за Postgres, voting-postgres, MinIO и uploads.
+
+**Остава:**
+
+- **Достижим кластер.** Това е същинският блокер, не код: `deploy.yml` е ръчен, защото minikube е недостижим за GitHub-hosted runner. Докато това не се реши, критерият „един commit deploy-ва без ръчна намеса“ е недостижим по конструкция, а всяка следваща фаза се доставя на сляпо.
+- Трайност и пълнота на мониторинга: Prometheus/Loki/Grafana са на `emptyDir`, Zipkin е без `STORAGE_TYPE`, няма Alertmanager и няма дашборди като код. В compose Loki и Zipkin изобщо липсват като услуги, макар Grafana да е provision-ната за тях — тоест „trace от край до край в Grafana“ локално не е проверимо.
+- `pipeline_stages` в promtail на chart-а: в Kubernetes JSON логовете стигат неразпарсвани.
+- `securityContext` с `runAsNonRoot` и read-only root filesystem — няма нито един такъв блок в chart-а; voting все още върви като root.
+- OIDC вместо дълготраен `KUBECONFIG` secret, staging tier, Trivy/CodeQL/SBOM, contract тестове.
+- CI за nabat-fe.
 
 ### Фаза 2 — Event backbone-ът да стане реален
 
@@ -215,21 +232,31 @@ Kafka в nabat-app. Schema Registry с Avro. Transactional outbox в двете 
 
 **Критерий:** voting-service може да бъде спряна и гласовете все пак се съгласуват след време; несъвместима промяна на схема се отхвърля от CI.
 
+**Налична предпоставка:** outbox pattern-ът вече е упражнен в рамките на процеса (Event Publication Registry, V11), заедно с урока, който плаща цената му — преиграването десериализира съхранения JSON, така че payload, който се сериализира, но не се десериализира, превръща всеки незавършен ред във вечна грешка, откриваема точно след краш.
+
+**Предпоставка, която липсва:** nabat-voting няма среда, в която да бъде спряна и наблюдавана. Тя не е в `docker-compose.yml` на nabat-app, не е в нито един тест, а Helm пътят не се deploy-ва — тоест критерият на тази фаза днес е непроверим. Първата стъпка е Kafka и nabat-voting в compose, преди каквато и да е работа по темата.
+
 ### Фаза 3 — RS256 и JWKS
 
 Identity подписва с частен ключ; всяка друга услуга верифицира срещу публикуван JWKS. TTL на access токена — до ~15 минути. Отнемането се разпространява чрез събитие вместо четене от базата при всяка заявка. `kid` headers, за да могат ключовете да се ротират без прекъсване.
 
 **Критерий:** никоя услуга освен identity не държи материал за подписване; ключ се ротира без нито една неуспешна заявка.
 
+**Свършено предварително:** отнемането вече се зачита и на WebSocket handshake-а, не само по HTTP — `AuthenticateSessionUseCase` е единственото място с правилата, така че когато четенето от базата бъде заменено със събитие, се сменя един клас, а не всяка входна точка. Симетричният HS256 secret остава: nabat-voting може не само да верифицира, а и да *сече* токени, които nabat-app приема.
+
 ### Фаза 4 — Изваждане на media-service
 
-Най-чистият възможен разрез: без FK свързаност, без тестове за пренасяне, а сегашният адаптер вече е документиран като неработещ при две реплики. Преминаване към presigned S3/MinIO URL-и и решаване на факта, че `GET /api/v1/uploads/{filename}` в момента изисква JWT, което прави CDN кеширане невъзможно.
+Най-чистият възможен разрез: без FK свързаност, без тестове за пренасяне. Преминаване към presigned S3/MinIO URL-и и решаване на факта, че `GET /api/v1/uploads/{filename}` в момента изисква JWT, което прави CDN кеширане невъзможно.
 
 **Критерий:** снимките преживяват рестарт на pod и се четат от която и да е реплика.
 
+**Критерият е изпълнен предсрочно, в монолита.** `S3StorageAdapter` (избиран с `nabat.storage.type=s3`, MinIO в compose и в chart-а) замени адаптера върху локална файлова система, а `OrphanedPhotoReclaimService` изчиства файловете, чийто alert никога не е подаден — компенсацията от единствената saga в раздел 6, само че вътрешнопроцесна. Значи изваждането вече не е нужно, за да са коректни снимките; то остава заради независимото скалиране и presigned URL-ите. Две правила от тази работа важат и след разделянето: неуспешното определяне на референции трябва да се разпространи като грешка, а не да се изроди в празно множество (иначе „базата е долу“ се чете като „нищо не е реферирано“ и томът се изтрива), и кандидати са само файлове по-стари от grace периода.
+
 ### Фаза 5 — Изваждане на realtime-service
 
-Redis relay-ът вече съществува, така че това е предимно промяна в deployment-а. Първо трябва да се разчупи свързването, при което `AlertWebSocketHandler` импортира REST DTO-та (`AlertResponse`, `NotificationResponse`) — форматът по мрежата трябва да стане собствен версиониран контракт.
+Redis relay-ът вече съществува, така че това е предимно промяна в deployment-а.
+
+**Предпоставката е изпълнена:** свързването, при което `AlertWebSocketHandler` импортираше REST DTO-та, е разчупено. `WsFrame` (в `realtime/spi`) носи `Object` payload, frame-а го строи произвеждащият модул, а `realtime` само маршрутизира и сериализира — точно обратната посока на предишната, при която транспортът зависеше от двата модула, които зависят от него. **Остава** обаче същината на бележката: по мрежата все още пътуват REST response DTO-та, а не собствен версиониран контракт, така че промяна в `AlertResponse` продължава да е промяна във WebSocket контракта.
 
 **Критерий:** realtime се скалира независимо; rolling restart на incident-service не разпада socket-ите.
 
@@ -259,4 +286,5 @@ Identity е последна: четири входящи FK-а и най-стр
 | Театър със saga-и | Има точно една истинска saga. Измислянето на още, за да се покаже pattern-ът, изгражда грешен инстинкт. |
 | Kafka като вътрешнопроцесен message bus | Сегашният self-loop на `vote.cast`: latency и dual-write риск за нулево decoupling. |
 | Event sourcing по подразбиране | Таблицата `votes` е коректна като текущо състояние. Event sourcing там, където историята е изискване, не като украса. |
-| Инфраструктура извън version control | Случаят с Kong: работи на една машина, но нито едно repo не може да го вдигне, така че всяка друга среда тихо остава без gateway и без rate limiting. Конфигурацията на нещо, което стои пред всички услуги, е код. |
+| Инфраструктура извън version control | Случаят с Kong, вече поправен: работеше на една машина, а нито едно repo не можеше да го вдигне, така че всяка друга среда тихо оставаше без gateway и без rate limiting. Конфигурацията на нещо, което стои пред всички услуги, е код — днес `kong.yml` е един файл, зареждан и от compose, и от chart-а, вместо два, които дрифтват. |
+| Услуга, извадена преди платформата да е реална | Случаят с nabat-voting: коректен код, минал CI, публикуван образ — и нула среди, в които върви, при положение че локалната таблица за гласове вече е изтрита. Изваждането не завършва с merge, а с работеща среда; иначе фичърът просто изчезва. |

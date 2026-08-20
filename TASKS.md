@@ -322,8 +322,14 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 
 If you want, point at a task ID and I'll pick it up next.
 
+---
 
-
+> **Everything below this line is a historical brainstorm, not a live backlog.** It was
+> written before the modules existed and several entries describe defects that have since
+> been fixed — item 1 (WebSocket trusting `?userId=`) was implemented long ago, ticket flow
+> included. Do not read it as the current gap list. **The current gaps live in the
+> "Known gaps / next tasks" table in `AGENTS.md`**, and the direction lives in
+> `TARGET_ARCHITECTURE.md` §8, whose phases carry their own status markers.
 
 
 
