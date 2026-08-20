@@ -1,13 +1,12 @@
 package org.example.nabat.incident.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.nabat.identity.adapter.in.security.JwtTokenProvider;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
-import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertSeverity;
@@ -72,10 +71,7 @@ class AlertControllerTest {
     private ListAlertsUseCase listAlertsUseCase;
 
     @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private UserRepository userRepository;
+    private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     private Alert buildAlert() {
         return new Alert(

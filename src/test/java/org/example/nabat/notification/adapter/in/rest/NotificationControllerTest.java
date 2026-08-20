@@ -1,8 +1,7 @@
 package org.example.nabat.notification.adapter.in.rest;
 
-import org.example.nabat.identity.adapter.in.security.JwtTokenProvider;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.notification.application.port.in.GetNotificationUseCase;
-import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.notification.domain.Notification;
 import org.example.nabat.notification.domain.NotificationId;
@@ -43,10 +42,7 @@ class NotificationControllerTest {
     private GetNotificationUseCase useCase;
 
     @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private UserRepository userRepository;
+    private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     private User user;
 

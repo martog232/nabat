@@ -2,14 +2,13 @@ package org.example.nabat.identity.config;
 
 import org.example.nabat.identity.adapter.in.rest.AuthController;
 import org.example.nabat.identity.adapter.in.security.JwtAuthenticationFilter;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.identity.application.port.in.ForgotPasswordUseCase;
 import org.example.nabat.identity.application.port.in.LoginUserUseCase;
 import org.example.nabat.identity.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.identity.application.port.in.RegisterUserUseCase;
 import org.example.nabat.identity.application.port.in.ResetPasswordUseCase;
 import org.example.nabat.identity.application.port.in.VerifyEmailUseCase;
-import org.example.nabat.identity.application.port.out.TokenProvider;
-import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.shared.config.AllowedOrigins;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,13 +47,11 @@ class AuthEndpointSecurityTest {
     @Autowired
     private MockMvc mockMvc;
 
-    // Collaborators of the real JwtAuthenticationFilter. No stubbing needed: every request
-    // below is either anonymous or carries a token the mock provider rejects by default.
+    // The one collaborator of the real JwtAuthenticationFilter. No stubbing needed: every
+    // request below is either anonymous or carries a credential the mock rejects, since an
+    // unstubbed Optional-returning mock answers empty.
     @MockitoBean
-    private TokenProvider tokenProvider;
-
-    @MockitoBean
-    private UserRepository userRepository;
+    private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     @MockitoBean
     private RegisterUserUseCase registerUserUseCase;

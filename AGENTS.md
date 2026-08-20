@@ -49,7 +49,10 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `JwtHandshakeInterceptor` validates on the HTTP upgrade. Two accepted auth paths:
   1. `Authorization: Bearer <accessToken>` header (non-browser clients).
   2. `?ticket=<one-time-ticket>` query param (browser clients). Tickets are issued by `POST /api/v1/ws/tickets` and redeemed via `RedeemWebSocketTicketUseCase` (backed by `WebSocketTicketService`). A ticket is single-use and short-lived.
+- **Both paths end in `AuthenticateSessionUseCase` (`identity`), which is also the only thing `JwtAuthenticationFilter` consults.** Verifying a signature is not the same as accepting a session: the account may be disabled or deleted, and a password reset bumps `tv` so tokens minted before it are stale inside their expiry window. Those checks lived only in the HTTP filter, so the handshake — the one other place that authenticates a bearer token — accepted revoked tokens, and a socket outlives its token by hours. Do not re-add a local `TokenProvider` call here.
+- A **redeemed ticket carries no token version**, so it proves only that its holder was authenticated at issue time. `resolveActiveUser` re-checks the account at redemption, because the ticket's whole lifetime sits after that point.
 - `AlertWebSocketHandler` reads `userId` exclusively from `session.getAttributes()` — never from query params.
+- **Revocation still does not close sockets that are already open.** The handshake is the only gate; nothing re-authenticates a live session, so a password reset takes effect on the next connect. Closing live sessions needs a revocation event routed through `WsClusterRelay` — every replica holds its own sessions.
 
 ### Spatial queries (`incident`/`subscription`/`identity` persistence + migrations)
 - `V4__postgis_spatial_indexes.sql` enables the `postgis` extension and adds a `GEOGRAPHY(Point, 4326)` column + GiST index on `alerts`. Nearby-alert queries use `ST_DWithin` instead of Haversine.
@@ -130,7 +133,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - Config is env-var driven; **no Spring profiles**. Defaults in `application.properties`.
 - **`JWT_SECRET` has no default and the app refuses to start without it.** It must be ≥ 32 chars, have ≥ 16 distinct characters, and not look like a placeholder. nabat-app and nabat-voting must share the same value. Do not reintroduce a fallback: a committed default is a publicly-known signing key.
 - **Password rules live in `identity/domain/PasswordPolicy`, not in the DTOs.** ≥10 characters, at least one letter and one digit, and **at most 72 UTF-8 bytes** — BCrypt hashes only the first 72 bytes and discards the rest silently, so a longer passphrase would be truncated and any string sharing that prefix would unlock the account. The bound is bytes, not characters, because that is what BCrypt truncates (Cyrillic costs two bytes each). Applied through `@StrongPassword` on both `RegisterRequest` and `ResetPasswordRequest` — they previously each carried their own `@Size(min = 6)`, so reset was a way around any tightening of registration. Login does **not** apply the policy: existing accounts with older, weaker passwords must keep working.
-- Access and refresh tokens carry a `tv` (token version) claim checked against `users.token_version`, so a password reset invalidates sessions already in flight. Refresh tokens are single-use, tracked by `jti` in Redis.
+- Access and refresh tokens carry a `tv` (token version) claim checked against `users.token_version`, so a password reset invalidates sessions already in flight. That check — with the exists and enabled checks — lives in `AuthenticateSessionUseCase` and nowhere else, so every entry point that accepts a token gets all three. Refresh tokens are single-use, tracked by `jti` in Redis.
 - CORS origins: `nabat.cors.allowed-origins` (comma-separated), resolved once by `AllowedOrigins` and shared by the HTTP and WebSocket configs. `*` is refused because credentials are enabled.
 
 ---
@@ -231,6 +234,7 @@ what lets it use package-private members instead of widening production visibili
 | Alert fan-out durability | ✅ Done | Event Publication Registry (V11). Outstanding publications replay on startup; delivery is at-least-once. |
 | Orphaned uploads | ✅ Done | `OrphanedPhotoSweeper` → `ReclaimOrphanedPhotosUseCase`, hourly, behind `nabat.storage.orphan-sweep.enabled` (on in compose and Helm). Only files older than `nabat.storage.orphan-grace` (24h) are candidates. |
 | Kafka dual write | 🟡 Known | The vote commit and the `vote.cast` publish are not atomic. Failures are logged and the projection is rebuildable; a transactional outbox is the proper fix. |
+| Revocation of live WebSocket sockets | 🟡 Known | The handshake authenticates fully (`AuthenticateSessionUseCase`), but nothing re-checks a session already open, so a password reset or a disable only takes effect on the next connect. The fix is a revocation event relayed through `WsClusterRelay`, since each replica holds its own sessions. |
 | Shared JWT secret | 🟡 Known | Symmetric HS256 means nabat-voting could also *mint* tokens nabat-app trusts. RS256 with a published public key would let it verify without signing power. |
 | Spring Boot version drift | 🟡 Known | nabat-app 3.4.1 (past OSS support, Jackson 2) vs nabat-voting 4.0.6 (Jackson 3). Worth aligning. |
 | Boot 3.4.1 / Lombok / JDK | 🟡 Known | The build needs JDK 21; Lombok 1.18.34 fails on newer JDKs. |

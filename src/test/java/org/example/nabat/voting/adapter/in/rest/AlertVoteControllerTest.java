@@ -1,9 +1,8 @@
 package org.example.nabat.voting.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.nabat.identity.adapter.in.security.JwtTokenProvider;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.voting.application.port.in.VoteAlertUseCase;
-import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -47,10 +46,7 @@ class AlertVoteControllerTest {
     private VoteAlertUseCase voteAlertUseCase;
 
     @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private UserRepository userRepository;
+    private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     private static final UUID ALERT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
