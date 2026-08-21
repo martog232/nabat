@@ -1,22 +1,50 @@
 apiVersion: 1
 
+# Datasources for the compose stack only — the Helm chart templates its own from the
+# release name (see templates/grafana.yaml).
+#
+# Addressed by compose *service* name rather than by container_name. Both resolve on the
+# default network, but the service name is the alias compose guarantees; container_name is
+# an optional field, so relying on it makes these URLs break the moment one is renamed or
+# dropped. Loki and Zipkin were pointed at hosts that did not exist in docker-compose.yml
+# at all, which is what made two of these three panels dead.
+# Removed before the definitions below are applied. Necessary because these datasources
+# were provisioned before they had explicit uids: Grafana keys a provisioned datasource by
+# uid, so on a volume that still holds the old auto-generated ones it tries to update a uid
+# that does not exist and refuses to start entirely — "Datasource provisioning error: data
+# source not found", with the whole service dead, not just the datasource. Deleting by name
+# first makes this file idempotent against an existing volume instead of requiring whoever
+# hits it to work out that they need to wipe one.
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+  - name: Loki
+    orgId: 1
+  - name: Zipkin
+    orgId: 1
+
 datasources:
   - name: Prometheus
     type: prometheus
+    # Stable uid so provisioned dashboards can reference this datasource by name-independent
+    # id. Without it Grafana generates one per install and every dashboard JSON points at a
+    # datasource that exists only on the machine where it was exported.
+    uid: prometheus
     access: proxy
-    url: http://nabat-prometheus:9090
+    url: http://prometheus:9090
     isDefault: true
     editable: true
 
   - name: Loki
     type: loki
+    uid: loki
     access: proxy
-    url: http://nabat-loki:3100
+    url: http://loki:3100
     editable: true
 
   - name: Zipkin
     type: zipkin
+    uid: zipkin
     access: proxy
-    url: http://nabat-zipkin:9411
+    url: http://zipkin:9411
     editable: true
-

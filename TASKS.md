@@ -204,9 +204,20 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 - Done part: `.env.example` exists and documents these variables.
 - Remaining part: explicit `env_file` wiring is still not present in `docker-compose.yml`.
 
-### T-41 📊 Pagination & filtering on list endpoints
-- `/alerts/nearby` returns an unbounded list. Add `Pageable`, max `radiusKm`,
-  optional `type` / `severity` filters.
+### T-41 📊 Pagination & filtering on list endpoints ✅ COMPLETED
+- `/alerts/nearby` returned an unbounded list. Now capped and filterable.
+- **Deviation from the task as written:** no `Pageable`. Nothing pages through a map, and
+  Spring Data's `Page` would put `pageable`/`sort` internals into a public HTTP contract.
+  The defect was the missing bound, not missing navigation, so the fix is `limit`
+  (default 100, max 500) plus a `truncated` flag — a cap the client cannot see is worse
+  than no cap, because the map silently goes partial.
+- **Breaking change:** the response is now `{ alerts, count, limit, truncated }` instead of
+  a bare JSON array. nabat-fe must read `$.alerts`.
+- `radiusKm` was already bounded at 100 km by `NearbyAlertsQuery`; unchanged.
+- Filters `type` and `severity` are optional and applied in SQL, as is the limit — trimming
+  in Java would still make PostGIS materialise and ship every row in the circle.
+- `cacheKey()` now includes the filters and the limit. Without that, a filtered request
+  could be served an unfiltered cached response from the same grid square.
 
 ### T-42 🗺️ Replace native Haversine with PostGIS ✅ COMPLETED
 - Added `V4__postgis_spatial_indexes.sql` — conditionally enables the `postgis` extension
@@ -274,9 +285,20 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
   Externalize to `messages.properties` so future locales drop in.
 - Implemented: notification text keys moved to `src/main/resources/messages.properties` and resolved in `NotificationService` via `MessageSource` + request locale.
 
-### T-50 🎚️ Minimum password policy
-- `RegisterRequest.password` is `@Size(min = 6)`. Bump to ≥ 10, require
-  mix of letters/digits, surface a clear validation error.
+### T-50 🎚️ Minimum password policy ✅ COMPLETED
+- `identity/domain/PasswordPolicy` holds the rules; `@StrongPassword` applies them.
+- ≥ 10 characters, at least one letter and one digit, as asked.
+- **Added beyond the task:** an upper bound of 72 UTF-8 bytes. Passwords are BCrypt-hashed
+  and BCrypt reads only the first 72 bytes, discarding the rest without complaint — so a
+  long passphrase was being silently truncated, and any string sharing its first 72 bytes
+  opened the account. Counted in bytes rather than characters because that is the unit
+  BCrypt truncates on; a 40-character Cyrillic passphrase is already 80 bytes.
+- **`ResetPasswordRequest` had its own duplicate `@Size(min = 6)`.** Raising the bar on
+  registration alone would have left "forgot password" as a supported route to a password
+  registration refuses. Both now share one annotation.
+- Errors name the single rule that was broken rather than listing the policy, so the user
+  is sent to the fix instead of working out which part they failed.
+- Login deliberately does not apply the policy — existing accounts keep working.
 
 ---
 
@@ -300,8 +322,14 @@ Legend: 🅿️ priority — **P0** ship-blockers / security, **P1** core featur
 
 If you want, point at a task ID and I'll pick it up next.
 
+---
 
-
+> **Everything below this line is a historical brainstorm, not a live backlog.** It was
+> written before the modules existed and several entries describe defects that have since
+> been fixed — item 1 (WebSocket trusting `?userId=`) was implemented long ago, ticket flow
+> included. Do not read it as the current gap list. **The current gaps live in the
+> "Known gaps / next tasks" table in `AGENTS.md`**, and the direction lives in
+> `TARGET_ARCHITECTURE.md` §8, whose phases carry their own status markers.
 
 
 

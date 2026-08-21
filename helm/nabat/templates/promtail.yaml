@@ -26,6 +26,44 @@ data:
         target_label: namespace
       - source_labels: [__meta_kubernetes_pod_name]
         target_label: pod
+      # Without this, the job discovered pods and shipped nothing at all. Promtail is a
+      # file tailer: service discovery only produces targets, and a target with no
+      # `__path__` has no file to read. The glob resolves to
+      # /var/log/pods/<namespace>_<pod>_<uid>/<container>/*.log, which is why both
+      # /var/log and the runtime's container directory are mounted below.
+      - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+        separator: /
+        target_label: __path__
+        replacement: /var/log/pods/*$1/*.log
+      pipeline_stages:
+      # The container-runtime wrapper comes off first. The kubelet writes CRI lines
+      # ("<ts> stdout F <message>"), so here the application's JSON sits one level deeper
+      # than in compose, where the Docker API hands over the bare line. This is the reason
+      # the two environments cannot share one config verbatim.
+      - cri: {}
+      # ECS JSON into fields. Without this Loki keeps each line as an opaque string and
+      # traceId is findable only by substring search, which defeats logging JSON at all.
+      - json:
+          expressions:
+            # Keys containing dots are quoted: these are JMESPath expressions, and an
+            # unquoted log.level would be read as a nested object rather than a flat key.
+            level: '"log.level"'
+            logger: '"log.logger"'
+            traceId: traceId
+            service: '"service.name"'
+            ts: '"@timestamp"'
+      # Labels, not just fields: this is what turns "every line from this trace" into a
+      # label selector. Deliberately only level and traceId — labels are indexed, and high
+      # cardinality is what makes Loki slow, so message and logger stay as content.
+      - labels:
+          level:
+          traceId:
+      # The application's own timestamp, so ordering survives a shipping delay. `source`
+      # names a field extracted above, not a JMESPath expression — hence `ts`.
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
+          action_on_failure: skip
 ---
 apiVersion: apps/v1
 kind: DaemonSet

@@ -1,0 +1,55 @@
+# Alertmanager configuration, shared by the compose stack and the Helm chart — same
+# reasoning as kong/kong.yml and prometheus/rules.yml.
+#
+# Delivery goes to MailHog, the SMTP catcher this project already runs for verification
+# emails. That is a deliberate choice over a webhook to nowhere: an alerting pipeline whose
+# last hop is unverifiable is the thing this whole exercise exists to remove. Point
+# `smarthost` at a real relay (or add a Slack receiver) when there is somewhere real for
+# alerts to go; the routing below does not change.
+global:
+  # No TLS and no auth: MailHog accepts anything. Both are required flags for a real relay.
+  smtp_smarthost: 'mailhog:1025'
+  smtp_from: 'alertmanager@nabat.local'
+  smtp_require_tls: false
+  # How long a firing alert may go without a refresh from Prometheus before it is treated
+  # as resolved. Must stay comfortably above Prometheus's evaluation interval, or alerts
+  # flap between firing and resolved on their own.
+  resolve_timeout: 5m
+
+route:
+  # Group by alertname and job, not by every label: one notification saying "ServiceDown
+  # for nabat-app" beats one per instance, and grouping by instance would defeat that.
+  group_by: ['alertname', 'job']
+  # Wait a little before the first notification so alerts that fire together arrive in one
+  # message rather than three.
+  group_wait: 30s
+  group_interval: 5m
+  # Deliberately long. A re-notification every few minutes for something already known is
+  # how people learn to filter the alert mailbox.
+  repeat_interval: 12h
+  receiver: mailhog
+
+  routes:
+    # Critical alerts skip most of the batching. The point of the severity label is that it
+    # changes behaviour somewhere — otherwise it is decoration.
+    - matchers:
+        - severity = "critical"
+      receiver: mailhog
+      group_wait: 10s
+      repeat_interval: 1h
+
+receivers:
+  - name: mailhog
+    email_configs:
+      - to: 'oncall@nabat.local'
+        send_resolved: true
+
+inhibit_rules:
+  # While a service is down, its latency and error-rate alerts add nothing — they are
+  # symptoms of the same fact and arriving separately makes the mailbox look like three
+  # problems instead of one.
+  - source_matchers:
+      - alertname = "ServiceDown"
+    target_matchers:
+      - severity =~ "warning|critical"
+    equal: ['job']

@@ -61,7 +61,16 @@ public class SecurityConfig {
                     "/api/v1/auth/login",
                     "/api/v1/auth/refresh").permitAll()
                 .requestMatchers("/ws/**").permitAll()
-                .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
+                // The probe groups are listed individually rather than as /actuator/health/**:
+                // that wildcard would also expose any future health group, and `anyRequest()`
+                // below is denyAll precisely so new endpoints are private until someone
+                // decides otherwise. Kubernetes probes are unauthenticated, so these two
+                // have to be public or every probe fails closed with 401 and the pod is
+                // killed for a security rule rather than for being unhealthy.
+                .requestMatchers("/actuator/health",
+                    "/actuator/health/liveness",
+                    "/actuator/health/readiness",
+                    "/actuator/info", "/actuator/prometheus").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/api/v1/**").authenticated()
                 // Fail closed. Previously `permitAll()`, which meant any endpoint added

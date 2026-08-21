@@ -1,9 +1,7 @@
 package org.example.nabat.identity.adapter.in.security;
 
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletResponse;
-import org.example.nabat.identity.application.port.out.UserRepository;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.identity.domain.UserId;
@@ -19,34 +17,34 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Date;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * What the filter itself is responsible for: turning an accepted session into a
+ * populated security context, and leaving the context empty otherwise.
+ *
+ * <p>Whether a token names an accepted session is
+ * {@link AuthenticateSessionUseCase}'s decision, and is covered by
+ * {@code SessionAuthenticationServiceTest} — the WebSocket handshake asks the same
+ * question, so the rules cannot live here.
+ */
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
-    private static final String SECRET =
-        "filter-secret-key-min-256-bits-for-testing-purposes-only-not-for-prod";
-
     @Mock
-    private UserRepository userRepository;
+    private AuthenticateSessionUseCase authenticateSessionUseCase;
 
-    private JwtTokenProvider tokenProvider;
     private JwtAuthenticationFilter filter;
     private User user;
 
     @BeforeEach
     void setUp() {
-        tokenProvider = new JwtTokenProvider(SECRET, 3_600_000L, 86_400_000L);
-        filter = new JwtAuthenticationFilter(tokenProvider, userRepository);
+        filter = new JwtAuthenticationFilter(authenticateSessionUseCase);
         user = new User(
             UserId.generate(),
             "filter@example.com",
@@ -60,10 +58,9 @@ class JwtAuthenticationFilterTest {
             5,
             null,
             null,
-            null
-        ,
-
-            0);
+            null,
+            0
+        );
     }
 
     @AfterEach
@@ -72,94 +69,70 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void authenticatesEnabledUserWithValidAccessToken() throws Exception {
-        String token = tokenProvider.generateAccessToken(user);
-        when(userRepository.findById(user.id())).thenReturn(Optional.of(user));
+    void authenticatesAnAcceptedSessionWithItsRole() throws Exception {
+        when(authenticateSessionUseCase.authenticateAccessToken("good-token"))
+            .thenReturn(Optional.of(user));
 
-        filter.doFilterInternal(requestWithBearer(token), new MockHttpServletResponse(), new MockFilterChain());
+        filter.doFilterInternal(
+            requestWithBearer("good-token"), new MockHttpServletResponse(), new MockFilterChain());
 
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         assertInstanceOf(UsernamePasswordAuthenticationToken.class, authentication);
         assertSame(user, authentication.getPrincipal());
         assertTrue(authentication.getAuthorities().stream()
             .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
-        verify(userRepository).findById(user.id());
     }
 
     @Test
-    void rejectsRefreshTokenForApiAuthentication() throws Exception {
-        String token = tokenProvider.generateRefreshToken(user);
-
-        filter.doFilterInternal(requestWithBearer(token), new MockHttpServletResponse(), new MockFilterChain());
-
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(userRepository);
-    }
-
-    @Test
-    void invalidTokenContinuesUnauthenticatedWithoutRepositoryLookup() throws Exception {
+    void rejectedTokenContinuesTheChainUnauthenticated() throws Exception {
+        when(authenticateSessionUseCase.authenticateAccessToken("stale-token"))
+            .thenReturn(Optional.empty());
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilterInternal(
-            requestWithBearer("not-a-jwt"),
+            requestWithBearer("stale-token"),
             response,
-            (request, servletResponse) -> ((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NO_CONTENT)
+            (request, servletResponse) ->
+                ((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NO_CONTENT)
         );
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         assertEquals(HttpServletResponse.SC_NO_CONTENT, response.getStatus());
-        verifyNoInteractions(userRepository);
     }
 
+    /**
+     * A request carrying a bearer token must not inherit an authentication that was
+     * already in the context. The chain is stateless so that is normally impossible;
+     * the filter clears it anyway, and this pins that.
+     */
     @Test
-    void disabledUserIsNotAuthenticated() throws Exception {
-        String token = tokenProvider.generateAccessToken(user);
-        when(userRepository.findById(user.id())).thenReturn(Optional.of(user.disable()));
-
-        filter.doFilterInternal(requestWithBearer(token), new MockHttpServletResponse(), new MockFilterChain());
-
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verify(userRepository).findById(user.id());
-    }
-
-    @Test
-    void missingUserIsNotAuthenticated() throws Exception {
-        String token = tokenProvider.generateAccessToken(user);
-        when(userRepository.findById(user.id())).thenReturn(Optional.empty());
-
-        filter.doFilterInternal(requestWithBearer(token), new MockHttpServletResponse(), new MockFilterChain());
-
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verify(userRepository).findById(user.id());
-    }
-
-    @Test
-    void malformedUserIdClaimClearsPartialSecurityContext() throws Exception {
+    void rejectedTokenClearsAPreExistingAuthentication() throws Exception {
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken("previous", null)
         );
-        String token = tokenWithInvalidUserIdClaim();
+        when(authenticateSessionUseCase.authenticateAccessToken("stale-token"))
+            .thenReturn(Optional.empty());
 
-        filter.doFilterInternal(requestWithBearer(token), new MockHttpServletResponse(), new MockFilterChain());
+        filter.doFilterInternal(
+            requestWithBearer("stale-token"), new MockHttpServletResponse(), new MockFilterChain());
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verifyNoInteractions(userRepository);
     }
 
     @Test
-    void missingBearerHeaderDoesNotAuthenticate() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+    void missingBearerHeaderIsNotEvenAsked() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilterInternal(
-            request,
+            new MockHttpServletRequest(),
             response,
-            (req, servletResponse) -> ((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NO_CONTENT)
+            (req, servletResponse) ->
+                ((HttpServletResponse) servletResponse).setStatus(HttpServletResponse.SC_NO_CONTENT)
         );
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         assertEquals(HttpServletResponse.SC_NO_CONTENT, response.getStatus());
-        verifyNoInteractions(userRepository);
+        verifyNoInteractions(authenticateSessionUseCase);
     }
 
     private static MockHttpServletRequest requestWithBearer(String token) {
@@ -167,20 +140,4 @@ class JwtAuthenticationFilterTest {
         request.addHeader("Authorization", "Bearer " + token);
         return request;
     }
-
-    private static String tokenWithInvalidUserIdClaim() {
-        return Jwts.builder()
-            .claims(Map.of(
-                "userId", "not-a-uuid",
-                "email", "bad@example.com",
-                "role", "USER",
-                JwtTokenProvider.TOKEN_TYPE, JwtTokenProvider.ACCESS_TOKEN_TYPE
-            ))
-            .subject("bad@example.com")
-            .issuedAt(new Date())
-            .expiration(new Date(System.currentTimeMillis() + 3_600_000L))
-            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
-            .compact();
-    }
 }
-

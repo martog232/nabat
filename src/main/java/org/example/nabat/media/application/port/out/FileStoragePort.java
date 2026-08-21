@@ -1,7 +1,9 @@
 package org.example.nabat.media.application.port.out;
 
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Storage for user-uploaded alert photos.
@@ -28,6 +30,29 @@ public interface FileStoragePort {
 
     /** Opens a stored file, or empty if there is no such file. */
     Optional<StoredContent> load(String filename);
+
+    /**
+     * Names of stored files last modified before {@code cutoff}, newest excluded.
+     *
+     * <p>Only files older than the cutoff, because a file uploaded moments ago is very
+     * likely on its way to being attached to an alert that has not been submitted yet.
+     * Reclaiming it would delete a photo the user is still looking at in the form.
+     *
+     * @param limit maximum names to return, so one sweep cannot pull an unbounded
+     *              directory listing into memory
+     */
+    Set<String> listStoredBefore(Instant cutoff, int limit);
+
+    /**
+     * Deletes a stored file.
+     *
+     * <p>Idempotent: a name that is already gone is not an error. Two replicas sharing a
+     * volume can sweep concurrently, and losing that race is the expected outcome rather
+     * than a failure.
+     *
+     * @return true if this call removed the file
+     */
+    boolean delete(String filename);
 
     /**
      * @param filename    the name the client supplied, used only for its extension

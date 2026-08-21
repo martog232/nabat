@@ -4,10 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.example.nabat.identity.application.port.out.TokenProvider;
-import org.example.nabat.identity.application.port.out.UserRepository;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.identity.domain.User;
-import org.example.nabat.identity.domain.UserId;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -26,12 +24,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private final TokenProvider tokenProvider;
-    private final UserRepository userRepository;
+    private final AuthenticateSessionUseCase authenticateSessionUseCase;
 
-    public JwtAuthenticationFilter(TokenProvider tokenProvider, UserRepository userRepository) {
-        this.tokenProvider = tokenProvider;
-        this.userRepository = userRepository;
+    public JwtAuthenticationFilter(AuthenticateSessionUseCase authenticateSessionUseCase) {
+        this.authenticateSessionUseCase = authenticateSessionUseCase;
     }
 
     @Override
@@ -58,36 +54,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Verifies the token once and, if it names a live user whose session has not been
-     * invalidated, populates the security context.
+     * Populates the security context if the token still names an accepted session.
      *
-     * <p>The signature used to be verified three times per request — once each by
-     * {@code validateToken}, {@code isAccessToken} and {@code getUserIdFromToken}.
+     * <p>Whether it does is decided by {@link AuthenticateSessionUseCase}, not here:
+     * the WebSocket handshake asks the same question, and while these checks lived in
+     * this filter it answered it with a signature check alone.
      */
     private void authenticate(String jwt, HttpServletRequest request) {
-        Optional<TokenProvider.AccessTokenClaims> parsed = tokenProvider.parseAccessToken(jwt);
-        if (parsed.isEmpty()) {
-            reject("invalid or non-access token");
+        Optional<User> authenticated = authenticateSessionUseCase.authenticateAccessToken(jwt);
+        if (authenticated.isEmpty()) {
+            // A request carrying a bearer token must never end up authenticated as
+            // whatever happened to be in the context already. The chain is stateless
+            // so it is normally empty; this makes the guarantee independent of that.
+            SecurityContextHolder.clearContext();
             return;
         }
-        TokenProvider.AccessTokenClaims claims = parsed.get();
-
-        User user = userRepository.findById(UserId.of(claims.userId())).orElse(null);
-        if (user == null) {
-            reject("token names a user that no longer exists");
-            return;
-        }
-        if (!user.enabled()) {
-            reject("user is disabled");
-            return;
-        }
-        // A password reset or an explicit revocation bumps tokenVersion, which makes
-        // every token minted before that point stale even though it is still within
-        // its expiry window.
-        if (claims.tokenVersion() != user.tokenVersion()) {
-            reject("token was invalidated by a credential change");
-            return;
-        }
+        User user = authenticated.get();
 
         List<SimpleGrantedAuthority> authorities =
             List.of(new SimpleGrantedAuthority("ROLE_" + user.role().name()));
@@ -97,19 +79,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
-
-    /**
-     * Refuses the presented token and clears the security context.
-     *
-     * <p>Clearing matters: a request that carries a bearer token must never end up
-     * authenticated as whatever happened to be in the context already. The chain is
-     * stateless so the context is normally empty, but this makes the guarantee
-     * independent of that.
-     */
-    private void reject(String reason) {
-        SecurityContextHolder.clearContext();
-        logger.debug("Rejected request: " + reason);
     }
 
     private String getJwtFromRequest(HttpServletRequest request) {

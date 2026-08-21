@@ -40,6 +40,28 @@ postgres:
 redis:
   image: redis:7-alpine
 
+# In-cluster object storage for alert photos. Only rendered when
+# nabatApp.storage.type is "s3"; set enabled: false to point at a managed bucket instead
+# (and give nabatApp.storage.endpoint its address).
+#
+# Single replica with a ReadWriteOnce volume — this is development-grade storage that
+# survives pod restarts, not a distributed MinIO deployment.
+minio:
+  enabled: true
+  image: minio/minio:RELEASE.2024-08-29T01-40-52Z
+  # Same re-pin as docker-compose.yml: the 2024-08-26 tag has been pruned from Docker Hub,
+  # so the bucket-creation Job would have gone straight to ImagePullBackOff — and with
+  # --atomic that surfaces as a timed-out release rather than a missing image.
+  clientImage: minio/mc:RELEASE.2025-08-13T08-35-41Z
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 # The API gateway. Its routing, CORS and rate-limiting rules are not here — they live in
 # kong/kong.yml at the chart root, which docker-compose mounts as well, so the two cannot
 # drift. Disabling this sends the Ingress straight at the application, which is how the
@@ -96,6 +118,38 @@ nabatApp:
   votingServiceUrl: http://nabat-voting-app:8081
   mailHost: mailhog
   mailPort: 1025
+  tracing:
+    # 1.0 keeps every request traceable, which is what a learning deployment wants and
+    # what makes "find this request in Grafana" a reliable instruction. Lower it before
+    # the request rate makes span volume the problem — sampling is a cost control, not a
+    # correctness setting, so leaving it at 1.0 hides nothing.
+    samplingProbability: 1.0
+  # Boot 3.4's built-in ECS formatter. Set to "" to fall back to the human-readable
+  # pattern — worth doing when tailing a single pod by hand, since JSON is far harder to
+  # read than it is to query.
+  logFormat: ecs
+  environment: kubernetes
+  storage:
+    # `s3` because replicas is 2. On local disk a photo written by one pod is simply
+    # absent from the other, so roughly half of reads 404 and a restart takes the uploads
+    # with it. Set to `filesystem` only for a single-replica install.
+    type: s3
+    bucket: nabat-uploads
+    # Empty means the in-cluster MinIO service below. Point it at a managed bucket to run
+    # without MinIO — then set minio.enabled=false.
+    endpoint: ""
+    accessKey: nabat
+    # No committed default, same reasoning as postgres.password: pass it at install time.
+    secretKey: ""
+  orphanSweep:
+    enabled: true
+    # ISO-8601. How long a photo may sit unreferenced before it is reclaimed. Long on
+    # purpose — being late costs disk, being early costs a user's photo.
+    #
+    # Note for the multi-replica case: storage is a per-pod volume today, so each replica
+    # only ever sees and sweeps its own files. On a ReadWriteMany volume both would sweep
+    # the same directory, which is safe (deletion is idempotent) but does duplicate work.
+    grace: PT24H
   uploadsStorage: 100Mi
   resources:
     requests:
@@ -105,6 +159,8 @@ nabatApp:
       cpu: 512m
       memory: 1Gi
   probes:
+    # Generous: the startup probe holds the other two off until it first succeeds, so this
+    # is the budget for JVM start plus Flyway. 30 x 5s = 150s before the pod is given up on.
     startup:
       initialDelaySeconds: 15
       periodSeconds: 5
@@ -112,6 +168,12 @@ nabatApp:
     liveness:
       initialDelaySeconds: 60
       periodSeconds: 15
+    # Tighter than liveness on purpose. Being wrong about readiness costs one pod's share
+    # of traffic for a few seconds; being wrong about liveness costs a restart.
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 3
 
 votingPostgres:
   image: postgres:16
@@ -165,3 +227,16 @@ monitoring:
     image: grafana/promtail:latest
   zipkin:
     image: openzipkin/zipkin:latest
+  alertmanager:
+    image: prom/alertmanager:latest
+    # Silences and notification state, not metrics — small, but losing it re-notifies
+    # everything still firing and discards every silence someone set.
+    storage: 1Gi
+
+# SMTP catcher for verification mail and for Alertmanager delivery. The application has
+# always been configured to send mail to a host called `mailhog`, which this chart did not
+# deploy — so every verification email in Kubernetes failed. Set enabled: false when
+# nabatApp.mailHost points at a real relay.
+mailhog:
+  enabled: true
+  image: mailhog/mailhog:latest

@@ -106,6 +106,7 @@ jobs:
           --set global.jwtSecret=ci-lint-only-not-a-real-secret-0123456789 \
           --set postgres.password=ci-lint-only \
           --set votingPostgres.password=ci-lint-only \
+          --set nabatApp.storage.secretKey=ci-lint-only \
           > rendered.yaml
         echo "rendered $(grep -c '^kind:' rendered.yaml) objects"
 

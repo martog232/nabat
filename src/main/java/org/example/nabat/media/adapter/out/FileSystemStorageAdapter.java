@@ -5,7 +5,6 @@ import org.example.nabat.media.domain.UnsupportedFileTypeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -13,19 +12,27 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Stores alert photos on the local filesystem.
  *
  * <p><strong>Multi-instance caveat:</strong> local disk means a photo written by one
  * replica is not readable by another unless the volume is {@code ReadWriteMany}. With
- * {@code nabatApp.replicas: 2} in the Helm values, roughly half of photo reads will
- * miss. An S3/MinIO adapter is the real fix; this is called out in AGENTS.md as a
- * known gap.
+ * {@code nabatApp.replicas: 2} in the Helm values, roughly half of photo reads miss.
+ * {@link S3StorageAdapter} is the answer to that; select it with
+ * {@code nabat.storage.type=s3}. This adapter remains the default because it is the right
+ * choice for a single local process and needs nothing running alongside it.
+ *
+ * <p>Registered by {@code StorageConfig}, not by a stereotype annotation: exactly one
+ * {@link FileStoragePort} must exist, and putting both conditions in one class makes the
+ * choice readable in a single place.
  */
-@Component
 public class FileSystemStorageAdapter implements FileStoragePort {
 
     private static final Logger log = LoggerFactory.getLogger(FileSystemStorageAdapter.class);
@@ -108,6 +115,53 @@ public class FileSystemStorageAdapter implements FileStoragePort {
         } catch (IOException | IllegalArgumentException e) {
             log.debug("Could not load upload {}: {}", filename, e.getMessage());
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public Set<String> listStoredBefore(Instant cutoff, int limit) {
+        try (Stream<Path> entries = Files.list(uploadDir)) {
+            return entries
+                    .filter(Files::isRegularFile)
+                    .filter(path -> lastModifiedBefore(path, cutoff))
+                    .map(path -> path.getFileName().toString())
+                    // Only names this class could have written. A stray file that wandered
+                    // into the directory is left alone rather than reclaimed: sweeping is
+                    // destructive and the directory is not guaranteed to be ours alone.
+                    .filter(name -> ImageContentType.fromExtension(name).isPresent())
+                    .limit(limit)
+                    .collect(Collectors.toSet());
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not list the upload directory: " + uploadDir, e);
+        }
+    }
+
+    @Override
+    public boolean delete(String filename) {
+        try {
+            return Files.deleteIfExists(resolveWithin(filename));
+        } catch (IOException | IllegalArgumentException e) {
+            // Windows refuses to unlink a file that is open, and another replica may have
+            // deleted it first. Neither is worth failing a sweep over — the next one
+            // retries.
+            log.debug("Could not delete upload {}: {}", filename, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Uses last-modified rather than a creation timestamp: creation time is not portable
+     * across filesystems, and these files are written once and never updated, so the two
+     * are the same thing here.
+     */
+    private boolean lastModifiedBefore(Path path, Instant cutoff) {
+        try {
+            return Files.getLastModifiedTime(path).toInstant().isBefore(cutoff);
+        } catch (IOException e) {
+            // Unreadable timestamp means unknown age, and unknown age must not be treated
+            // as old — that would make an unreadable file a deletion candidate.
+            log.debug("Could not read the timestamp of {}: {}", path, e.getMessage());
+            return false;
         }
     }
 

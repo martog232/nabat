@@ -9,27 +9,51 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> {
 
     List<AlertJpaEntity> findByStatus(AlertStatus status);
 
+    /*
+     * The four spatial queries below share a shape: circle predicate, optional type and
+     * severity filters, newest first, LIMIT.
+     *
+     * On the filters — `CAST(:type AS text) IS NULL OR ...` rather than the obvious
+     * `:type IS NULL OR ...`. PostgreSQL infers parameter types from context, and in a
+     * bare `NULL` comparison there is no context, so it fails the statement with
+     * "could not determine data type of parameter". The cast supplies the type.
+     * `a.type` is compared as text because the column is a varchar holding the enum name.
+     *
+     * On the LIMIT — it belongs here rather than in Java. Trimming the list after the
+     * fact would still make the database materialise and ship every row in the radius,
+     * which is exactly the cost this is meant to avoid. Combined with ORDER BY
+     * created_at DESC it means a truncated response drops the *oldest* matches, which is
+     * the right end to lose for a live incident map.
+     */
+
     /** PostGIS path — used when the location_geog generated column exists. */
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
             :radius * 1000.0
         )
         ORDER BY a.created_at DESC
+        LIMIT :limit
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadius(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
-        @Param("radius") double radiusKm
+        @Param("radius") double radiusKm,
+        @Param("type") String type,
+        @Param("severity") String severity,
+        @Param("limit") int limit
     );
 
     /**
@@ -41,18 +65,24 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
         AND a.created_at >= :since
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
             :radius * 1000.0
         )
         ORDER BY a.created_at DESC
+        LIMIT :limit
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadiusSince(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("since") Instant since
+        @Param("since") Instant since,
+        @Param("type") String type,
+        @Param("severity") String severity,
+        @Param("limit") int limit
     );
 
     /** Haversine equivalent of {@link #findActiveAlertsWithinRadiusSince}. */
@@ -60,36 +90,81 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
         AND a.created_at >= :since
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
             + sin(radians(:lat)) * sin(radians(a.latitude)))
         )) <= :radius
         ORDER BY a.created_at DESC
+        LIMIT :limit
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadiusSinceHaversine(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("since") Instant since
+        @Param("since") Instant since,
+        @Param("type") String type,
+        @Param("severity") String severity,
+        @Param("limit") int limit
     );
 
     /** Haversine fallback — used when PostGIS is not installed on the server. */
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status = 'ACTIVE'
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
             + sin(radians(:lat)) * sin(radians(a.latitude)))
         )) <= :radius
         ORDER BY a.created_at DESC
+        LIMIT :limit
         """, nativeQuery = true)
     List<AlertJpaEntity> findActiveAlertsWithinRadiusHaversine(
         @Param("lat") double latitude,
         @Param("lon") double longitude,
-        @Param("radius") double radiusKm
+        @Param("radius") double radiusKm,
+        @Param("type") String type,
+        @Param("severity") String severity,
+        @Param("limit") int limit
     );
+
+    /**
+     * Of the given storage names, those that are the last path segment of some alert's
+     * {@code photo_url}.
+     *
+     * <p>Backs the orphaned-upload sweep. Alerts store a serving URL while the caller holds
+     * bare filenames, so the two have to be related somehow; passing whole URLs instead
+     * would make {@code incident} responsible for knowing how {@code media} builds them.
+     *
+     * <p>The comparison is on the final segment rather than {@code LIKE '%' || name}. A
+     * plain suffix match reports {@code graph.jpg} as referenced whenever any alert points
+     * at {@code photograph.jpg}, because the URL does end with those characters. Here that
+     * errs safe — an orphan is kept, not a live photo deleted — but it means files quietly
+     * never get reclaimed, which is the bug this job exists to fix.
+     *
+     * <p>Not indexable, deliberately: a few hundred names at a time, once an hour, against
+     * a column holding a URL rather than a key. Reshaping the schema so a housekeeping job
+     * can use an index would be the wrong trade.
+     */
+    @Query(value = """
+        SELECT DISTINCT f.name FROM unnest(CAST(:filenames AS text[])) AS f(name)
+        WHERE EXISTS (
+            SELECT 1 FROM alerts a
+            WHERE a.photo_url IS NOT NULL
+            AND substring(a.photo_url from '[^/]+$') = f.name
+        )
+        """, nativeQuery = true)
+    Set<String> findReferencedPhotoFilenames(@Param("filenames") String[] filenames);
+
+    /** Convenience over the array form, so callers can pass the set they already have. */
+    default Set<String> findReferencedPhotoFilenames(Set<String> filenames) {
+        return findReferencedPhotoFilenames(filenames.toArray(String[]::new));
+    }
 
     /**
      * {@code flushAutomatically} so pending changes are not lost, and

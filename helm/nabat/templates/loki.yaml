@@ -1,3 +1,17 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "nabat.fullname" . }}-loki-data
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # As with Prometheus: monitoring.loki.storage was configured and unused, so logs
+      # lived only as long as the pod that received them.
+      storage: {{ .Values.monitoring.loki.storage }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,6 +25,10 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/component: loki
+  # Recreate: the ReadWriteOnce PVC cannot be mounted by a new pod while the outgoing
+  # one holds it, which is a deadlock rather than a slow rollout.
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -29,7 +47,8 @@ spec:
           name: storage
       volumes:
       - name: storage
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: {{ include "nabat.fullname" . }}-loki-data
 ---
 apiVersion: v1
 kind: Service

@@ -1,9 +1,8 @@
 package org.example.nabat.identity.adapter.in.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.nabat.identity.adapter.in.security.JwtTokenProvider;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.identity.application.port.in.UpdateUserPreferencesUseCase;
-import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.identity.domain.UserId;
@@ -42,10 +41,7 @@ class UserControllerTest {
     private UpdateUserPreferencesUseCase updateUserPreferencesUseCase;
 
     @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private UserRepository userRepository;
+    private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     private User user;
 

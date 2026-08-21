@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.example.nabat.identity.application.port.in.RegisterUserUseCase;
+import org.example.nabat.identity.domain.PasswordPolicy;
 
 @Schema(description = "Request body for creating a new user account")
 public record RegisterRequest(
@@ -13,9 +14,14 @@ public record RegisterRequest(
     @Email(message = "Email must be valid")
     String email,
 
-    @Schema(description = "Password — minimum 6 characters", example = "s3cr3tP@ss", minLength = 6)
+    @Schema(
+        description = "Password — at least 10 characters, including a letter and a digit, "
+                      + "and at most 72 UTF-8 bytes",
+        example = "s3cr3tP@ssphrase",
+        minLength = PasswordPolicy.MIN_LENGTH
+    )
     @NotBlank(message = "Password is required")
-    @Size(min = 6, message = "Password must be at least 6 characters")
+    @StrongPassword
     String password,
 
     @Schema(description = "Public display name shown to other users", example = "Alice", minLength = 2, maxLength = 50)

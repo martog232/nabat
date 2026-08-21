@@ -1,4 +1,47 @@
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "nabat.fullname" . }}-grafana-data
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Datasources are provisioned from the ConfigMap below and survive without this, but
+      # anything a person builds in the UI — a dashboard, an explore query, a preference —
+      # lived in an emptyDir and died with the pod.
+      storage: {{ .Values.monitoring.grafana.storage }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nabat.fullname" . }}-grafana-dashboard-provider
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+  nabat.yml: |
+{{ .Files.Get "grafana/dashboards.yml" | indent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nabat.fullname" . }}-grafana-dashboards
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+  # Globbed rather than listed: adding a dashboard file should not also require editing a
+  # template, or the second dashboard never gets committed as code.
+  {{- range $path, $bytes := .Files.Glob "grafana/dashboards/*.json" }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+  {{- end }}
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "nabat.fullname" . }}-grafana-datasources
@@ -6,18 +49,35 @@ metadata:
 data:
   datasources.yml: |
     apiVersion: 1
+    # Deleted by name before the definitions below are applied. Grafana keys a provisioned
+    # datasource by uid, so on a PVC that still holds datasources provisioned before these
+    # uids existed, it tries to update a uid that is not there and the whole service fails
+    # to start — not just the datasource. This keeps the file idempotent against an
+    # existing volume.
+    deleteDatasources:
+    - name: Prometheus
+      orgId: 1
+    - name: Loki
+      orgId: 1
+    - name: Zipkin
+      orgId: 1
     datasources:
     - name: Prometheus
       type: prometheus
+      # Stable uid: provisioned dashboards reference it, and a generated one differs per
+      # install, so the dashboards would point at nothing.
+      uid: prometheus
       access: proxy
       url: http://{{ include "nabat.fullname" . }}-prometheus:9090
       isDefault: true
     - name: Loki
       type: loki
+      uid: loki
       access: proxy
       url: http://{{ include "nabat.fullname" . }}-loki:3100
     - name: Zipkin
       type: zipkin
+      uid: zipkin
       access: proxy
       url: http://{{ include "nabat.fullname" . }}-zipkin:9411
 ---
@@ -34,6 +94,9 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/component: grafana
+  # Recreate: ReadWriteOnce PVC, so the outgoing pod must release it first.
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -53,14 +116,25 @@ spec:
         volumeMounts:
         - mountPath: /etc/grafana/provisioning/datasources
           name: datasources
+        - mountPath: /etc/grafana/provisioning/dashboards
+          name: dashboard-provider
+        - mountPath: /var/lib/grafana/dashboards
+          name: dashboards
         - mountPath: /var/lib/grafana
           name: storage
       volumes:
       - name: datasources
         configMap:
           name: {{ include "nabat.fullname" . }}-grafana-datasources
+      - name: dashboard-provider
+        configMap:
+          name: {{ include "nabat.fullname" . }}-grafana-dashboard-provider
+      - name: dashboards
+        configMap:
+          name: {{ include "nabat.fullname" . }}-grafana-dashboards
       - name: storage
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: {{ include "nabat.fullname" . }}-grafana-data
 ---
 apiVersion: v1
 kind: Service

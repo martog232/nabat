@@ -1,7 +1,6 @@
 package org.example.nabat.media.adapter.in.rest;
 
-import org.example.nabat.identity.application.port.out.TokenProvider;
-import org.example.nabat.identity.application.port.out.UserRepository;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.media.application.port.in.LoadPhotoUseCase;
 import org.example.nabat.media.application.port.in.StorePhotoUseCase;
 import org.junit.jupiter.api.Test;
@@ -50,10 +49,7 @@ class UploadControllerTest {
     // JwtAuthenticationFilter is a @Component and a Filter, so @WebMvcTest instantiates it
     // even with addFilters = false. Its collaborators have to exist for the context to start.
     @MockitoBean
-    private TokenProvider tokenProvider;
-
-    @MockitoBean
-    private UserRepository userRepository;
+    private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     @Test
     void returnsTheUrlOfAStoredUpload() throws Exception {

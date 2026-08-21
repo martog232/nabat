@@ -33,17 +33,24 @@ import java.util.UUID;
  *       read, and the original transaction is already gone by the time this runs.</li>
  * </ul>
  *
- * <h2>What is deliberately not solved yet</h2>
- * An async after-commit listener is not durable: if the process dies between commit and
- * delivery, this fan-out is simply lost. Spring Modulith's Event Publication Registry is
- * the fix and turns the same annotation into a transactional outbox, but it needs the
- * {@code spring-modulith-events-jpa} dependency and a table of its own.
+ * <h2>Durability</h2>
+ * The three properties above still leave a window: an async after-commit listener that
+ * dies between the commit and the push loses the fan-out with no record it was owed.
+ * Spring Modulith's Event Publication Registry closes it, and the same annotation is all
+ * it takes — {@code spring-modulith-events-jpa} on the classpath makes publishing write a
+ * row per (event, listener) into {@code event_publication} <em>inside</em> the publishing
+ * transaction, stamped complete only once this method returns.
  *
- * <p>Tolerable for this payload specifically, and only because the frontend already
- * recovers: it records when its socket dropped and calls {@code GET /alerts/nearby?since}
- * on reconnect, so a missed {@code NEW_ALERT} frame surfaces anyway. A lost push is a
- * delay, not a hole. That argument does <em>not</em> extend to anything the client cannot
- * re-derive, which is why the registry belongs in the plan rather than in a comment.
+ * <p>So the outbox and the alert commit or roll back together, and an incomplete row means
+ * exactly "this listener still owes this event".
+ * {@code spring.modulith.events.republish-outstanding-events-on-restart} replays those on
+ * startup. See {@code AlertCreatedOutboxIntegrationTest}, which asserts against the table
+ * rather than through an abstraction, because the table is the guarantee.
+ *
+ * <p>Note what this does <em>not</em> promise: delivery is retried, not guaranteed
+ * exactly-once. A crash after the socket write but before completion replays the push, so
+ * a client can see the same {@code NEW_ALERT} twice. That is the right trade here — the
+ * frontend upserts by alert id — but it is at-least-once, not exactly-once.
  */
 @Component
 public class NewAlertFanout {

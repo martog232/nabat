@@ -1,8 +1,7 @@
 package org.example.nabat.realtime.adapter.in.rest;
 
-import org.example.nabat.identity.adapter.in.security.JwtTokenProvider;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.realtime.application.port.in.IssueWebSocketTicketUseCase;
-import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.identity.domain.UserId;
@@ -34,10 +33,7 @@ class WebSocketTicketControllerTest {
     private IssueWebSocketTicketUseCase issueWebSocketTicketUseCase;
 
     @MockitoBean
-    private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private UserRepository userRepository;
+    private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     @Test
     void issuesTicketForAuthenticatedUser() throws Exception {

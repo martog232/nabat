@@ -1,7 +1,9 @@
 package org.example.nabat.realtime.adapter.in.websocket;
 
 import org.example.nabat.realtime.application.port.in.RedeemWebSocketTicketUseCase;
-import org.example.nabat.identity.application.port.out.TokenProvider;
+import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
+import org.example.nabat.identity.domain.User;
+import org.example.nabat.identity.domain.UserId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,11 @@ import java.util.UUID;
  * <p>On success the authenticated user id is placed into the session
  * attributes under {@link #USER_ID_ATTR} so handlers can read it without
  * trusting client-supplied data.
+ *
+ * <p>Both paths end in {@link AuthenticateSessionUseCase}, the same decision the
+ * HTTP filter defers to. This class used to verify the token's signature and stop
+ * there, so a token revoked by a password reset — or one belonging to a disabled
+ * account — still opened a socket, and a socket outlives its token by hours.
  */
 @Component
 public class JwtHandshakeInterceptor implements HandshakeInterceptor {
@@ -37,15 +44,14 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(JwtHandshakeInterceptor.class);
 
-    /** The port, not the concrete provider — nothing here needs the implementation. */
-    private final TokenProvider tokenProvider;
+    private final AuthenticateSessionUseCase authenticateSessionUseCase;
     private final RedeemWebSocketTicketUseCase redeemWebSocketTicketUseCase;
 
     public JwtHandshakeInterceptor(
-        TokenProvider tokenProvider,
+        AuthenticateSessionUseCase authenticateSessionUseCase,
         RedeemWebSocketTicketUseCase redeemWebSocketTicketUseCase
     ) {
-        this.tokenProvider = tokenProvider;
+        this.authenticateSessionUseCase = authenticateSessionUseCase;
         this.redeemWebSocketTicketUseCase = redeemWebSocketTicketUseCase;
     }
 
@@ -92,25 +98,39 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     }
 
     /**
-     * One signature verification, which also enforces that this is an access token and
-     * that the {@code userId} claim is a well-formed UUID.
+     * Signature, token type, and the account behind the token — the same three checks
+     * every HTTP request gets, from the same place.
      */
     private UUID authenticateAccessToken(String token) {
-        return tokenProvider.parseAccessToken(token)
-            .map(TokenProvider.AccessTokenClaims::userId)
+        return authenticateSessionUseCase.authenticateAccessToken(token)
+            .map(user -> user.id().value())
             .orElseGet(() -> {
-                log.debug("WS handshake rejected: invalid or non-access token");
+                log.debug("WS handshake rejected: token is invalid or no longer accepted");
                 return null;
             });
     }
 
+    /**
+     * A ticket carries no token version, so redeeming it proves only that its holder
+     * was authenticated when it was issued. The account is re-checked here because the
+     * ticket's entire lifetime sits after that point.
+     */
     private UUID redeemTicket(String ticket) {
+        UserId ticketOwner;
         try {
-            return redeemWebSocketTicketUseCase.redeem(ticket).value();
+            ticketOwner = redeemWebSocketTicketUseCase.redeem(ticket);
         } catch (RuntimeException ex) {
             log.warn("WS handshake rejected: invalid or expired ticket");
             return null;
         }
+
+        return authenticateSessionUseCase.resolveActiveUser(ticketOwner)
+            .map(User::id)
+            .map(UserId::value)
+            .orElseGet(() -> {
+                log.warn("WS handshake rejected: ticket owner is no longer an active account");
+                return null;
+            });
     }
 
     private static String extractBearerToken(ServerHttpRequest request) {
@@ -139,4 +159,3 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
         }
     }
 }
-

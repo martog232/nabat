@@ -77,6 +77,50 @@ class AuthControllerIntegrationTest extends PostgresTestSupport {
             .andExpect(jsonPath("$.user.notificationRadiusKm").value(5));
     }
 
+    /**
+     * The password policy is enforced at the edge, and the message names the rule that was
+     * broken. A combined "must be 10+ chars with a letter and a digit" makes the user work
+     * out which part they failed; this sends them straight to the fix.
+     */
+    @Test
+    void shouldRejectRegistrationWithATooShortPassword() throws Exception {
+        RegisterRequest request = new RegisterRequest("short@example.com", "passw0rd", "Short Pass");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors.password").value("Password must be at least 10 characters"));
+    }
+
+    @Test
+    void shouldRejectRegistrationWithAPasswordThatHasNoDigit() throws Exception {
+        RegisterRequest request = new RegisterRequest("nodigit@example.com", "passwordonly", "No Digit");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors.password").value("Password must contain at least one digit"));
+    }
+
+    /**
+     * Reset carried its own {@code @Size(min = 6)}, so tightening registration alone would
+     * have left "forgot password" as a supported way to set a password registration
+     * refuses. The token is nonsense on purpose: validation runs before it is looked at, so
+     * a 400 here proves the policy is checked at the edge rather than after the token.
+     */
+    @Test
+    void shouldApplyTheSamePasswordPolicyToPasswordReset() throws Exception {
+        var request = new ResetPasswordRequest("irrelevant-token", "passw0rd");
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errors.newPassword").value("Password must be at least 10 characters"));
+    }
+
     @Test
     void shouldPersistUserAfterRegistration() throws Exception {
         String email = "persisted-user@example.com";

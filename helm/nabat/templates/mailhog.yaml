@@ -1,0 +1,78 @@
+{{/*
+SMTP catcher. Two things need it and neither had it in this chart:
+
+  * The application sends verification and password-reset mail. `nabatApp.mailHost` has
+    always defaulted to `mailhog`, and no such service existed here — so in Kubernetes
+    every one of those emails failed to send.
+  * Alertmanager needs somewhere to deliver. A receiver pointing at nothing would make the
+    whole alerting chain unverifiable, which is the failure this work exists to remove.
+
+Development-grade by definition: mail is held in memory and readable in the web UI at
+port 8025. Point `nabatApp.mailHost` and the Alertmanager smarthost at a real relay when
+there is one; nothing else changes.
+*/}}
+{{- if .Values.mailhog.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nabat.fullname" . }}-mailhog
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mailhog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: mailhog
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: mailhog
+        {{- include "nabat.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: mailhog
+        image: {{ .Values.mailhog.image }}
+        ports:
+        - name: smtp
+          containerPort: 1025
+        - name: http
+          containerPort: 8025
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8025
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  # Deliberately *not* prefixed with the release name. `alertmanager/alertmanager.yml` is
+  # shared verbatim with the compose stack, where `mailhog` is the compose service name, so
+  # a fullname-prefixed Service here would resolve in neither file's favour. The same
+  # coupling already exists in kong/kong.yml, which names `nabat-app` directly.
+  name: mailhog
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "nabat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mailhog
+spec:
+  selector:
+    app.kubernetes.io/component: mailhog
+  ports:
+  - name: smtp
+    port: 1025
+    targetPort: smtp
+  - name: http
+    port: 8025
+    targetPort: http
+{{- end }}

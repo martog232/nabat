@@ -1,0 +1,19 @@
+# Dashboard provider, shared by compose and the chart.
+#
+# `foldersFromFilesStructure` is off and the path is flat: one folder keeps the sidebar
+# honest about how many dashboards actually exist.
+apiVersion: 1
+
+providers:
+  - name: nabat
+    orgId: 1
+    folder: Nabat
+    type: file
+    # Editing a provisioned dashboard in the UI is allowed, but the file wins on restart.
+    # allowUiUpdates would let a change live only in Grafana's database, which is how a
+    # dashboard stops being code without anyone deciding that.
+    allowUiUpdates: false
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
