@@ -135,9 +135,14 @@ public class AlertController {
         return ResponseEntity.ok(AlertResponse.from(resolved));
     }
 
-    /** Admin-only listing of all alerts by status (defaults to ACTIVE). */
+    /**
+     * Listing of all alerts by status (defaults to ACTIVE), for moderation rather than for
+     * the map. Open to moderators as well as admins: triaging reports is the moderator role,
+     * and requiring account-administration rights to read a list was the coupling that made
+     * one role do two jobs.
+     */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
     public ResponseEntity<List<AlertResponse>> listByStatus(
             @RequestParam(defaultValue = "ACTIVE") AlertStatus status
     ) {

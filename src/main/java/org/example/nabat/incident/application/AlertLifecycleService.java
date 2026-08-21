@@ -12,7 +12,6 @@ import org.example.nabat.shared.domain.NotAuthorizedException;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,11 +52,13 @@ public class AlertLifecycleService implements GetAlertByIdUseCase, ResolveAlertU
                 .orElseThrow(() -> new AlertNotFoundException(id));
 
         boolean isOwner = alert.reportedBy().equals(actor.id().value());
-        boolean isAdmin = actor.role() == Role.ADMIN;
-        if (!isOwner && !isAdmin) {
+        // The capability, not the role: closing someone else's alert is content moderation,
+        // and asking `role == ADMIN` here is what tied it to the one role that can also
+        // disable accounts.
+        if (!isOwner && !actor.role().canModerateContent()) {
             // Domain exception, not Spring Security's AccessDeniedException: AGENTS.md
             // forbids framework exceptions here, and the handler maps this to the same 403.
-            throw new NotAuthorizedException("Only the reporter or an admin can resolve this alert");
+            throw new NotAuthorizedException("Only the reporter or a moderator can resolve this alert");
         }
 
         Alert resolved = alertRepository.save(alert.resolve());
