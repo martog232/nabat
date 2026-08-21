@@ -164,6 +164,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V10 | `alerts.version` — optimistic locking |
 | V11 | `event_publication` — Modulith Event Publication Registry (transactional outbox) |
 | V12 | `users_role_check` — CHECK constraint on `users.role`, adding MODERATOR |
+| V13 | Widen `verification_tokens.id` to VARCHAR(64) — it holds a 43-char hash, not a UUID |
 
 ---
 
