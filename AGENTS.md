@@ -59,6 +59,10 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - Tests that exercise spatial queries use **Testcontainers** with a PostGIS image (`@DataJpaTest`). Docker is required for those tests.
 
 ### Voting via Kafka microservice (`voting/application/ExternalVoteService.java`)
+- **Running it: `docker compose --profile voting up`.** Kafka, a second Postgres and nabat-voting itself are behind a profile, because Kafka plus another JVM on top of twelve containers is a lot to ask of a laptop for work that usually does not touch voting. **Without the profile every vote answers 503** — `V7` dropped the local `alert_votes` table, so there is no fallback path and that is the honest answer rather than a pretence that the feature is absent.
+- The image comes from GHCR (`NABAT_VOTING_IMAGE` overrides it); this file does not build another repository's source, which is also how the Helm chart consumes it. A `denied` on pull means the package is still private — `docker login ghcr.io`. `nabat-voting/docker-compose.yml` remains the place to *develop* that service, with a build context and a debug port; the two stacks are alternatives and collide on port 8081 if both run.
+- **Do not simplify the Kafka listener config.** Two listeners are advertised — `INTERNAL://kafka:9092` and `EXTERNAL://localhost:29092` — because with one, bootstrap succeeds and the broker then hands back `localhost:9092` as the partition leader, which inside the app container is the app itself. Every produce and fetch fails against a broker that looks healthy. The three internal topics are also pinned to replication factor 1: on a single broker their creation otherwise fails and takes consumer-group coordination with it.
+- `NABAT_VOTING_SERVICE_BASE_URL` is stated in compose. The application default is `http://localhost:8081`, which inside the container is the container.
 - `ExternalVoteService` delegates to `ExternalVotingPort` (HTTP bridge to the `nabat-voting` Kafka-backed microservice).
 - **The caller's own access token is forwarded** (via `RequestContextPort.callerAccessToken()`); nabat-voting derives the voter from its `userId` claim. Never send a voter id in the body — it is rejected — and never authenticate with a shared service token, which would attribute every vote to one identity.
 - `vote`/`removeVote` **return the resulting tallies**. Do not follow a write with `getVoteStats()`: that endpoint reads an asynchronously-updated projection and will return the pre-write counts.
@@ -177,7 +181,8 @@ $env:JAVA_HOME="C:\Program Files\Java\jdk21.0.11_10"  # see the JDK note below
 .\mvnw.cmd clean package                     # builds jar + runs JaCoCo (fails <60% LINE BUNDLE coverage)
 .\mvnw.cmd spring-boot:run                   # run app; needs Postgres on 127.0.0.1:5432 (or set SPRING_DATASOURCE_URL)
 docker compose up -d postgres                # dev DB on host port 5433 (note: not 5432)
-docker compose up --build                    # full stack on :8080
+docker compose up --build                    # full stack on :8080 (no voting)
+docker compose --profile voting up --build   # ...plus Kafka, a second Postgres and nabat-voting
 ```
 
 - **The build requires JDK 21.** Lombok 1.18.34 (pinned in `pom.xml`) cannot parse newer
@@ -245,7 +250,8 @@ what lets it use package-private members instead of widening production visibili
 | Photo serving is not CDN-cacheable | 🟡 Known | `GET /api/v1/uploads/{filename}` still streams through the application behind JWT, so every byte crosses it. Presigned URLs are the fix and belong with the media-service split (phase 4), since they change the API contract. |
 | Alert fan-out durability | ✅ Done | Event Publication Registry (V11). Outstanding publications replay on startup; delivery is at-least-once. |
 | Orphaned uploads | ✅ Done | `OrphanedPhotoSweeper` → `ReclaimOrphanedPhotosUseCase`, hourly, behind `nabat.storage.orphan-sweep.enabled` (on in compose and Helm). Only files older than `nabat.storage.orphan-grace` (24h) are candidates. |
-| Kafka dual write | 🟡 Known | The vote commit and the `vote.cast` publish are not atomic. Failures are logged and the projection is rebuildable; a transactional outbox is the proper fix. |
+| Kafka dual write | 🟡 Known | The vote commit and the `vote.cast` publish are not atomic. Failures are logged and the projection is rebuildable; a transactional outbox is the proper fix — the pattern is already exercised in-process here (V11), so this is a change of transport, not of idea. |
+| Voting integration untested | 🟡 Known | Nothing automated starts a real nabat-voting: `ExternalVotingPort` is mocked everywhere. Now that the service runs in compose, a Testcontainers test against the GHCR image is the obvious next step. |
 | Revocation of live WebSocket sockets | 🟡 Known | The handshake authenticates fully (`AuthenticateSessionUseCase`), but nothing re-checks a session already open, so a password reset or a disable only takes effect on the next connect. The fix is a revocation event relayed through `WsClusterRelay`, since each replica holds its own sessions. |
 | Shared JWT secret | 🟡 Known | Symmetric HS256 means nabat-voting could also *mint* tokens nabat-app trusts. RS256 with a published public key would let it verify without signing power. |
 | Spring Boot version drift | 🟡 Known | nabat-app 3.4.1 (past OSS support, Jackson 2) vs nabat-voting 4.0.6 (Jackson 3). Worth aligning. |
