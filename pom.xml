@@ -207,6 +207,17 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            Declared rather than inherited. It arrives transitively through
+            spring-modulith-test today, so the code would compile either way — until that
+            dependency is dropped or reshuffled and an unrelated change breaks a test that
+            never mentioned Modulith. Version comes from Boot's dependency management.
+        -->
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
