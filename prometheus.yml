@@ -46,17 +46,14 @@ scrape_configs:
         labels:
           component: nabat-app
 
-  # nabat-voting lives in its own compose stack, on its own default network, so this target
-  # does not resolve from here without joining the two. Left in place and left failing
-  # visibly: a target shown as DOWN is honest, whereas silently not scraping it — which is
-  # what the discovery-based config did for everything — is not.
+  # nabat-voting now runs in this stack, behind the `voting` compose profile, so this target
+  # resolves and goes UP with `docker compose --profile voting up`. It previously lived only
+  # in its own compose stack on its own network and could never resolve from here.
   #
-  # To make it resolve, create a shared network once:
-  #   docker network create nabat-net
-  # then in each compose file put the services on it:
-  #   networks: [nabat-net]
-  # and declare it:
-  #   networks: {nabat-net: {external: true}}
+  # Without the profile it shows DOWN, which is correct rather than untidy: the service is
+  # genuinely absent and every vote is answering 503. A target quietly removed when the
+  # profile is off would hide exactly the fact worth seeing. `VotingServiceUnreachable` in
+  # prometheus/rules.yml is a warning rather than a critical for the same reason.
   - job_name: 'nabat-voting'
     metrics_path: /actuator/prometheus
     static_configs:

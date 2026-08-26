@@ -1,0 +1,21 @@
+-- Widen verification_tokens.id so a token can actually be stored.
+--
+-- The column has been VARCHAR(36) since V3 — sized for a UUID, from before the design changed
+-- to storing a *hash* of the emailed secret rather than the secret itself. What goes in there
+-- is SHA-256, Base64url-encoded without padding: 32 bytes → 43 characters. Every insert has
+-- therefore failed with "value too long for type character varying(36)" since email
+-- verification was added, which means no verification token was ever persisted, and neither
+-- POST /auth/verify nor POST /auth/reset-password could ever succeed.
+--
+-- Nothing caught it because nothing wrote one: EmailVerificationServiceTest mocks the
+-- repository, and the integration tests register users without verifying them. A persistence
+-- test that saves a real token now exists alongside this migration.
+--
+-- 64 rather than exactly 43: varchar(n) in Postgres costs nothing for the unused headroom, and
+-- a bound sized to the current algorithm to the character is what produced this bug in the
+-- first place. It is still a bound — a switch to SHA-512 (86 characters) needs a migration,
+-- which is the correct amount of friction for changing how tokens are stored.
+--
+-- No data migration: there are no rows to convert, since none could ever be written.
+ALTER TABLE verification_tokens
+    ALTER COLUMN id TYPE VARCHAR(64);

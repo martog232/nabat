@@ -59,6 +59,10 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - Tests that exercise spatial queries use **Testcontainers** with a PostGIS image (`@DataJpaTest`). Docker is required for those tests.
 
 ### Voting via Kafka microservice (`voting/application/ExternalVoteService.java`)
+- **Running it: `docker compose --profile voting up`.** Kafka, a second Postgres and nabat-voting itself are behind a profile, because Kafka plus another JVM on top of twelve containers is a lot to ask of a laptop for work that usually does not touch voting. **Without the profile every vote answers 503** — `V7` dropped the local `alert_votes` table, so there is no fallback path and that is the honest answer rather than a pretence that the feature is absent.
+- The image comes from GHCR (`NABAT_VOTING_IMAGE` overrides it); this file does not build another repository's source, which is also how the Helm chart consumes it. A `denied` on pull means the package is still private — `docker login ghcr.io`. `nabat-voting/docker-compose.yml` remains the place to *develop* that service, with a build context and a debug port; the two stacks are alternatives and collide on port 8081 if both run.
+- **Do not simplify the Kafka listener config.** Two listeners are advertised — `INTERNAL://kafka:9092` and `EXTERNAL://localhost:29092` — because with one, bootstrap succeeds and the broker then hands back `localhost:9092` as the partition leader, which inside the app container is the app itself. Every produce and fetch fails against a broker that looks healthy. The three internal topics are also pinned to replication factor 1: on a single broker their creation otherwise fails and takes consumer-group coordination with it.
+- `NABAT_VOTING_SERVICE_BASE_URL` is stated in compose. The application default is `http://localhost:8081`, which inside the container is the container.
 - `ExternalVoteService` delegates to `ExternalVotingPort` (HTTP bridge to the `nabat-voting` Kafka-backed microservice).
 - **The caller's own access token is forwarded** (via `RequestContextPort.callerAccessToken()`); nabat-voting derives the voter from its `userId` claim. Never send a voter id in the body — it is rejected — and never authenticate with a shared service token, which would attribute every vote to one identity.
 - `vote`/`removeVote` **return the resulting tallies**. Do not follow a write with `getVoteStats()`: that endpoint reads an asynchronously-updated projection and will return the pre-write counts.
@@ -137,6 +141,11 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - **Tracing context crosses `@Async` only because `AsyncConfig` declares a `TaskDecorator`.** Spring Boot registers none on its own; it applies one if a single `TaskDecorator` bean exists. What propagates is an **Observation**, not a bare span — only `ObservationThreadLocalAccessor` is ServiceLoader-registered, so `tracer.withSpan(...)` outside an Observation travels nowhere. Spring MVC wraps every request in one, so request-initiated work is covered.
 - Config is env-var driven; **no Spring profiles**. Defaults in `application.properties`.
 - **`JWT_SECRET` has no default and the app refuses to start without it.** It must be ≥ 32 chars, have ≥ 16 distinct characters, and not look like a placeholder. nabat-app and nabat-voting must share the same value. Do not reintroduce a fallback: a committed default is a publicly-known signing key.
+- **Roles are three, and rights are asked as capabilities, never compared as roles.** `Role.canModerateContent()` (MODERATOR, ADMIN) and `Role.canAdministerUsers()` (ADMIN) live on the enum in `identity/domain`. Write `actor.role().canModerateContent()`, not `role == Role.ADMIN` — that comparison is what tied "close a false alarm" to the one role that can also disable accounts. Do **not** replace the capabilities with an ordinal rank: `>=` reads naturally until the first role that does not sit on the line (an auditor who reads everything and moderates nothing), and then every comparison in the codebase is quietly wrong.
+- **The role names are duplicated into a `CHECK` constraint on `users.role` (V12), deliberately.** Same reasoning as `notification_radius_km` in V6: without it the column took any string, and since Hibernate maps it to the enum, a bad value failed on *read*, inside the authentication path, making the account unloadable rather than under-privileged. A constant added to `Role` without a migration fails on first assignment.
+- **Authorisation about a relationship between two accounts cannot live in `@PreAuthorize`.** `/api/v1/admin/users/**` has both gates: the annotation refuses a token that does not claim the role, and `UserAdministrationService` re-reads the actor's current row — a token carries the role it was minted with, so an admin demoted a minute ago still presents `ROLE_ADMIN` until it expires. Token version invalidates sessions on a *credential* change, not on a role change.
+- **An admin cannot demote or disable themselves.** There is no break-glass path, so the last step has to be taken by someone else. Disabling someone else bumps their token version, which stops sessions immediately — including WebSocket handshakes, which ask the same question; re-enabling deliberately does not, so a switch off and back on does not also drop every session.
+- **Roles take effect on the next sign-in**, because they ride in the token. Pinned by `AdminUserControllerIntegrationTest`. If that ever needs to be immediate, the change is to invalidate sessions on role change, not to re-read the role per request.
 - **Password rules live in `identity/domain/PasswordPolicy`, not in the DTOs.** ≥10 characters, at least one letter and one digit, and **at most 72 UTF-8 bytes** — BCrypt hashes only the first 72 bytes and discards the rest silently, so a longer passphrase would be truncated and any string sharing that prefix would unlock the account. The bound is bytes, not characters, because that is what BCrypt truncates (Cyrillic costs two bytes each). Applied through `@StrongPassword` on both `RegisterRequest` and `ResetPasswordRequest` — they previously each carried their own `@Size(min = 6)`, so reset was a way around any tightening of registration. Login does **not** apply the policy: existing accounts with older, weaker passwords must keep working.
 - Access and refresh tokens carry a `tv` (token version) claim checked against `users.token_version`, so a password reset invalidates sessions already in flight. That check — with the exists and enabled checks — lives in `AuthenticateSessionUseCase` and nowhere else, so every entry point that accepts a token gets all three. Refresh tokens are single-use, tracked by `jti` in Redis.
 - CORS origins: `nabat.cors.allowed-origins` (comma-separated), resolved once by `AllowedOrigins` and shared by the HTTP and WebSocket configs. `*` is refused because credentials are enabled.
@@ -158,6 +167,8 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V9 | `users.token_version` — session invalidation on credential change |
 | V10 | `alerts.version` — optimistic locking |
 | V11 | `event_publication` — Modulith Event Publication Registry (transactional outbox) |
+| V12 | `users_role_check` — CHECK constraint on `users.role`, adding MODERATOR |
+| V13 | Widen `verification_tokens.id` to VARCHAR(64) — it holds a 43-char hash, not a UUID |
 
 ---
 
@@ -170,7 +181,8 @@ $env:JAVA_HOME="C:\Program Files\Java\jdk21.0.11_10"  # see the JDK note below
 .\mvnw.cmd clean package                     # builds jar + runs JaCoCo (fails <60% LINE BUNDLE coverage)
 .\mvnw.cmd spring-boot:run                   # run app; needs Postgres on 127.0.0.1:5432 (or set SPRING_DATASOURCE_URL)
 docker compose up -d postgres                # dev DB on host port 5433 (note: not 5432)
-docker compose up --build                    # full stack on :8080
+docker compose up --build                    # full stack on :8080 (no voting)
+docker compose --profile voting up --build   # ...plus Kafka, a second Postgres and nabat-voting
 ```
 
 - **The build requires JDK 21.** Lombok 1.18.34 (pinned in `pom.xml`) cannot parse newer
@@ -232,13 +244,14 @@ what lets it use package-private members instead of widening production visibili
 
 | Area | Status | Notes |
 |------|--------|-------|
-| `Role.ADMIN` enforcement | 🟡 Partial | `@PreAuthorize("hasRole('ADMIN')")` on `GET /api/v1/alerts` and on nabat-voting's projection rebuild. No other admin-only endpoints exist yet. |
+| Role enforcement | ✅ Done | Three roles with two capabilities — see the Roles section under Conventions. `MODERATOR` may close and list anyone's alerts; `ADMIN` additionally administers accounts (`/api/v1/admin/users/{id}/role`, `/enabled`). nabat-voting's projection rebuild is still `hasRole('ADMIN')` and has no moderator equivalent. |
 | Notification REST API | ✅ Done | `NotificationController` exposes the 5 `GetNotificationUseCase` methods. There is deliberately no create endpoint. |
 | Photo upload storage (multi-instance) | ✅ Done | `S3StorageAdapter` selected by `nabat.storage.type=s3`; MinIO in compose and in the chart. `filesystem` remains the default for single-process local runs. |
 | Photo serving is not CDN-cacheable | 🟡 Known | `GET /api/v1/uploads/{filename}` still streams through the application behind JWT, so every byte crosses it. Presigned URLs are the fix and belong with the media-service split (phase 4), since they change the API contract. |
 | Alert fan-out durability | ✅ Done | Event Publication Registry (V11). Outstanding publications replay on startup; delivery is at-least-once. |
 | Orphaned uploads | ✅ Done | `OrphanedPhotoSweeper` → `ReclaimOrphanedPhotosUseCase`, hourly, behind `nabat.storage.orphan-sweep.enabled` (on in compose and Helm). Only files older than `nabat.storage.orphan-grace` (24h) are candidates. |
-| Kafka dual write | 🟡 Known | The vote commit and the `vote.cast` publish are not atomic. Failures are logged and the projection is rebuildable; a transactional outbox is the proper fix. |
+| Kafka dual write | 🟡 Known, and now demonstrated | The `vote.cast` publish happens **inside** the transaction that writes the vote, and the consumer recomputes the credibility projection from the write model — so it races the commit. Lose the race and the projection stores zeros, permanently, since recomputation only runs again on the next event for that alert. Observed both ways while writing `VotingServiceIntegrationTest`. A transactional outbox is the fix (Phase 2); the pattern already exists in-process here (V11), so it is a change of transport, not of idea. Do not "fix" it with an after-commit publish: that narrows the window without closing it. |
+| Voting integration untested | ✅ Done | `VotingServiceIntegrationTest` starts nabat-voting, Kafka and a second Postgres with Testcontainers and votes through the real HTTP path. Select the image with `-Dnabat.voting.image`; the default is the published one. It found the Flyway defect below on its first run. |
 | Revocation of live WebSocket sockets | 🟡 Known | The handshake authenticates fully (`AuthenticateSessionUseCase`), but nothing re-checks a session already open, so a password reset or a disable only takes effect on the next connect. The fix is a revocation event relayed through `WsClusterRelay`, since each replica holds its own sessions. |
 | Shared JWT secret | 🟡 Known | Symmetric HS256 means nabat-voting could also *mint* tokens nabat-app trusts. RS256 with a published public key would let it verify without signing power. |
 | Spring Boot version drift | 🟡 Known | nabat-app 3.4.1 (past OSS support, Jackson 2) vs nabat-voting 4.0.6 (Jackson 3). Worth aligning. |

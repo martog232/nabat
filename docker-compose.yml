@@ -133,6 +133,11 @@ services:
       NABAT_S3_BUCKET: nabat-uploads
       NABAT_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-nabat}
       NABAT_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-nabat-dev-secret}
+      # Stated because the application default is http://localhost:8081, which inside this
+      # container is this container. Set whether or not the voting profile is running: with
+      # it, votes work; without it, they fail as 503 against a name that does not resolve,
+      # which is the same answer the code gives for a voting service that is down.
+      NABAT_VOTING_SERVICE_BASE_URL: http://nabat-voting-app:8081
     ports:
       # Published for direct access during development and for Prometheus. Browser traffic
       # should go through Kong on :8000 so local behaviour matches deployed behaviour.
@@ -276,6 +281,118 @@ services:
       - loki
     restart: unless-stopped
 
+  # ── The voting service, opt-in ────────────────────────────────────────────────
+  #
+  # `docker compose up` leaves these out; `docker compose --profile voting up` includes
+  # them. Kafka plus a second Postgres plus a second JVM is a lot to ask of a laptop that
+  # is already running twelve containers, and most work here does not touch voting.
+  #
+  # Without the profile, every vote answers 503: V7 dropped the local alert_votes table, so
+  # nabat-voting is the only path there is. That is the honest failure — the endpoint says
+  # the dependency is unavailable rather than pretending the feature does not exist.
+  #
+  # These are an *alternative* to running nabat-voting's own compose file, not a companion
+  # to it. Both bind 8081 and both name a container nabat-voting-app, so starting both at
+  # once fails loudly, which is the intended outcome.
+  kafka:
+    profiles: [voting]
+    image: apache/kafka:latest
+    container_name: nabat-kafka
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      # Two listeners, and this is not incidental: nabat-voting's own compose file records
+      # what happens with one. Advertising only PLAINTEXT://localhost:9092 lets the
+      # bootstrap connection succeed, after which the broker hands back localhost:9092 as
+      # the partition leader's address — which, resolved inside the app container, is the
+      # app itself. Every produce and fetch then fails, with a healthy-looking broker.
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      # All three internal topics have to be single-replica on a one-broker cluster, or
+      # their creation fails and takes consumer-group coordination down with it.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      CLUSTER_ID: DWKW8vl4RI6tPZGCbhhHVg
+    ports:
+      # Host tooling (a console consumer, say) uses the EXTERNAL listener; containers on
+      # this network reach kafka:9092 directly.
+      - "29092:29092"
+    # No volume, deliberately: the topics are recreated on start and the broker holds
+    # nothing this stack cannot rebuild. Mounting one would mean guessing the image's log
+    # directory, and a named volume at the wrong path is an empty directory that looks
+    # mounted.
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-cluster.sh cluster-id --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # Its own database, not a second schema in nabat-app's. Owning its data is most of the
+  # reason the service exists; a shared database would make this a distributed monolith,
+  # which is the first entry in the anti-pattern table in TARGET_ARCHITECTURE.md.
+  voting-postgres:
+    profiles: [voting]
+    image: postgres:16
+    container_name: nabat-voting-postgres
+    environment:
+      POSTGRES_DB: nabat_voting_db
+      POSTGRES_USER: nabat_voting_user
+      POSTGRES_PASSWORD: nabat_voting_password
+    ports:
+      # 5434: nabat-app's Postgres is on 5433, a locally installed one is usually on 5432.
+      - "${VOTING_POSTGRES_HOST_PORT:-5434}:5432"
+    volumes:
+      - voting_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nabat_voting_user -d nabat_voting_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  nabat-voting-app:
+    profiles: [voting]
+    # Consumed as a published artifact, exactly as the Helm chart consumes it — this file
+    # does not build another repository's source. Override with NABAT_VOTING_IMAGE to pin a
+    # tag, or point it at a locally built image when working on that service. If the pull
+    # fails with "denied", the GHCR package is still private: `docker login ghcr.io`, or
+    # make the package public.
+    #
+    # NOTE (2026-08-26): the currently published `latest` predates a fix in nabat-voting and
+    # crash-loops against an empty database — it lacks spring-boot-flyway, so Boot 4 runs no
+    # migrations and ddl-auto=validate then fails on the missing alert_credibility table.
+    # Until CI republishes, build it and point this at the result:
+    #     (cd ../nabat-voting && docker build -t nabat-voting-app:local .)
+    #     NABAT_VOTING_IMAGE=nabat-voting-app:local docker compose --profile voting up -d
+    image: ${NABAT_VOTING_IMAGE:-ghcr.io/martog232/nabat-voting-app:latest}
+    container_name: nabat-voting-app
+    depends_on:
+      voting-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://voting-postgres:5432/nabat_voting_db
+      SPRING_DATASOURCE_USERNAME: nabat_voting_user
+      SPRING_DATASOURCE_PASSWORD: nabat_voting_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8081
+      # The same value nabat-app signs with. nabat-voting verifies the caller's forwarded
+      # access token and derives the voter from its userId claim, so a different secret
+      # turns every vote into a 401 there and a 503 here — the shared-secret weakness and
+      # the reason it currently has to be shared, both in one line.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required and must match nabat-app. Generate with `openssl rand -base64 48` and set it in .env}
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
   # Tracing backend. The application has always been configured to send spans here
   # (`ZIPKIN_ENDPOINT`, defaulting to this host name), but the service was missing from
   # this file, so every export failed DNS resolution and no trace was ever viewable.
@@ -300,6 +417,8 @@ volumes:
   grafana_data:
     driver: local
   loki_data:
+    driver: local
+  voting_postgres_data:
     driver: local
   # Silences and notification state. Without it every restart re-notifies everything that
   # is still firing, and any silence a person set is gone.

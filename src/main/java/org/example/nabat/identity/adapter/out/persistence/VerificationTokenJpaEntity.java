@@ -21,8 +21,15 @@ import java.util.UUID;
 @Table(name = "verification_tokens")
 public class VerificationTokenJpaEntity {
 
+    /**
+     * The SHA-256 hash of the emailed secret, Base64url without padding — 43 characters, not
+     * a UUID. This declared 36 and the column matched it (V3), so every insert was rejected
+     * and no token was ever stored. Kept in step with the widened column in V13; with
+     * {@code ddl-auto=validate}, a length that disagrees with the schema fails at startup
+     * rather than at the first write.
+     */
     @Id
-    @Column(length = 36)
+    @Column(length = 64)
     private String id;
 
     @Column(nullable = false)
