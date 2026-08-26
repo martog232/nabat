@@ -61,14 +61,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>It found two real defects on its first run. The image could not migrate its schema at
  * all, because Spring Boot 4 moved Flyway's autoconfiguration into a module the pom did not
- * declare. And the credibility projection races: the vote event is published inside the
- * transaction that writes the vote, so a consumer that recomputes from the write model can
- * get there first and store zeros — observed both ways, zeros in the compose stack and the
- * correct count here. Neither outcome is asserted; see
+ * declare; that one is fixed and published. And the credibility projection races: the vote
+ * event is published inside the transaction that writes the vote, so a consumer that
+ * recomputes from the write model can get there first and store zeros — observed both ways,
+ * zeros in the compose stack and the correct count here. Neither outcome is asserted; see
  * {@link #theWriteModelHoldsTheVoteRegardlessOfHowTheProjectionRaceGoes()}.
  *
- * <p><b>Which image.</b> {@code -Dnabat.voting.image} selects it; the default is the
- * published one. Until nabat-voting's Flyway fix is published this test needs a local build:
+ * <p><b>Which image.</b> The default is the published one,
+ * {@code ghcr.io/martog232/nabat-voting-app:latest}. To test a change to nabat-voting that
+ * is not published yet, build it and point {@code -Dnabat.voting.image} at the result:
  * <pre>
  *   (cd ../nabat-voting &amp;&amp; docker build -t nabat-voting-app:local .)
  *   mvnw -Dnabat.voting.image=nabat-voting-app:local -Dtest=VotingServiceIntegrationTest test
