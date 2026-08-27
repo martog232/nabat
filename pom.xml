@@ -207,6 +207,12 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- @EmbeddedKafka, so the vote-event listener can be tested without a broker. -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!--
             Declared rather than inherited. It arrives transitively through
             spring-modulith-test today, so the code would compile either way — until that
@@ -270,6 +276,17 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+
+        <!--
+          Kafka: consumer only. nabat-app publishes nothing to a broker — its own fan-out
+          goes through the Event Publication Registry in-process — but it maintains the
+          denormalised vote counts on `alerts` from nabat-voting's vote.cast / vote.removed.
+          The listener is inactive unless nabat.kafka.enabled is set.
+        -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
         </dependency>
 
         <!-- Tracing: Brave bridge — populates MDC traceId/spanId per request -->

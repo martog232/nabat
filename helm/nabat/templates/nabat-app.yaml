@@ -84,6 +84,14 @@ spec:
           value: {{ .Values.nabatApp.baseUrl | default (printf "http://%s" .Values.ingress.host) | quote }}
         - name: NABAT_VOTING_SERVICE_BASE_URL
           value: {{ .Values.nabatApp.votingServiceUrl }}
+        # The denormalised vote counts on `alerts` are written by consuming nabat-voting's
+        # vote events. Unconditionally on here, unlike in compose: this chart always deploys
+        # the broker and the voting service together, so there is no configuration of it in
+        # which the listener would have nothing to talk to.
+        - name: NABAT_KAFKA_ENABLED
+          value: "true"
+        - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          value: {{ include "nabat.fullname" . }}-kafka:9092
         # JSON logs so Promtail ships structured fields to Loki and traceId is queryable
         # in Grafana instead of being text inside a message.
         - name: NABAT_LOG_FORMAT

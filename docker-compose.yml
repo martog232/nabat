@@ -138,6 +138,17 @@ services:
       # it, votes work; without it, they fail as 503 against a name that does not resolve,
       # which is the same answer the code gives for a voting service that is down.
       NABAT_VOTING_SERVICE_BASE_URL: http://nabat-voting-app:8081
+      # The vote counts on `alerts` are written by a consumer of nabat-voting's vote events,
+      # so this belongs on whenever the voting profile is:
+      #
+      #     NABAT_KAFKA_ENABLED=true docker compose --profile voting up -d
+      #
+      # It is not simply "true", because the broker only exists under that profile and a
+      # listener without one logs a connection warning every second forever. Compose cannot
+      # ask which profiles are active, so this is the one thing the profile does not carry
+      # by itself.
+      NABAT_KAFKA_ENABLED: ${NABAT_KAFKA_ENABLED:-false}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     ports:
       # Published for direct access during development and for Prometheus. Browser traffic
       # should go through Kong on :8000 so local behaviour matches deployed behaviour.
