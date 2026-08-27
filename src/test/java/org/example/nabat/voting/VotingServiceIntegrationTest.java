@@ -59,13 +59,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   <li>the failure mapping — with the service stopped, a vote is a 503 and not a 500.</li>
  * </ul>
  *
- * <p>It found two real defects on its first run. The image could not migrate its schema at
- * all, because Spring Boot 4 moved Flyway's autoconfiguration into a module the pom did not
- * declare; that one is fixed and published. And the credibility projection races: the vote
- * event is published inside the transaction that writes the vote, so a consumer that
- * recomputes from the write model can get there first and store zeros — observed both ways,
- * zeros in the compose stack and the correct count here. Neither outcome is asserted; see
- * {@link #theWriteModelHoldsTheVoteRegardlessOfHowTheProjectionRaceGoes()}.
+ * <p>It found two real defects on its first run, both since fixed in nabat-voting. The image
+ * could not migrate its schema at all, because Spring Boot 4 moved Flyway's autoconfiguration
+ * into a module the pom did not declare. And the credibility projection raced its own commit:
+ * the vote event was published <em>inside</em> the transaction that wrote the vote, so a
+ * consumer that recomputes from the write model could get there first and store zeros —
+ * observed both ways, zeros in the compose stack and the correct count here. The event now
+ * goes through a transactional outbox, which is what lets
+ * {@link #theProjectionEndsUpAgreeingWithTheWriteModel()} assert a count rather than print
+ * one.
  *
  * <p><b>Which image.</b> The default is the published one,
  * {@code ghcr.io/martog232/nabat-voting-app:latest}. To test a change to nabat-voting that
@@ -212,37 +214,49 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
     }
 
     /**
-     * The write model is authoritative; the projection is not, and deliberately is not
-     * asserted on.
+     * The projection catches up to the write model, and this test is allowed to say so.
      *
-     * <p>The projection recomputes from the {@code votes} table whenever an event arrives,
-     * and the event is published <em>inside</em> the transaction that writes the vote. So the
-     * consumer races the commit: win, and the row is correct; lose, and it recomputes against
-     * a table that does not yet hold the vote and writes zeros — permanently, because
-     * recomputation only runs again on the next event for that alert.
+     * <p>It was not always. The projection recomputes from the {@code votes} table whenever an
+     * event arrives, and the event used to be published <em>inside</em> the transaction that
+     * wrote the vote — so the consumer raced the commit. Win, and the row was correct; lose,
+     * and it recomputed against a table that did not hold the vote yet and wrote zeros,
+     * permanently, because recomputation only runs again on the next event for that alert.
+     * Both outcomes were observed while writing this test, so it asserted the write model and
+     * merely printed the projection: pinning either outcome would have been a flaky test that
+     * said nothing.
      *
-     * <p>Both outcomes were observed while writing this test: zeros in the compose stack, the
-     * correct count here. That non-determinism is the defect, and it is the "Kafka dual write"
-     * row in AGENTS.md made concrete. Pinning either outcome would produce a flaky test that
-     * says nothing, so this asserts only what the design actually guarantees — and Phase 2's
-     * outbox is what turns the projection into something a test may assert on.
+     * <p>nabat-voting now writes the event to an outbox row in the vote's own transaction and
+     * sends it after the commit, so the consumer cannot read a table that does not hold the
+     * vote. The count is still eventual — hence the wait — but it is no longer ambiguous, and
+     * a regression to the dual write fails here as a projection stuck at zero rather than as
+     * flakiness.
+     *
+     * <p>Read through the API rather than the voting service's database, unlike
+     * {@link #theVoteEventReachesTheProjectionThroughKafka()}: a count of 1 is a claim about
+     * the whole read path, and it cannot be confused with a missing row the way a zero can.
      */
     @Test
     @Order(3)
-    void theWriteModelHoldsTheVoteRegardlessOfHowTheProjectionRaceGoes() throws Exception {
+    void theProjectionEndsUpAgreeingWithTheWriteModel() throws Exception {
         assertThat(voteRowsFor(alertId))
             .as("the vote itself — committed, and what the caller's own response was read from")
             .isEqualTo(1);
 
+        await().atMost(Duration.ofSeconds(60))
+            .pollInterval(Duration.ofSeconds(1))
+            .untilAsserted(() -> assertThat(confirmationsFromTheApi())
+                .as("the projection, recomputed from a write model that already held the vote")
+                .isEqualTo(1));
+    }
+
+    private int confirmationsFromTheApi() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/alerts/{id}/votes/stats", alertId)
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andReturn();
 
-        // Recorded, not asserted: 0 and 1 are both reachable today, which is the point.
         JsonNode stats = objectMapper.readTree(result.getResponse().getContentAsString());
-        System.out.println("projection confirmations after the vote (0 or 1, racy by design): "
-                           + stats.get("confirmations").asInt());
+        return stats.get("confirmations").asInt();
     }
 
     /** Casting the same vote twice is a conflict there, and must arrive here as 409, not 503. */

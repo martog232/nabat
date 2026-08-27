@@ -275,11 +275,18 @@ Both are keyed by alert id so events for one alert keep their order. Replica cou
 configurable via `NABAT_KAFKA_TOPIC_REPLICAS` and defaults to 1, matching the
 single-broker clusters used in docker-compose and the Helm chart.
 
-The publish is a dual write: the database transaction and the Kafka send are not
-atomic, so a crash between commit and send loses the event. Send failures are logged
-loudly, and the projection can be rebuilt from the write model at any time via
-`POST /api/v1/admin/credibility/rebuild` (ADMIN only). A transactional outbox is the
-proper fix and is not yet implemented.
+Neither is published from the transaction that writes the vote. nabat-voting writes the
+event to its `outbox_event` table in that transaction and its `OutboxRelay` sends the
+committed rows afterwards, so an event cannot describe a vote that is not there, and a
+crash before the send does not lose it. That replaced a dual write whose second failure
+mode was the damaging one: a send that overtook its own commit made the consumer
+recompute the projection from a write model without the vote in it, and store zeros
+permanently.
+
+Delivery is at-least-once — the send and the row's `published_at` update are not atomic —
+which is safe because the consumer recomputes rather than applying deltas. The projection
+can still be rebuilt from the write model at any time via
+`POST /api/v1/admin/credibility/rebuild` (ADMIN only).
 
 ## Debugging
 
