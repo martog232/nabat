@@ -164,7 +164,7 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
             .withEnv("SCHEMA_REGISTRY_LISTENERS", "http://0.0.0.0:8085")
             .withEnv("SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS", "PLAINTEXT://kafka:9092")
             .withEnv("SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR", "1")
-            .withEnv("SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL", "backward")
+            .withEnv("SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL", "backward_transitive")
             .withExposedPorts(8085)
             .waitingFor(Wait.forHttp("/subjects")
                             .forPort(8085)

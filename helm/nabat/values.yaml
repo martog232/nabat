@@ -196,9 +196,9 @@ kafka:
 # serialise a vote event and nabat-app cannot read one.
 schemaRegistry:
   image: confluentinc/cp-schema-registry:8.0.0
-  # A new schema must be able to read old data. See the comment in the template for why that
-  # is the direction this system needs.
-  compatibility: backward
+  # A new schema must read data written by every published version, not just the previous
+  # one. See the template for why replaying the topic makes that the requirement.
+  compatibility: backward_transitive
 
 votingApp:
   # Pinned deliberately and changed on purpose. deploy.yml used to override this with

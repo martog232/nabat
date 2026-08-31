@@ -31,9 +31,9 @@ spec:
         # else on this one-broker cluster.
         - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR
           value: "1"
-        # BACKWARD: a new schema must read data written with the old one. That is the
-        # direction this system needs — nabat-app replays vote.changed from the beginning to
-        # rebuild its counts, so it meets messages written by older producers by design.
+        # BACKWARD_TRANSITIVE: a new schema must read data written by *every* published
+        # version, not just the previous one — nabat-app replays vote.changed from the
+        # beginning to rebuild its counts, so the oldest message on it is still one it reads.
         - name: SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL
           value: {{ .Values.schemaRegistry.compatibility | quote }}
         ports:

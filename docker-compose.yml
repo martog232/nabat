@@ -372,10 +372,10 @@ services:
       # The registry keeps its schemas in a Kafka topic, single-replica like everything else
       # on a one-broker cluster.
       SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: "1"
-      # BACKWARD: a new schema must read data written with the old one. That is the direction
-      # this system needs, because nabat-app replays the topic from the start to rebuild its
-      # counts and therefore meets old messages by design.
-      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: backward
+      # BACKWARD_TRANSITIVE: a new schema must read data written by *every* published version,
+      # not just the previous one. nabat-app replays this topic from the beginning to rebuild
+      # its counts, so the oldest message on it is still one it will read.
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: backward_transitive
     restart: unless-stopped
 
   # Its own database, not a second schema in nabat-app's. Owning its data is most of the
