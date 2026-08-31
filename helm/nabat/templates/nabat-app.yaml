@@ -92,6 +92,8 @@ spec:
           value: "true"
         - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
           value: {{ include "nabat.fullname" . }}-kafka:9092
+        - name: NABAT_SCHEMA_REGISTRY_URL
+          value: http://{{ include "nabat.fullname" . }}-schema-registry:8085
         # JSON logs so Promtail ships structured fields to Loki and traceId is queryable
         # in Grafana instead of being text inside a message.
         - name: NABAT_LOG_FORMAT

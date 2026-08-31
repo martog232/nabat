@@ -149,6 +149,7 @@ services:
       # by itself.
       NABAT_KAFKA_ENABLED: ${NABAT_KAFKA_ENABLED:-false}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      NABAT_SCHEMA_REGISTRY_URL: http://schema-registry:8085
     ports:
       # Published for direct access during development and for Prometheus. Browser traffic
       # should go through Kong on :8000 so local behaviour matches deployed behaviour.
@@ -345,6 +346,38 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Holds the Avro schema for vote.changed and refuses a version that would break the
+  # consumers already reading it. Part of the profile rather than the default stack because
+  # it is only useful alongside Kafka — but within the profile it is not optional: a vote
+  # cannot be serialised without a schema id, and an id cannot be resolved without this.
+  schema-registry:
+    profiles: [voting]
+    image: confluentinc/cp-schema-registry:8.0.0
+    container_name: nabat-schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8085/subjects || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    ports:
+      - "8085:8085"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8085
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      # The registry keeps its schemas in a Kafka topic, single-replica like everything else
+      # on a one-broker cluster.
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: "1"
+      # BACKWARD_TRANSITIVE: a new schema must read data written by *every* published version,
+      # not just the previous one. nabat-app replays this topic from the beginning to rebuild
+      # its counts, so the oldest message on it is still one it will read.
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: backward_transitive
+    restart: unless-stopped
+
   # Its own database, not a second schema in nabat-app's. Owning its data is most of the
   # reason the service exists; a shared database would make this a distributed monolith,
   # which is the first entry in the anti-pattern table in TARGET_ARCHITECTURE.md.
@@ -394,6 +427,7 @@ services:
       SPRING_DATASOURCE_USERNAME: nabat_voting_user
       SPRING_DATASOURCE_PASSWORD: nabat_voting_password
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      NABAT_SCHEMA_REGISTRY_URL: http://schema-registry:8085
       SERVER_PORT: 8081
       # The same value nabat-app signs with. nabat-voting verifies the caller's forwarded
       # access token and derives the voter from its userId claim, so a different secret

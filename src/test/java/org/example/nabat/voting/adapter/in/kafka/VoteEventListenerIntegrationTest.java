@@ -1,7 +1,14 @@
 package org.example.nabat.voting.adapter.in.kafka;
 
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.example.nabat.PostgresTestSupport;
+import org.example.nabat.events.vote.VoteChangeType;
+import org.example.nabat.events.vote.VoteChanged;
+import org.example.nabat.events.vote.VoteKind;
+import org.example.nabat.events.vote.VoteTallies;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.domain.Alert;
@@ -10,6 +17,7 @@ import org.example.nabat.testsupport.Fixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -19,6 +27,9 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,12 +38,14 @@ import static org.awaitility.Awaitility.await;
 /**
  * The vote counts on an alert, written by an event rather than by the request that caused it.
  *
- * <p>The JSON below is written by hand on purpose. It is nabat-voting's schema, from a
- * separate repository and a separate build, so the contract between the two is a shape agreed
- * in prose — not a shared class that a rename would quietly keep in step. Pinning it here
- * means a producer-side rename fails on this side as well, which is where it would otherwise
- * be discovered in production. That the real producer still emits this shape is what
- * {@code VotingServiceIntegrationTest} checks, by running the actual service.
+ * <p>The messages here are built from the same schema nabat-voting publishes with —
+ * {@code src/main/avro/VoteChanged.avsc}, a verbatim copy of the file in that repository —
+ * and serialised the same way, schema id and all. The test used to write the JSON by hand
+ * because the shape was an agreement in prose; it is a file now, and a rename on either side
+ * fails at the registry rather than in production.
+ *
+ * <p>What this cannot check is that the two copies of that file are still the same. That is
+ * {@code VotingServiceIntegrationTest}, which runs the real service against a real registry.
  */
 @SpringBootTest(properties = "nabat.kafka.enabled=true")
 @EmbeddedKafka(
@@ -52,15 +65,21 @@ class VoteEventListenerIntegrationTest extends PostgresTestSupport {
     @Autowired
     private EmbeddedKafkaBroker broker;
 
-    private KafkaTemplate<String, String> producer;
+    @Value("${nabat.schema-registry.url}")
+    private String schemaRegistryUrl;
+
+    private KafkaTemplate<String, VoteChanged> producer;
     private AlertId alertId;
 
     @BeforeEach
     void setUp() {
-        // A string producer, because that is what the outbox relay is: it ships the JSON it
-        // stored, with no type headers for the consumer to lean on.
-        producer = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(
-                KafkaTestUtils.producerProps(broker), new StringSerializer(), new StringSerializer()));
+        Map<String, Object> properties = new HashMap<>(KafkaTestUtils.producerProps(broker));
+        properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);
+        // The same in-memory registry the application context resolves ids against, so the
+        // id this producer writes is one the listener can look up.
+        properties.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+        producer = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(properties));
 
         UUID owner = userRepository.save(
                 Fixtures.user("vote-events-" + UUID.randomUUID() + "@example.com")).id().value();
@@ -68,24 +87,51 @@ class VoteEventListenerIntegrationTest extends PostgresTestSupport {
         alertRepository.save(Fixtures.alert(alertId, owner));
     }
 
+    private void send(VoteChanged message) {
+        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, message.getAlertId(), message);
+    }
+
+    private VoteChanged cast(VoteKind voteType, int upvotes, int downvotes, int confirmations, int score) {
+        return VoteChanged.newBuilder()
+                .setChangeType(VoteChangeType.CAST)
+                .setVoteId(UUID.randomUUID().toString())
+                .setAlertId(alertId.value().toString())
+                .setVoterId(UUID.randomUUID().toString())
+                .setVoteType(voteType)
+                .setOccurredAt(Instant.now())
+                .setTallies(tallies(upvotes, downvotes, confirmations, score))
+                .build();
+    }
+
+    private VoteChanged retraction(int upvotes, int downvotes, int confirmations, int score) {
+        return VoteChanged.newBuilder()
+                .setChangeType(VoteChangeType.REMOVED)
+                .setAlertId(alertId.value().toString())
+                .setVoterId(UUID.randomUUID().toString())
+                .setOccurredAt(Instant.now())
+                .setTallies(tallies(upvotes, downvotes, confirmations, score))
+                .build();
+    }
+
+    private static VoteTallies tallies(int upvotes, int downvotes, int confirmations, int score) {
+        return VoteTallies.newBuilder()
+                .setUpvotes(upvotes)
+                .setDownvotes(downvotes)
+                .setConfirmations(confirmations)
+                .setCredibilityScore(score)
+                .build();
+    }
+
     @Test
     void aCastWritesTheCountsOntoTheAlert() {
-        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
-            {"changeType":"CAST",
-             "voteId":"%s",
-             "alertId":"%s",
-             "voterId":"%s",
-             "voteType":"CONFIRM",
-             "occurredAt":"2026-08-31T10:00:00Z",
-             "tallies":{"upvotes":3,"downvotes":1,"confirmations":2,"credibilityScore":6}}"""
-            .formatted(UUID.randomUUID(), alertId.value(), UUID.randomUUID()));
+        send(cast(VoteKind.CONFIRM, 3, 1, 2, 6));
 
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
             Alert alert = alertRepository.findById(alertId).orElseThrow();
             assertThat(alert.upvoteCount()).isEqualTo(3);
             assertThat(alert.downvoteCount()).isEqualTo(1);
             assertThat(alert.confirmationCount()).isEqualTo(2);
-            // Carried by the event, not recomputed here: the formula lives in nabat-voting.
+            // Carried by the message, not recomputed here: the formula lives in nabat-voting.
             assertThat(alert.credibilityScore()).isEqualTo(6);
         });
     }
@@ -93,15 +139,7 @@ class VoteEventListenerIntegrationTest extends PostgresTestSupport {
     /** A retraction has no vote and no vote type, and is otherwise the same message. */
     @Test
     void aRetractionWritesTheCountsThatAreLeft() {
-        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
-            {"changeType":"REMOVED",
-             "voteId":null,
-             "alertId":"%s",
-             "voterId":"%s",
-             "voteType":null,
-             "occurredAt":"2026-08-31T10:05:00Z",
-             "tallies":{"upvotes":1,"downvotes":0,"confirmations":0,"credibilityScore":1}}"""
-            .formatted(alertId.value(), UUID.randomUUID()));
+        send(retraction(1, 0, 0, 1));
 
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
             Alert alert = alertRepository.findById(alertId).orElseThrow();
@@ -126,50 +164,13 @@ class VoteEventListenerIntegrationTest extends PostgresTestSupport {
     void aRetractionAfterACastLeavesTheRetractionsCounts() {
         alertRepository.applyVoteCounts(alertId, 9, 9, 9, 9);
 
-        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
-            {"changeType":"CAST","voteId":"%s","alertId":"%s","voterId":"%s","voteType":"UPVOTE",
-             "occurredAt":"2026-08-31T11:00:00Z",
-             "tallies":{"upvotes":1,"downvotes":0,"confirmations":0,"credibilityScore":1}}"""
-            .formatted(UUID.randomUUID(), alertId.value(), UUID.randomUUID()));
-
-        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
-            {"changeType":"REMOVED","voteId":null,"alertId":"%s","voterId":"%s","voteType":null,
-             "occurredAt":"2026-08-31T11:00:01Z",
-             "tallies":{"upvotes":0,"downvotes":0,"confirmations":0,"credibilityScore":0}}"""
-            .formatted(alertId.value(), UUID.randomUUID()));
+        send(cast(VoteKind.UPVOTE, 1, 0, 0, 1));
+        send(retraction(0, 0, 0, 0));
 
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
             Alert alert = alertRepository.findById(alertId).orElseThrow();
             assertThat(alert.upvoteCount()).isZero();
             assertThat(alert.credibilityScore()).isZero();
         });
-    }
-
-    /**
-     * An event from a producer that predates the tallies leaves the counts alone.
-     *
-     * <p>The alternative — reading absent counts as zeros — would write the wrong numbers and
-     * keep them until the next vote on that alert, which is exactly the failure this whole
-     * change removed elsewhere.
-     */
-    @Test
-    void anEventWithoutTalliesIsSkippedRatherThanTreatedAsZeros() throws Exception {
-        alertRepository.applyVoteCounts(alertId, 7, 0, 0, 7);
-
-        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
-            {"changeType":"CAST","voteId":"%s","alertId":"%s","voterId":"%s","voteType":"UPVOTE",
-             "occurredAt":"2026-08-31T10:10:00Z"}"""
-            .formatted(UUID.randomUUID(), alertId.value(), UUID.randomUUID()));
-
-        // Then one that does carry them, on the same key and so the same partition: once its
-        // counts are visible, the one before it has certainly been consumed.
-        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
-            {"changeType":"CAST","voteId":"%s","alertId":"%s","voterId":"%s","voteType":"UPVOTE",
-             "occurredAt":"2026-08-31T10:11:00Z",
-             "tallies":{"upvotes":8,"downvotes":0,"confirmations":0,"credibilityScore":8}}"""
-            .formatted(UUID.randomUUID(), alertId.value(), UUID.randomUUID()));
-
-        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-            assertThat(alertRepository.findById(alertId).orElseThrow().upvoteCount()).isEqualTo(8));
     }
 }
