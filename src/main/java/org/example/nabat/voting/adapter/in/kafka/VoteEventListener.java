@@ -19,18 +19,13 @@ import java.util.UUID;
  * vote was accepted — but the *consequence* of the vote on this side no longer rides on that
  * response.
  *
- * <p>Both topics are handled the same way, because both say what the counts became. Absolute
- * values, so a redelivery is the same write; per-alert order, because the alert id is the
- * message key.
- *
- * <p><b>Known gap: order holds within a topic, not across the two.</b> A vote and its
- * retraction go to different topics with their own listener containers, so a voter who
- * unvotes immediately can have the removal applied before the cast — leaving counts one vote
- * too high until the next event for that alert. nabat-voting's own consumer is immune
- * because it recomputes from the write model rather than applying what it is told; this one
- * cannot, not owning that model. The fix is a watermark: carry the event's timestamp, keep
- * the last applied one on the alert, and ignore anything older. It is not here yet — see the
- * gap table in AGENTS.md.
+ * <p>Casts and retractions arrive on one topic, keyed by alert, and this listener treats them
+ * alike: both say what the counts became. That gives the two properties it depends on —
+ * absolute values, so a redelivery is the same write, and one partition per alert, so a vote
+ * and an immediate retraction cannot be applied in the wrong order. They were two topics
+ * once, which gave the second property to nobody: two containers polled them independently,
+ * and a consumer that applies the counts it is told (this one does; nabat-voting's own
+ * recomputes instead) could end up one vote off until the next event for that alert.
  *
  * <p>Inactive unless {@code nabat.kafka.enabled} is set. Where there is no broker there is no
  * nabat-voting either — it cannot start without one — so there are no votes to project, and
@@ -42,29 +37,19 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VoteEventListener {
 
-    static final String VOTE_CAST_TOPIC = "vote.cast";
-    static final String VOTE_REMOVED_TOPIC = "vote.removed";
+    static final String VOTE_CHANGED_TOPIC = "vote.changed";
 
     private static final Logger log = LoggerFactory.getLogger(VoteEventListener.class);
 
     private final ApplyVoteTalliesUseCase applyVoteTallies;
 
     @KafkaListener(
-        topics = VOTE_CAST_TOPIC,
+        topics = VOTE_CHANGED_TOPIC,
         groupId = "${spring.kafka.consumer.group-id}",
         containerFactory = "voteEventListenerContainerFactory"
     )
-    public void onVoteCast(VoteTalliesMessage message) {
-        apply(VOTE_CAST_TOPIC, message);
-    }
-
-    @KafkaListener(
-        topics = VOTE_REMOVED_TOPIC,
-        groupId = "${spring.kafka.consumer.group-id}",
-        containerFactory = "voteEventListenerContainerFactory"
-    )
-    public void onVoteRemoved(VoteTalliesMessage message) {
-        apply(VOTE_REMOVED_TOPIC, message);
+    public void onVoteChanged(VoteTalliesMessage message) {
+        apply(VOTE_CHANGED_TOPIC, message);
     }
 
     private void apply(String topic, VoteTalliesMessage message) {

@@ -5,10 +5,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 /**
  * The parts of a vote event this service consumes: which alert, and what its counts became.
  *
- * <p>One type for both {@code vote.cast} and {@code vote.removed}. They are different events
- * — one names a vote and a voter, the other does not — but the fields that matter here are
- * the same two, and a projection that writes absolute tallies does not care which of them
- * produced the number.
+ * <p>Two fields out of seven. nabat-voting's {@code vote.changed} messages also carry the
+ * change type, the vote, the voter and when it happened; a projection that writes absolute
+ * tallies needs none of it, and every field named here is one this service would have to keep
+ * in step with a schema it does not own.
  *
  * <p>Unknown fields are ignored deliberately rather than by default. nabat-voting owns this
  * schema and may add to it; a consumer that fails on a field it was not told about turns

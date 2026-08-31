@@ -46,11 +46,11 @@
 │   │External  │  │  │  │ PostgresVoteRepo  │    │
 │   │VoteService│  │  │  │ (own DB :5434)   │    │
 │   │          │  │  │  └──────────────────┘    │
-│   │ syncProject│  │  │            │               │
-│   │ notifyOwner│  │  │            ▼               │
+│   │ notifyOwner│  │  │            │               │
+│   │ receipt   │  │  │            ▼               │
 │   └──────────┘  │  │  ┌──────────────────┐    │
-│                 │  │  │ KafkaVoteEventPub │    │
-│   ┌──────────┐  │  │  │ topic: vote.cast │    │
+│                 │  │  │ OutboxRelay      │    │
+│   ┌──────────┐  │  │  │ topic:vote.changed│    │
 │   │ AlertRepo│  │  │  └────────┬─────────┘    │
 │   │ (own DB  │  │  │           │               │
 │   │  :5433)  │  │  │           ▼               │
@@ -132,7 +132,7 @@ Browser → POST /api/v1/alerts/{id}/votes ──► nabat-app AlertVoteControll
                                                   │                  │
                                                   │                  └──► outbox row, same transaction
                                                   │                          └──► OutboxRelay, after commit
-                                                  │                                  └──► topic: vote.cast
+                                                  │                                  └──► topic: vote.changed
                                                   │                                       (with the tallies)
                                                   │
                                                   └──► notifyAlertOwner()
@@ -142,13 +142,15 @@ Browser → POST /api/v1/alerts/{id}/votes ──► nabat-app AlertVoteControll
 
   ...and separately, off the topic rather than off the request:
 
-vote.cast / vote.removed ──► nabat-app VoteEventListener
-                                  │
-                                  ▼
-                             VoteTalliesProjectionService
-                                  ├──► alertRepository.applyVoteCounts()
-                                  │       absolute values, so a redelivery is the same write
-                                  └──► broadcastAlertUpdate()
+vote.changed (keyed by alert) ──► nabat-app VoteEventListener
+                                       │
+                                       ▼
+                                  VoteTalliesProjectionService
+                                       ├──► alertRepository.applyVoteCounts()
+                                       │       absolute values, so a redelivery is the
+                                       │       same write; one partition per alert, so
+                                       │       an unvote cannot precede its vote
+                                       └──► broadcastAlertUpdate()
 ```
 
 ### 3. Nearby alerts (read-heavy)
@@ -225,7 +227,7 @@ Browser → GET /api/v1/alerts/nearby?lat=...&lng=...&radius=...
 
 - `alerts` has denormalized vote-count columns (`upvote_count`, `downvote_count`,
   `confirmation_count`, `credibility_score`) written by `VoteEventListener` from the tallies
-  on `vote.cast` / `vote.removed`, not by the request that cast the vote. The caller still
+  on `vote.changed`, not by the request that cast the vote. The caller still
   gets fresh numbers in the vote's own response; this copy is a Kafka round trip behind, and
   in exchange it survives nabat-app dying between the remote vote and the local write.
   `credibility_score` has exactly one author — the voting service — and is carried through
@@ -271,12 +273,18 @@ limits: a baseline on the service, and a tighter one on a dedicated route matchi
 
 ## Kafka topics
 
-| Topic          | Publisher    | Consumer     | Purpose |
-|----------------|--------------|--------------|---------|
-| `vote.cast`    | nabat-voting | nabat-voting | Credibility projection recalculation |
-| `vote.removed` | nabat-voting | nabat-voting | Same, on vote removal |
+| Topic          | Publisher    | Consumers                 | Purpose |
+|----------------|--------------|---------------------------|---------|
+| `vote.changed` | nabat-voting | nabat-voting, nabat-app   | Credibility projection recalculation there; the denormalised counts on `alerts` here |
 
-Both are keyed by alert id so events for one alert keep their order. Replica count is
+Keyed by alert id, which is what keeps everything said about one alert in one partition and
+therefore in order. That is why there is one topic and not two: casts and retractions used to
+have a topic each, and nothing ordered them relative to each other, so an immediate unvote
+could be applied before the vote it retracts. nabat-voting never noticed — it recomputes from
+its own write model — but nabat-app applies the counts it is told and would have held the
+wrong ones until the next vote on that alert.
+
+Each service consumes with its own group, so both receive every message. Replica count is
 configurable via `NABAT_KAFKA_TOPIC_REPLICAS` and defaults to 1, matching the
 single-broker clusters used in docker-compose and the Helm chart.
 
