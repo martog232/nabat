@@ -37,7 +37,7 @@ import static org.awaitility.Awaitility.await;
 @SpringBootTest(properties = "nabat.kafka.enabled=true")
 @EmbeddedKafka(
         partitions = 1,
-        topics = {VoteEventListener.VOTE_CAST_TOPIC, VoteEventListener.VOTE_REMOVED_TOPIC},
+        topics = {VoteEventListener.VOTE_CHANGED_TOPIC},
         bootstrapServersProperty = "spring.kafka.bootstrap-servers"
 )
 @DirtiesContext
@@ -69,13 +69,14 @@ class VoteEventListenerIntegrationTest extends PostgresTestSupport {
     }
 
     @Test
-    void aCastEventWritesTheCountsOntoTheAlert() {
-        producer.send(VoteEventListener.VOTE_CAST_TOPIC, alertId.value().toString(), """
-            {"voteId":"%s",
+    void aCastWritesTheCountsOntoTheAlert() {
+        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
+            {"changeType":"CAST",
+             "voteId":"%s",
              "alertId":"%s",
              "voterId":"%s",
              "voteType":"CONFIRM",
-             "castAt":"2026-08-27T10:00:00Z",
+             "occurredAt":"2026-08-31T10:00:00Z",
              "tallies":{"upvotes":3,"downvotes":1,"confirmations":2,"credibilityScore":6}}"""
             .formatted(UUID.randomUUID(), alertId.value(), UUID.randomUUID()));
 
@@ -89,12 +90,16 @@ class VoteEventListenerIntegrationTest extends PostgresTestSupport {
         });
     }
 
+    /** A retraction has no vote and no vote type, and is otherwise the same message. */
     @Test
-    void aRemovalEventWritesTheCountsThatAreLeft() {
-        producer.send(VoteEventListener.VOTE_REMOVED_TOPIC, alertId.value().toString(), """
-            {"alertId":"%s",
+    void aRetractionWritesTheCountsThatAreLeft() {
+        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
+            {"changeType":"REMOVED",
+             "voteId":null,
+             "alertId":"%s",
              "voterId":"%s",
-             "removedAt":"2026-08-27T10:05:00Z",
+             "voteType":null,
+             "occurredAt":"2026-08-31T10:05:00Z",
              "tallies":{"upvotes":1,"downvotes":0,"confirmations":0,"credibilityScore":1}}"""
             .formatted(alertId.value(), UUID.randomUUID()));
 
@@ -102,6 +107,41 @@ class VoteEventListenerIntegrationTest extends PostgresTestSupport {
             Alert alert = alertRepository.findById(alertId).orElseThrow();
             assertThat(alert.upvoteCount()).isEqualTo(1);
             assertThat(alert.credibilityScore()).isEqualTo(1);
+        });
+    }
+
+    /**
+     * A vote and an immediate retraction, in that order, end at the retraction's counts.
+     *
+     * <p>This is the assertion two topics could not support. Same key means one partition,
+     * which means these are applied in the order they were sent; with a topic each, two
+     * listener containers polled independently and the cast could be applied second, leaving
+     * the alert one vote high until the next event for it. Nothing was wrong with either
+     * message — only with the order, and nothing ordered them.
+     *
+     * <p>The alert is seeded with counts that neither message carries, so reaching the
+     * retraction's numbers cannot be an accident of where it started.
+     */
+    @Test
+    void aRetractionAfterACastLeavesTheRetractionsCounts() {
+        alertRepository.applyVoteCounts(alertId, 9, 9, 9, 9);
+
+        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
+            {"changeType":"CAST","voteId":"%s","alertId":"%s","voterId":"%s","voteType":"UPVOTE",
+             "occurredAt":"2026-08-31T11:00:00Z",
+             "tallies":{"upvotes":1,"downvotes":0,"confirmations":0,"credibilityScore":1}}"""
+            .formatted(UUID.randomUUID(), alertId.value(), UUID.randomUUID()));
+
+        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
+            {"changeType":"REMOVED","voteId":null,"alertId":"%s","voterId":"%s","voteType":null,
+             "occurredAt":"2026-08-31T11:00:01Z",
+             "tallies":{"upvotes":0,"downvotes":0,"confirmations":0,"credibilityScore":0}}"""
+            .formatted(alertId.value(), UUID.randomUUID()));
+
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            Alert alert = alertRepository.findById(alertId).orElseThrow();
+            assertThat(alert.upvoteCount()).isZero();
+            assertThat(alert.credibilityScore()).isZero();
         });
     }
 
@@ -116,16 +156,16 @@ class VoteEventListenerIntegrationTest extends PostgresTestSupport {
     void anEventWithoutTalliesIsSkippedRatherThanTreatedAsZeros() throws Exception {
         alertRepository.applyVoteCounts(alertId, 7, 0, 0, 7);
 
-        producer.send(VoteEventListener.VOTE_CAST_TOPIC, alertId.value().toString(), """
-            {"voteId":"%s","alertId":"%s","voterId":"%s","voteType":"UPVOTE",
-             "castAt":"2026-08-27T10:10:00Z"}"""
+        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
+            {"changeType":"CAST","voteId":"%s","alertId":"%s","voterId":"%s","voteType":"UPVOTE",
+             "occurredAt":"2026-08-31T10:10:00Z"}"""
             .formatted(UUID.randomUUID(), alertId.value(), UUID.randomUUID()));
 
-        // Then one that does carry them, to the same partition: once its counts are visible,
-        // the one before it has certainly been consumed.
-        producer.send(VoteEventListener.VOTE_CAST_TOPIC, alertId.value().toString(), """
-            {"voteId":"%s","alertId":"%s","voterId":"%s","voteType":"UPVOTE",
-             "castAt":"2026-08-27T10:11:00Z",
+        // Then one that does carry them, on the same key and so the same partition: once its
+        // counts are visible, the one before it has certainly been consumed.
+        producer.send(VoteEventListener.VOTE_CHANGED_TOPIC, alertId.value().toString(), """
+            {"changeType":"CAST","voteId":"%s","alertId":"%s","voterId":"%s","voteType":"UPVOTE",
+             "occurredAt":"2026-08-31T10:11:00Z",
              "tallies":{"upvotes":8,"downvotes":0,"confirmations":0,"credibilityScore":8}}"""
             .formatted(UUID.randomUUID(), alertId.value(), UUID.randomUUID()));
 
