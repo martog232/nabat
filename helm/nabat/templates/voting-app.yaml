@@ -52,6 +52,8 @@ spec:
           value: {{ .Values.votingPostgres.password }}
         - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
           value: {{ include "nabat.fullname" . }}-kafka:9092
+        - name: NABAT_SCHEMA_REGISTRY_URL
+          value: http://{{ include "nabat.fullname" . }}-schema-registry:8085
         - name: SERVER_PORT
           value: "{{ .Values.votingApp.port }}"
         - name: SPRING_JPA_HIBERNATE_DDL_AUTO

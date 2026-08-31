@@ -1,8 +1,11 @@
 package org.example.nabat.voting.adapter.in.kafka;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.example.nabat.events.vote.VoteChanged;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +18,6 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
@@ -25,6 +27,12 @@ import java.util.Map;
  * The consumer side of nabat-app. There is no producer: this service publishes its own events
  * in-process through the Event Publication Registry, and the only thing it takes off a broker
  * is what nabat-voting says about vote counts.
+ *
+ * <p>Values are Avro with a schema id in front of them. The id is resolved through the schema
+ * registry into {@link VoteChanged}, generated from {@code src/main/avro/VoteChanged.avsc} —
+ * a verbatim copy of nabat-voting's. Nothing here parses field names: if the two copies ever
+ * diverge incompatibly, the registry refuses the producer's schema rather than letting this
+ * side quietly read the wrong thing.
  *
  * <p>Absent entirely unless {@code nabat.kafka.enabled} is set — see {@link VoteEventListener}
  * for why that is a property of the topology rather than a feature switch.
@@ -41,40 +49,43 @@ public class VoteEventKafkaConfig {
      *                        alert, so replaying the topic from the start converges on the
      *                        latest value for every alert — a new deployment rebuilds its
      *                        projection instead of waiting for the next vote on each alert.
+     *                        It is also why the schema's compatibility level is BACKWARD: a
+     *                        replay means reading messages written by older producers.
      */
     @Bean
-    public ConsumerFactory<String, VoteTalliesMessage> voteEventConsumerFactory(
-            ObjectMapper objectMapper,
+    public ConsumerFactory<String, VoteChanged> voteEventConsumerFactory(
             @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
             @Value("${spring.kafka.consumer.group-id}") String groupId,
-            @Value("${spring.kafka.consumer.auto-offset-reset:earliest}") String autoOffsetReset) {
+            @Value("${spring.kafka.consumer.auto-offset-reset:earliest}") String autoOffsetReset,
+            @Value("${nabat.schema-registry.url}") String schemaRegistryUrl) {
 
         Map<String, Object> properties = new HashMap<>();
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
+        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
 
-        // The producer sends plain JSON with no type headers — the outbox relay stores the
-        // serialised form and ships it as a string — so the target type is fixed here rather
-        // than read off the record.
-        JsonDeserializer<VoteTalliesMessage> valueDeserializer =
-                new JsonDeserializer<>(VoteTalliesMessage.class, objectMapper, false);
+        // Wrapped, so that a record this service cannot read — a schema id the registry does
+        // not know, a corrupt payload — becomes a handled failure rather than an exception
+        // thrown inside the poll loop, which the container can only answer by trying the same
+        // record again forever.
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
+        properties.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, KafkaAvroDeserializer.class);
 
-        // Wrapped, so that a record this service cannot parse becomes a handled failure
-        // rather than an exception thrown inside the poll loop, which the container can only
-        // answer by trying the same record again forever.
-        return new DefaultKafkaConsumerFactory<>(
-                properties,
-                new ErrorHandlingDeserializer<>(new StringDeserializer()),
-                new ErrorHandlingDeserializer<>(valueDeserializer)
-        );
+        properties.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+        // Without this the deserialiser hands back a GenericRecord and every field access is
+        // a string lookup that the compiler cannot check — which is most of what the schema
+        // was adopted to stop.
+        properties.put(KafkaAvroDeserializerConfig.SPECIFIC_AVRO_READER_CONFIG, true);
+
+        return new DefaultKafkaConsumerFactory<>(properties);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, VoteTalliesMessage>
-            voteEventListenerContainerFactory(ConsumerFactory<String, VoteTalliesMessage> voteEventConsumerFactory) {
+    public ConcurrentKafkaListenerContainerFactory<String, VoteChanged>
+            voteEventListenerContainerFactory(ConsumerFactory<String, VoteChanged> voteEventConsumerFactory) {
 
-        ConcurrentKafkaListenerContainerFactory<String, VoteTalliesMessage> factory =
+        ConcurrentKafkaListenerContainerFactory<String, VoteChanged> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(voteEventConsumerFactory);
         factory.setCommonErrorHandler(errorHandler());

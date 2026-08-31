@@ -1,6 +1,8 @@
 package org.example.nabat.voting.adapter.in.kafka;
 
 import lombok.RequiredArgsConstructor;
+import org.example.nabat.events.vote.VoteChanged;
+import org.example.nabat.events.vote.VoteTallies;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.voting.application.port.in.ApplyVoteTalliesUseCase;
 import org.slf4j.Logger;
@@ -48,32 +50,26 @@ public class VoteEventListener {
         groupId = "${spring.kafka.consumer.group-id}",
         containerFactory = "voteEventListenerContainerFactory"
     )
-    public void onVoteChanged(VoteTalliesMessage message) {
+    public void onVoteChanged(VoteChanged message) {
         apply(VOTE_CHANGED_TOPIC, message);
     }
 
-    private void apply(String topic, VoteTalliesMessage message) {
-        AlertId alertId = parseAlertId(topic, message.alertId());
+    private void apply(String topic, VoteChanged message) {
+        AlertId alertId = parseAlertId(topic, message.getAlertId());
         if (alertId == null) {
             return;
         }
 
-        if (message.tallies() == null) {
-            // Only an event published before the tallies were added to the schema, still in
-            // nabat-voting's outbox across a deploy. Skipping loses one update, which the
-            // next vote on that alert corrects; treating absent counts as zeros would write
-            // the wrong numbers and keep them until then.
-            log.warn("Event on {} for alert {} carries no tallies; skipping", topic, alertId.value());
-            return;
-        }
-
-        VoteTalliesMessage.Tallies tallies = message.tallies();
+        // No check that the tallies are there: the schema makes them a required field, so a
+        // message without them cannot be written, let alone read. That guard used to exist
+        // and was doing the schema's job by hand.
+        VoteTallies tallies = message.getTallies();
         applyVoteTallies.applyTallies(new ApplyVoteTalliesUseCase.VoteTalliesUpdate(
                 alertId,
-                tallies.upvotes(),
-                tallies.downvotes(),
-                tallies.confirmations(),
-                tallies.credibilityScore()
+                tallies.getUpvotes(),
+                tallies.getDownvotes(),
+                tallies.getConfirmations(),
+                tallies.getCredibilityScore()
         ));
     }
 

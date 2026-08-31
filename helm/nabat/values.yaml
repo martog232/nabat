@@ -192,6 +192,14 @@ kafka:
   nodeId: "1"
   clusterId: "DWKW8vl4RI6tPZGCbhhHVg"
 
+# Holds the Avro schema for vote.changed. Not optional: without it nabat-voting cannot
+# serialise a vote event and nabat-app cannot read one.
+schemaRegistry:
+  image: confluentinc/cp-schema-registry:8.0.0
+  # A new schema must be able to read old data. See the comment in the template for why that
+  # is the direction this system needs.
+  compatibility: backward
+
 votingApp:
   # Pinned deliberately and changed on purpose. deploy.yml used to override this with
   # nabat-app's own commit SHA, which named no nabat-voting build that had ever existed. This

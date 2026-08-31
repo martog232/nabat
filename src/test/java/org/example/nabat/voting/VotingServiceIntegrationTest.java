@@ -23,6 +23,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.ImagePullPolicy;
 import org.testcontainers.images.PullPolicy;
 import org.testcontainers.utility.DockerImageName;
 
@@ -50,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Spring Boot 4 moved Flyway's autoconfiguration into its own module, so no migration ran —
  * and every suite stayed green throughout, because a mock does not need a schema.
  *
- * <p>Three containers on a shared network, plus the two {@link PostgresTestSupport} already
+ * <p>Four containers on a shared network, plus the two {@link PostgresTestSupport} already
  * starts. This is the most expensive test in the repository and it earns that by covering
  * what nothing else can:
  *
@@ -149,20 +150,37 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
             .waitingFor(Wait.forLogMessage(".*Kafka Server started.*", 1)
                             .withStartupTimeout(Duration.ofMinutes(3)));
 
+    /**
+     * The fifth container, and not an optional one: nabat-voting cannot serialise a vote event
+     * without a registry to give the schema an id, and this service cannot read one without a
+     * registry to resolve that id. Everywhere else in the suite a {@code mock://} url stands in
+     * for it; here the point is that the real service and the real registry agree.
+     */
+    private static final GenericContainer<?> SCHEMA_REGISTRY =
+        new GenericContainer<>(DockerImageName.parse("confluentinc/cp-schema-registry:8.0.0"))
+            .withNetwork(NETWORK)
+            .withNetworkAliases("schema-registry")
+            .withEnv("SCHEMA_REGISTRY_HOST_NAME", "schema-registry")
+            .withEnv("SCHEMA_REGISTRY_LISTENERS", "http://0.0.0.0:8085")
+            .withEnv("SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS", "PLAINTEXT://kafka:9092")
+            .withEnv("SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR", "1")
+            .withEnv("SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL", "backward")
+            .withExposedPorts(8085)
+            .waitingFor(Wait.forHttp("/subjects")
+                            .forPort(8085)
+                            .forStatusCode(200)
+                            .withStartupTimeout(Duration.ofMinutes(3)));
+
     private static final GenericContainer<?> VOTING =
         new GenericContainer<>(DockerImageName.parse(VOTING_IMAGE))
-            // Or "the published image" means "whatever :latest happened to be the last time
-            // this machine pulled". That is how this test first failed after nabat-voting
-            // changed its topic: locally green against a four-day-old copy, and the mismatch
-            // it exists to catch invisible. An hour is short enough to notice a publish and
-            // long enough not to pull on every run; CI has nothing cached either way.
-            .withImagePullPolicy(PullPolicy.ageBased(Duration.ofHours(1)))
+            .withImagePullPolicy(pullPolicy())
             .withNetwork(NETWORK)
             .withEnv("SPRING_DATASOURCE_URL",
                      "jdbc:postgresql://voting-postgres:5432/nabat_voting_db")
             .withEnv("SPRING_DATASOURCE_USERNAME", "nabat_voting_user")
             .withEnv("SPRING_DATASOURCE_PASSWORD", "nabat_voting_password")
             .withEnv("SPRING_KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+            .withEnv("NABAT_SCHEMA_REGISTRY_URL", "http://schema-registry:8085")
             .withEnv("SERVER_PORT", "8081")
             .withEnv("JWT_SECRET", JWT_SECRET)
             .withExposedPorts(8081)
@@ -176,6 +194,7 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
     static {
         VOTING_DB.start();
         KAFKA.start();
+        SCHEMA_REGISTRY.start();
         VOTING.start();
     }
 
@@ -192,6 +211,30 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
         // real service, which is the only way to find out that both sides mean the same topic.
         registry.add("nabat.kafka.enabled", () -> true);
         registry.add("spring.kafka.bootstrap-servers", () -> "localhost:" + KAFKA_EXTERNAL_PORT);
+        // The real registry rather than the mock:// the rest of the suite uses. Reading a
+        // message here means resolving the id nabat-voting wrote against the schema it
+        // registered, which is the whole point of running both.
+        registry.add("nabat.schema-registry.url",
+            () -> "http://" + SCHEMA_REGISTRY.getHost() + ":" + SCHEMA_REGISTRY.getMappedPort(8085));
+    }
+
+    /**
+     * Re-pull the published tag; never try to pull a local build.
+     *
+     * <p>Without the first half, "the published image" means "whatever this machine last
+     * pulled" — which is how this test went green against a four-day-old copy on the day
+     * nabat-voting changed its topic, hiding the very mismatch it exists to catch. An hour is
+     * short enough to notice a publish and long enough not to pull on every run; CI has
+     * nothing cached either way.
+     *
+     * <p>Without the second half, the workflow documented on this class breaks: an image built
+     * locally exists nowhere to be pulled from, and Testcontainers reports the attempt as a
+     * 404 that reads like a permissions problem. Age-based pulling applies to the default tag
+     * only, because it is the only one that can go stale behind your back.
+     */
+    private static ImagePullPolicy pullPolicy() {
+        boolean overridden = System.getProperty("nabat.voting.image") != null;
+        return overridden ? PullPolicy.defaultPolicy() : PullPolicy.ageBased(Duration.ofHours(1));
     }
 
     private static int freePort() {
