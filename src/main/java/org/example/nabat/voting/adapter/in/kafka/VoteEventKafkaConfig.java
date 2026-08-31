@@ -89,6 +89,10 @@ public class VoteEventKafkaConfig {
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(voteEventConsumerFactory);
         factory.setCommonErrorHandler(errorHandler());
+        // Not with the context. An unreachable broker makes constructing the consumer throw,
+        // which used to take the whole application down with it — see VoteEventListenerStarter,
+        // which starts this and keeps trying.
+        factory.setAutoStartup(false);
         return factory;
     }
 

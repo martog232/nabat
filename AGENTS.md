@@ -20,9 +20,12 @@ Each direct sub-package of `org.example.nabat` is a Spring Modulith module. `Mod
 | `realtime` | WebSocket transport: sessions, tickets, cross-instance relay |
 | `media` | photo upload and retrieval |
 | `shared` | value types every module needs (`Location`, `NotAuthorizedException`, `@UseCase`) plus infrastructure beans. **Depends on nothing.** |
+| `events` | the Avro event contract shared with nabat-voting, **generated** from `src/main/avro` into `org.example.nabat.events.*`. An **open** module (`@ApplicationModule(type = OPEN)`): every type is public, because the package holds nothing but generated classes whose shape another repository also owns. |
 | `platform` | app-wide composition: `GlobalExceptionHandler`, request logging, use-case metrics, async enablement. **Depended on by nothing.** |
 
-`shared` is the only sink and `platform` the only source; everything else forms a DAG between them.
+`shared` and `events` are the sinks and `platform` the only source; everything else forms a DAG between them.
+
+`events` became a module by accident — Modulith treats every direct sub-package of the root as one, and the Avro namespace lands there. It is declared rather than moved on purpose: a record's fully-qualified name is part of its Avro schema, so renaming the namespace would be an incompatible schema change made to satisfy a package convention. Do not add hand-written classes to it.
 
 ### Layers, inside every module
 
