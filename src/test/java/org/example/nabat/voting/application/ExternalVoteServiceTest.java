@@ -2,10 +2,8 @@ package org.example.nabat.voting.application;
 
 import org.example.nabat.notification.application.port.in.SendNotificationUseCase;
 import org.example.nabat.voting.application.port.in.VoteAlertUseCase;
-import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.voting.application.port.out.ExternalVotingPort;
-import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.identity.domain.UserId;
 import org.example.nabat.voting.domain.VoteType;
@@ -22,6 +20,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,8 +34,6 @@ class ExternalVoteServiceTest {
     private AlertRepository alertRepository;
     @Mock
     private SendNotificationUseCase sendNotificationUseCase;
-    @Mock
-    private AlertNotificationPort alertNotificationPort;
 
     private ExternalVoteService service;
     private AlertId alertId;
@@ -45,21 +42,20 @@ class ExternalVoteServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ExternalVoteService(
-            externalVotingPort, alertRepository, sendNotificationUseCase, alertNotificationPort);
+        service = new ExternalVoteService(externalVotingPort, alertRepository, sendNotificationUseCase);
         alertId = AlertId.generate();
         voterId = UserId.generate();
         ownerId = UserId.generate();
     }
 
     @Test
-    void vote_syncsProjectionFromTheStatsReturnedWithTheVote_andNotifiesOwner() {
+    void vote_returnsTheTalliesWithTheReceipt_andNotifiesTheOwner() {
         Instant createdAt = Instant.now();
         when(externalVotingPort.vote(alertId, voterId, VoteType.UPVOTE))
             .thenReturn(new ExternalVotingPort.VoteResult(
                 UUID.randomUUID(), alertId, VoteType.UPVOTE, createdAt,
                 new ExternalVotingPort.VoteStats(5, 2, 1, 5)));
-        when(alertRepository.applyVoteCounts(alertId, 5, 2, 1, 5))
+        when(alertRepository.findById(alertId))
             .thenReturn(Optional.of(Fixtures.alert(alertId, ownerId.value())));
 
         VoteAlertUseCase.VoteReceipt receipt =
@@ -71,12 +67,29 @@ class ExternalVoteServiceTest {
         assertEquals(5, receipt.stats().upvotes());
         assertEquals(5, receipt.stats().credibilityScore());
 
-        verify(alertRepository).applyVoteCounts(alertId, 5, 2, 1, 5);
         verify(sendNotificationUseCase).sendVoteNotification(any());
-        verify(alertNotificationPort).broadcastAlertUpdate(any(Alert.class));
         // No follow-up stats read: that endpoint is served from an eventually consistent
         // projection and would have returned the pre-vote counts.
         verify(externalVotingPort, never()).getVoteStats(any());
+    }
+
+    /**
+     * The counts on the local alert are written by the vote-event consumer now. Casting a vote
+     * must not also write them here, or the two would be racing to set the same row and the
+     * loser would be whichever event arrived first.
+     */
+    @Test
+    void vote_doesNotWriteTheCountsItself() {
+        when(externalVotingPort.vote(alertId, voterId, VoteType.UPVOTE))
+            .thenReturn(new ExternalVotingPort.VoteResult(
+                UUID.randomUUID(), alertId, VoteType.UPVOTE, Instant.now(),
+                new ExternalVotingPort.VoteStats(5, 2, 1, 5)));
+        when(alertRepository.findById(alertId))
+            .thenReturn(Optional.of(Fixtures.alert(alertId, ownerId.value())));
+
+        service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.UPVOTE));
+
+        verify(alertRepository, never()).applyVoteCounts(any(), anyInt(), anyInt(), anyInt(), anyInt());
     }
 
     @Test
@@ -85,7 +98,7 @@ class ExternalVoteServiceTest {
             .thenReturn(new ExternalVotingPort.VoteResult(
                 UUID.randomUUID(), alertId, VoteType.CONFIRM, Instant.now(),
                 new ExternalVotingPort.VoteStats(2, 1, 10, 21)));
-        when(alertRepository.applyVoteCounts(alertId, 2, 1, 10, 21))
+        when(alertRepository.findById(alertId))
             .thenReturn(Optional.of(Fixtures.alert(alertId, voterId.value())));
 
         service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.CONFIRM));
@@ -100,29 +113,26 @@ class ExternalVoteServiceTest {
             .thenReturn(new ExternalVotingPort.VoteResult(
                 UUID.randomUUID(), alertId, VoteType.UPVOTE, Instant.now(),
                 new ExternalVotingPort.VoteStats(1, 0, 0, 1)));
-        when(alertRepository.applyVoteCounts(alertId, 1, 0, 0, 1)).thenReturn(Optional.empty());
+        when(alertRepository.findById(alertId)).thenReturn(Optional.empty());
 
         VoteAlertUseCase.VoteReceipt receipt =
             service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.UPVOTE));
 
         assertEquals(1, receipt.stats().upvotes());
-        // Nothing to notify or broadcast about when the alert is gone locally.
+        // Nothing to notify about when the alert is gone locally.
         verify(sendNotificationUseCase, never()).sendVoteNotification(any());
-        verify(alertNotificationPort, never()).broadcastAlertUpdate(any());
     }
 
     @Test
-    void removeVote_syncsProjectionAndBroadcasts() {
+    void removeVote_returnsTheTalliesFromTheVotingService() {
         when(externalVotingPort.removeVote(alertId, voterId))
             .thenReturn(new ExternalVotingPort.VoteStats(3, 1, 0, 2));
-        when(alertRepository.applyVoteCounts(alertId, 3, 1, 0, 2))
-            .thenReturn(Optional.of(Fixtures.alert(alertId, ownerId.value())));
 
         VoteAlertUseCase.VoteStats stats = service.removeVote(alertId, voterId);
 
         assertEquals(3, stats.upvotes());
         assertEquals(2, stats.credibilityScore());
-        verify(alertNotificationPort).broadcastAlertUpdate(any(Alert.class));
+        verify(alertRepository, never()).applyVoteCounts(any(), anyInt(), anyInt(), anyInt(), anyInt());
     }
 
     @Test

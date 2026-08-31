@@ -130,23 +130,25 @@ Browser → POST /api/v1/alerts/{id}/votes ──► nabat-app AlertVoteControll
                                                   │                  │       └──► fresh tallies, returned
                                                   │                  │            in the response body
                                                   │                  │
-                                                  │                  └──► kafkaVoteEventPublisher
-                                                  │                          .publish()
-                                                  │                          └──► Kafka topic: vote.cast
-                                                  │                                  (updates the read-model
-                                                  │                                   asynchronously)
+                                                  │                  └──► outbox row, same transaction
+                                                  │                          └──► OutboxRelay, after commit
+                                                  │                                  └──► topic: vote.cast
+                                                  │                                       (with the tallies)
                                                   │
-                                                  ├──► syncProjection(stats from the response)
-                                                  │       └──► alertRepository.applyVoteCounts()
-                                                  │             update + reread, one short transaction,
-                                                  │             outside the HTTP call
-                                                  │
-                                                  ├──► notifyAlertOwner()
-                                                  │       └──► NotificationService
-                                                  │               ├──► persist Notification
-                                                  │               └──► WebSocket push to owner
-                                                  │
-                                                  └──► broadcastAlertUpdate()
+                                                  └──► notifyAlertOwner()
+                                                          └──► NotificationService
+                                                                  ├──► persist Notification
+                                                                  └──► WebSocket push to owner
+
+  ...and separately, off the topic rather than off the request:
+
+vote.cast / vote.removed ──► nabat-app VoteEventListener
+                                  │
+                                  ▼
+                             VoteTalliesProjectionService
+                                  ├──► alertRepository.applyVoteCounts()
+                                  │       absolute values, so a redelivery is the same write
+                                  └──► broadcastAlertUpdate()
 ```
 
 ### 3. Nearby alerts (read-heavy)
@@ -222,9 +224,12 @@ Browser → GET /api/v1/alerts/nearby?lat=...&lng=...&radius=...
 | nabat-voting | nabat_voting_db | 5434  | votes                                |
 
 - `alerts` has denormalized vote-count columns (`upvote_count`, `downvote_count`,
-  `confirmation_count`, `credibility_score`) written by `ExternalVoteService` from the
-  tallies nabat-voting returns. `credibility_score` has exactly one author — the voting
-  service — and is carried through the domain unchanged; it is never recomputed locally.
+  `confirmation_count`, `credibility_score`) written by `VoteEventListener` from the tallies
+  on `vote.cast` / `vote.removed`, not by the request that cast the vote. The caller still
+  gets fresh numbers in the vote's own response; this copy is a Kafka round trip behind, and
+  in exchange it survives nabat-app dying between the remote vote and the local write.
+  `credibility_score` has exactly one author — the voting service — and is carried through
+  the domain unchanged; it is never recomputed locally.
 - `alerts.version` provides optimistic locking, so a concurrent resolve and vote-count
   sync cannot silently overwrite each other.
 - Vote persistence is owned by `nabat-voting` only. The original `alert_votes` table in `nabat_db` was dropped by migration V7.
@@ -245,11 +250,11 @@ Helm's `.Files.Get` cannot read outside a chart directory.
 **Votes must not be routed directly to nabat-voting.** An earlier version of this
 document described a higher-priority regex route sending
 `~/api/v1/alerts/[^/]+/votes` straight to `nabat-voting-app:8081`. That would bypass
-`ExternalVoteService` entirely, and with it the denormalised vote-count sync on
-`alerts`, the owner/milestone notifications, and the `ALERT_UPDATED` WebSocket
-broadcast — so votes would land in the voting database and nothing else in the system
-would ever hear about them. Vote traffic goes to nabat-app, which calls nabat-voting
-and forwards the caller's own access token.
+`ExternalVoteService` entirely, and with it the owner and milestone notifications — and it
+would return a receipt this service knows nothing about. The counts themselves would
+survive, now that they arrive on the topic, which makes the bypass more tempting and no
+less wrong. Vote traffic goes to nabat-app, which calls nabat-voting and forwards the
+caller's own access token.
 
 Rate limiting and brute-force protection are Kong's responsibility. nabat-app's
 `LoginAttemptTracker` only observes and logs failed logins; it does not block.
@@ -275,11 +280,18 @@ Both are keyed by alert id so events for one alert keep their order. Replica cou
 configurable via `NABAT_KAFKA_TOPIC_REPLICAS` and defaults to 1, matching the
 single-broker clusters used in docker-compose and the Helm chart.
 
-The publish is a dual write: the database transaction and the Kafka send are not
-atomic, so a crash between commit and send loses the event. Send failures are logged
-loudly, and the projection can be rebuilt from the write model at any time via
-`POST /api/v1/admin/credibility/rebuild` (ADMIN only). A transactional outbox is the
-proper fix and is not yet implemented.
+Neither is published from the transaction that writes the vote. nabat-voting writes the
+event to its `outbox_event` table in that transaction and its `OutboxRelay` sends the
+committed rows afterwards, so an event cannot describe a vote that is not there, and a
+crash before the send does not lose it. That replaced a dual write whose second failure
+mode was the damaging one: a send that overtook its own commit made the consumer
+recompute the projection from a write model without the vote in it, and store zeros
+permanently.
+
+Delivery is at-least-once — the send and the row's `published_at` update are not atomic —
+which is safe because the consumer recomputes rather than applying deltas. The projection
+can still be rebuilt from the write model at any time via
+`POST /api/v1/admin/credibility/rebuild` (ADMIN only).
 
 ## Debugging
 

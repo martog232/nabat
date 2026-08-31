@@ -6,43 +6,50 @@ import lombok.RequiredArgsConstructor;
 import org.example.nabat.shared.UseCase;
 import org.example.nabat.notification.application.port.in.SendNotificationUseCase;
 import org.example.nabat.voting.application.port.in.VoteAlertUseCase;
-import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.voting.application.port.out.ExternalVotingPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.identity.domain.UserId;
 import org.example.nabat.voting.domain.VoteType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
 /**
- * Casts votes against the nabat-voting service and keeps this service's
- * denormalised projection and real-time pushes in step.
+ * Casts votes against the nabat-voting service.
+ *
+ * <h2>What this no longer does</h2>
+ * It used to write the vote counts onto the local alert and broadcast the update, from the
+ * tallies that came back with the vote. Both now happen in {@link VoteTalliesProjectionService},
+ * driven by {@code vote.cast} and {@code vote.removed}. The reason is durability: the local
+ * write rode on this request, so a crash between the remote vote and it left the counts wrong
+ * until somebody voted on that alert again. An event is retried until it is applied.
+ *
+ * <p>The vote itself stays synchronous — the caller has to be told whether it was accepted,
+ * and with what result — and the tallies still travel back in the response, so a client sees
+ * its own vote immediately. What became eventually consistent is the copy of the counts on
+ * the alert, by a Kafka round trip.
+ *
+ * <h2>Why the notification did not move with them</h2>
+ * At-least-once delivery would make a redelivered event a second notification to the alert's
+ * owner. A projection write does not care — it is absolute — but a notification is not
+ * idempotent without a dedupe key, and that belongs with the notification service in phase 6,
+ * where the event catalogue already lists it as a consumer of these topics.
  *
  * <h2>Why there is no {@code @Transactional} on these methods</h2>
- * Each of them starts with a network call to the voting service. Wrapping the whole
- * flow in a transaction — which is what this class used to do — meant holding a
- * pooled database connection open across two or three HTTP round-trips, and it
- * bought no atomicity anyway: the remote vote commits independently, so a local
- * rollback afterwards just left the two stores permanently disagreeing.
- *
- * <p>The local write is instead a single short transaction inside
- * {@link AlertRepository#applyVoteCounts}, and the projection is self-healing —
- * any subsequent vote re-syncs it from the voting service's authoritative counts.
+ * Each of them starts with a network call to the voting service. Wrapping the whole flow in a
+ * transaction — which is what this class used to do — meant holding a pooled database
+ * connection open across two or three HTTP round-trips, and it bought no atomicity anyway:
+ * the remote vote commits independently, so a local rollback afterwards just left the two
+ * stores permanently disagreeing.
  */
 @UseCase
 @RequiredArgsConstructor
 public class ExternalVoteService implements VoteAlertUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(ExternalVoteService.class);
-
     private final ExternalVotingPort externalVotingPort;
     private final AlertRepository alertRepository;
     private final SendNotificationUseCase sendNotificationUseCase;
-    private final AlertNotificationPort alertNotificationPort;
 
     @Override
     public VoteReceipt vote(VoteCommand command) {
@@ -54,13 +61,11 @@ public class ExternalVoteService implements VoteAlertUseCase {
 
         VoteStats stats = toStats(result.stats());
 
-        // One read+write instead of update + two separate findById calls.
-        Optional<Alert> updated = syncProjection(command.alertId(), stats);
-
-        updated.ifPresent(alert -> {
-            notifyAlertOwner(alert, command, stats.confirmations());
-            alertNotificationPort.broadcastAlertUpdate(alert);
-        });
+        // Read, not written: the counts on this row are the consumer's business now. The
+        // alert is fetched for the owner's id and title, and it can legitimately be absent —
+        // the voting service keeps votes by alert id and is never told about deletions.
+        alertRepository.findById(command.alertId())
+                .ifPresent(alert -> notifyAlertOwner(alert, command, stats.confirmations()));
 
         return new VoteReceipt(
                 result.id(),
@@ -73,12 +78,7 @@ public class ExternalVoteService implements VoteAlertUseCase {
 
     @Override
     public VoteStats removeVote(AlertId alertId, UserId userId) {
-        VoteStats stats = toStats(externalVotingPort.removeVote(alertId, userId));
-
-        syncProjection(alertId, stats)
-                .ifPresent(alertNotificationPort::broadcastAlertUpdate);
-
-        return stats;
+        return toStats(externalVotingPort.removeVote(alertId, userId));
     }
 
     /**
@@ -94,28 +94,6 @@ public class ExternalVoteService implements VoteAlertUseCase {
     @Override
     public VoteStats getVoteStats(AlertId alertId) {
         return toStats(externalVotingPort.getVoteStats(alertId));
-    }
-
-    /**
-     * Mirrors the voting service's tallies into the {@code alerts} row.
-     *
-     * <p>Returns empty when the alert is unknown locally — possible if it was
-     * deleted between the vote and this write — in which case there is nothing to
-     * notify or broadcast about.
-     */
-    private Optional<Alert> syncProjection(AlertId alertId, VoteStats stats) {
-        Optional<Alert> updated = alertRepository.applyVoteCounts(
-                alertId,
-                stats.upvotes(),
-                stats.downvotes(),
-                stats.confirmations(),
-                stats.credibilityScore()
-        );
-
-        if (updated.isEmpty()) {
-            log.warn("Voted on alert {} but it no longer exists locally; projection not updated", alertId);
-        }
-        return updated;
     }
 
     private void notifyAlertOwner(Alert alert, VoteCommand command, int confirmations) {
