@@ -18,12 +18,16 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.PullPolicy;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -56,6 +60,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *       token, so the two services must share a signing secret and agree on the claim;</li>
  *   <li>the Kafka round trip — the vote is published, consumed, and reaches the credibility
  *       projection;</li>
+ *   <li>the topic contract — this service's own listener is switched on here and reads what
+ *       nabat-voting actually publishes, which is the only check that the two repositories
+ *       still agree on the topic's name and shape;</li>
  *   <li>the failure mapping — with the service stopped, a vote is a 503 and not a 500.</li>
  * </ul>
  *
@@ -100,23 +107,40 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
             .withPassword("nabat_voting_password");
 
     /**
+     * The port this JVM reaches the broker on, chosen before the container starts.
+     *
+     * <p>Kafka hands a client the address of the partition leader, so that address has to be
+     * one the client can use — and it is baked into {@code KAFKA_ADVERTISED_LISTENERS} at
+     * boot, before Testcontainers would have assigned a random mapping. Picking a free port
+     * first and binding it is the way out that leaves nothing hardcoded to collide with; the
+     * alternative is rewriting the broker's advertised listeners after it is up.
+     */
+    private static final int KAFKA_EXTERNAL_PORT = freePort();
+
+    /**
      * A plain container rather than the Testcontainers Kafka module: this is the exact
      * KRaft configuration docker-compose.yml runs, and the listener setup is the part worth
-     * keeping identical. Only nabat-voting talks to it, so there is no EXTERNAL listener —
-     * the test observes Kafka through the projection it feeds, not by consuming the topic.
+     * keeping identical — including two advertised listeners, for the same reason compose has
+     * them. nabat-voting reaches the broker inside the network as {@code kafka:9092}; this
+     * JVM, which runs nabat-app and therefore its vote-event consumer, reaches it from outside
+     * as {@code localhost:<port>}. One listener would serve one of them and quietly fail the
+     * other on the first fetch.
      */
     private static final GenericContainer<?> KAFKA =
-        new GenericContainer<>(DockerImageName.parse("apache/kafka:latest"))
+        new FixedHostPortGenericContainer<>("apache/kafka:latest")
+            .withFixedExposedPort(KAFKA_EXTERNAL_PORT, 29092)
             .withNetwork(NETWORK)
             .withNetworkAliases("kafka")
             .withEnv("KAFKA_NODE_ID", "1")
             .withEnv("KAFKA_PROCESS_ROLES", "broker,controller")
-            .withEnv("KAFKA_LISTENERS", "INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093")
-            .withEnv("KAFKA_ADVERTISED_LISTENERS", "INTERNAL://kafka:9092")
+            .withEnv("KAFKA_LISTENERS",
+                     "INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093")
+            .withEnv("KAFKA_ADVERTISED_LISTENERS",
+                     "INTERNAL://kafka:9092,EXTERNAL://localhost:" + KAFKA_EXTERNAL_PORT)
             .withEnv("KAFKA_INTER_BROKER_LISTENER_NAME", "INTERNAL")
             .withEnv("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
             .withEnv("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP",
-                     "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT")
+                     "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT")
             .withEnv("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@kafka:9093")
             .withEnv("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
             .withEnv("KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR", "1")
@@ -127,6 +151,12 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
 
     private static final GenericContainer<?> VOTING =
         new GenericContainer<>(DockerImageName.parse(VOTING_IMAGE))
+            // Or "the published image" means "whatever :latest happened to be the last time
+            // this machine pulled". That is how this test first failed after nabat-voting
+            // changed its topic: locally green against a four-day-old copy, and the mismatch
+            // it exists to catch invisible. An hour is short enough to notice a publish and
+            // long enough not to pull on every run; CI has nothing cached either way.
+            .withImagePullPolicy(PullPolicy.ageBased(Duration.ofHours(1)))
             .withNetwork(NETWORK)
             .withEnv("SPRING_DATASOURCE_URL",
                      "jdbc:postgresql://voting-postgres:5432/nabat_voting_db")
@@ -156,6 +186,20 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
         // The default read timeout is 3s, which a cold container occasionally exceeds on the
         // first call. Raised here only; production values stay as they are.
         registry.add("nabat.voting.service.read-timeout", () -> "PT10S");
+
+        // The one place the consumer is switched on in tests. Everywhere else it is off,
+        // because everywhere else there is no broker; here there is the real one, fed by the
+        // real service, which is the only way to find out that both sides mean the same topic.
+        registry.add("nabat.kafka.enabled", () -> true);
+        registry.add("spring.kafka.bootstrap-servers", () -> "localhost:" + KAFKA_EXTERNAL_PORT);
+    }
+
+    private static int freePort() {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            throw new IllegalStateException("No free port for Kafka's external listener", e);
+        }
     }
 
     @Autowired
@@ -259,9 +303,43 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
         return stats.get("confirmations").asInt();
     }
 
-    /** Casting the same vote twice is a conflict there, and must arrive here as 409, not 503. */
+    /**
+     * The vote nabat-voting published reaches this service's own copy of the counts.
+     *
+     * <p>The only test in either repository that watches both sides of the topic at once. Its
+     * two neighbours each check half: the one above reads nabat-voting's projection, and
+     * {@code VoteEventListenerIntegrationTest} feeds this service JSON written by hand. Both
+     * stay green if the two sides stop agreeing on what the topic is called or what is in it —
+     * the counts would simply stop moving, in production, silently.
+     *
+     * <p>Nothing here is a stand-in: a real vote over HTTP, published by the real service
+     * through its outbox, onto a real broker, consumed by this service's real listener, and
+     * read back through the API a browser would call.
+     */
     @Test
     @Order(4)
+    void theVoteReachesThisServicesOwnCountsThroughKafka() {
+        await().atMost(Duration.ofSeconds(60))
+            .pollInterval(Duration.ofSeconds(1))
+            .untilAsserted(() -> {
+                JsonNode alert = objectMapper.readTree(mockMvc
+                    .perform(get("/api/v1/alerts/{id}", alertId)
+                                 .header("Authorization", "Bearer " + accessToken))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+
+                assertThat(alert.get("confirmationCount").asInt())
+                    .as("written by VoteEventListener from the tallies on vote.changed")
+                    .isEqualTo(1);
+                // Carried by the message, never recalculated here: CONFIRM counts double, and
+                // that rule has one owner.
+                assertThat(alert.get("credibilityScore").asInt()).isEqualTo(2);
+            });
+    }
+
+    /** Casting the same vote twice is a conflict there, and must arrive here as 409, not 503. */
+    @Test
+    @Order(5)
     void aDuplicateVoteIsAConflictRatherThanAnOutage() throws Exception {
         mockMvc.perform(post("/api/v1/alerts/{id}/votes", alertId)
                         .header("Authorization", "Bearer " + accessToken)
@@ -278,7 +356,7 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
      * the only way to check it is to actually take the dependency away.
      */
     @Test
-    @Order(5)
+    @Order(6)
     void anOutageIsA503() throws Exception {
         VOTING.stop();
 
