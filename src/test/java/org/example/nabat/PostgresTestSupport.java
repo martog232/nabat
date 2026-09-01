@@ -1,11 +1,9 @@
 package org.example.nabat;
 
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
@@ -15,6 +13,20 @@ import org.testcontainers.utility.DockerImageName;
  * <p>Postgres and Redis containers are shared across all test classes (static fields) which,
  * combined with Spring Boot's application-context cache, keeps the suite fast: each container
  * starts once per JVM, and each unique Spring context is created once and reused.
+ *
+ * <h2>No {@code @DirtiesContext} here, and that is the point</h2>
+ * This class used to carry {@code @DirtiesContext(AFTER_CLASS)}, which threw the context away
+ * after every test class that extended it — that is, after every integration test in the
+ * repository. The sentence above was then false about the half that mattered: the containers
+ * were shared, the contexts were not, and each class paid a fresh Spring startup. Measured on
+ * two of the slowest classes, reuse took {@code AdminUserControllerIntegrationTest} from 115s
+ * to 50s and {@code AuthControllerIntegrationTest} from 24s to 16s.
+ *
+ * <p>Put it back only on a class that genuinely leaves the context unusable — a bean replaced
+ * at runtime, a scheduler stopped — and put it on <em>that class</em>, not here. State in the
+ * database is a different problem: tests that need a clean table clear it themselves
+ * ({@code userJpaRepository.deleteAll()} in a {@code @BeforeEach}), which is cheaper and more
+ * honest than rebuilding an application to get an empty table.
  *
  * <h2>Why Redis is here</h2>
  * Redis is not optional for this application. WebSocket ticket redemption
@@ -47,7 +59,6 @@ import org.testcontainers.utility.DockerImageName;
  * ({@code disabledWithoutDocker = true}).
  */
 @Testcontainers(disabledWithoutDocker = true)
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class PostgresTestSupport {
 
     private static final DockerImageName POSTGIS_IMAGE = DockerImageName
@@ -56,7 +67,6 @@ public abstract class PostgresTestSupport {
 
     private static final int REDIS_PORT = 6379;
 
-    @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(POSTGIS_IMAGE)
             .withDatabaseName("nabat_test")
             .withUsername("nabat")
@@ -66,9 +76,32 @@ public abstract class PostgresTestSupport {
      * Plain {@link GenericContainer} rather than the Testcontainers Redis module: the module
      * would be a new dependency and this needs nothing beyond a port.
      */
-    @Container
     static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
             .withExposedPorts(REDIS_PORT);
+
+    /*
+     * Started here rather than by {@code @Container}, and that is what makes these containers
+     * genuinely shared.
+     *
+     * The JUnit extension manages an annotated field per *test class*: it starts the container
+     * before the class and stops it after. With a static field that means the container is
+     * recycled between classes — a new container, and a new mapped port, each time.
+     *
+     * Nothing noticed while every class also rebuilt its Spring context, because
+     * {@code @DynamicPropertySource} was then re-evaluated and picked the new port up. The
+     * moment contexts started being reused, a cached context kept pointing at the port of a
+     * container that no longer existed, and twenty-six tests failed with "Could not open JPA
+     * EntityManager" — no error from the database, because there was nothing there to answer.
+     *
+     * A static initialiser starts them once per JVM and never stops them; Testcontainers' Ryuk
+     * sidecar removes them when the JVM exits. {@code @Testcontainers} stays for
+     * {@code disabledWithoutDocker}, which is a condition on the class and does not need a
+     * managed field.
+     */
+    static {
+        POSTGRES.start();
+        REDIS.start();
+    }
 
     /**
      * Overrides the datasource, Redis and schema-management properties so every test type
