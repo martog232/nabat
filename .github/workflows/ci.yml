@@ -33,6 +33,13 @@ jobs:
         distribution: temurin
         cache: maven
 
+    # Before the build, because it is seconds and it explains a class of failure that is
+    # otherwise very confusing: the Avro class this repository generates comes from a copy of
+    # nabat-voting's schema, and a stale copy compiles perfectly while failing to read the
+    # messages that service actually publishes.
+    - name: Check the vote schema against nabat-voting
+      run: ./scripts/check-avro-contract.sh
+
     # Docker is present on GitHub runners, so the Testcontainers tests that
     # @Testcontainers(disabledWithoutDocker = true) skips locally do run here. This is the
     # only place the PostGIS spatial queries and the full auth REST flow are exercised.

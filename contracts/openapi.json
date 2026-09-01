@@ -1,0 +1,1537 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "title" : "OpenAPI definition",
+    "version" : "v0"
+  },
+  "servers" : [ {
+    "url" : "http://localhost",
+    "description" : "Generated server url"
+  } ],
+  "paths" : {
+    "/api/v1/ws/tickets" : {
+      "post" : {
+        "tags" : [ "web-socket-ticket-controller" ],
+        "operationId" : "issueTicket",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WebSocketTicketResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads" : {
+      "post" : {
+        "tags" : [ "upload-controller" ],
+        "operationId" : "upload",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "required" : [ "file" ],
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions" : {
+      "get" : {
+        "tags" : [ "subscription-controller" ],
+        "operationId" : "listMine",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SubscriptionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "subscription-controller" ],
+        "operationId" : "create",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SubscriptionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/{id}/read" : {
+      "post" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "markRead",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/read-all" : {
+      "post" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "markAll",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "verifyEmail",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "resetPassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "refresh",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RefreshTokenResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/forgot-password" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "forgotPassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "operationId" : "listByStatus",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "ACTIVE",
+            "enum" : [ "ACTIVE", "RESOLVED" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AlertResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "alert-controller" ],
+        "operationId" : "createAlert",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateAlertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{alertId}/votes" : {
+      "post" : {
+        "tags" : [ "alert-vote-controller" ],
+        "operationId" : "vote",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VoteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VoteResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "alert-vote-controller" ],
+        "operationId" : "removeVote",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VoteStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/preferences" : {
+      "patch" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "updatePreferences",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateUserPreferencesRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/resolve" : {
+      "patch" : {
+        "tags" : [ "alert-controller" ],
+        "operationId" : "resolve",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{id}/role" : {
+      "patch" : {
+        "tags" : [ "admin-user-controller" ],
+        "operationId" : "changeRole",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangeRoleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{id}/enabled" : {
+      "patch" : {
+        "tags" : [ "admin-user-controller" ],
+        "operationId" : "setEnabled",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetEnabledRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads/{filename}" : {
+      "get" : {
+        "tags" : [ "upload-controller" ],
+        "operationId" : "serve",
+        "parameters" : [ {
+          "name" : "filename",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "list",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/NotificationResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/unread" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "unread",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/NotificationResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/unread/count" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "unreadCount",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me" : {
+      "get" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "getCurrentUser",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "operationId" : "getById",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{alertId}/votes/stats" : {
+      "get" : {
+        "tags" : [ "alert-vote-controller" ],
+        "operationId" : "getStats",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VoteStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{alertId}/votes/me" : {
+      "get" : {
+        "tags" : [ "alert-vote-controller" ],
+        "operationId" : "getMyVote",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserVoteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/nearby" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "summary" : "Active alerts within a radius, optionally filtered and newer than `since`",
+        "operationId" : "getNearbyAlerts",
+        "parameters" : [ {
+          "name" : "latitude",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "maximum" : 90.0,
+            "exclusiveMaximum" : false,
+            "minimum" : -90.0,
+            "exclusiveMinimum" : false,
+            "type" : "number",
+            "format" : "double"
+          }
+        }, {
+          "name" : "longitude",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "maximum" : 180.0,
+            "exclusiveMaximum" : false,
+            "minimum" : -180.0,
+            "exclusiveMinimum" : false,
+            "type" : "number",
+            "format" : "double"
+          }
+        }, {
+          "name" : "radiusKm",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100.0,
+            "exclusiveMaximum" : false,
+            "minimum" : 0.0,
+            "exclusiveMinimum" : true,
+            "type" : "number",
+            "format" : "double",
+            "default" : 5.0
+          }
+        }, {
+          "name" : "since",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "type",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+          }
+        }, {
+          "name" : "severity",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "CRITICAL" ]
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "maximum" : 500,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 100
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NearbyAlertsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users" : {
+      "get" : {
+        "tags" : [ "admin-user-controller" ],
+        "operationId" : "listUsers",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 25
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserPageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions/{id}" : {
+      "delete" : {
+        "tags" : [ "subscription-controller" ],
+        "operationId" : "delete",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "WebSocketTicketResponse" : {
+        "type" : "object",
+        "properties" : {
+          "ticket" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "SubscriptionRequest" : {
+        "required" : [ "alertType", "latitude", "longitude", "radiusKm" ],
+        "type" : "object",
+        "properties" : {
+          "alertType" : {
+            "type" : "string",
+            "description" : "Alert type to subscribe to",
+            "example" : "GAS_LEAK",
+            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+          },
+          "latitude" : {
+            "type" : "number",
+            "description" : "Center latitude of the watch area",
+            "format" : "double",
+            "example" : 40.7128
+          },
+          "longitude" : {
+            "type" : "number",
+            "description" : "Center longitude of the watch area",
+            "format" : "double",
+            "example" : -74.006
+          },
+          "radiusKm" : {
+            "type" : "number",
+            "description" : "Radius in kilometres around the center point",
+            "format" : "double",
+            "example" : 5.0
+          }
+        },
+        "description" : "Request body for creating an alert subscription"
+      },
+      "SubscriptionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "Subscription identifier",
+            "format" : "uuid"
+          },
+          "userId" : {
+            "type" : "string",
+            "description" : "Owner of the subscription",
+            "format" : "uuid"
+          },
+          "alertType" : {
+            "type" : "string",
+            "description" : "Subscribed alert type",
+            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+          },
+          "latitude" : {
+            "type" : "number",
+            "description" : "Center latitude",
+            "format" : "double"
+          },
+          "longitude" : {
+            "type" : "number",
+            "description" : "Center longitude",
+            "format" : "double"
+          },
+          "radiusKm" : {
+            "type" : "number",
+            "description" : "Watch radius in km",
+            "format" : "double"
+          },
+          "active" : {
+            "type" : "boolean",
+            "description" : "Whether the subscription is active"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "description" : "Creation timestamp",
+            "format" : "date-time"
+          }
+        },
+        "description" : "Active subscription details"
+      },
+      "NotificationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "Notification identifier",
+            "format" : "uuid"
+          },
+          "recipientId" : {
+            "type" : "string",
+            "description" : "ID of the user who receives this notification",
+            "format" : "uuid"
+          },
+          "type" : {
+            "type" : "string",
+            "description" : "What triggered the notification",
+            "example" : "VOTE",
+            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED" ]
+          },
+          "title" : {
+            "type" : "string",
+            "description" : "Short notification title",
+            "example" : "New vote on your alert"
+          },
+          "message" : {
+            "type" : "string",
+            "description" : "Notification body text"
+          },
+          "relatedAlertId" : {
+            "type" : "string",
+            "description" : "Alert that triggered the notification; may be null",
+            "format" : "uuid"
+          },
+          "triggeredByUserId" : {
+            "type" : "string",
+            "description" : "User who caused the notification; may be null",
+            "format" : "uuid"
+          },
+          "read" : {
+            "type" : "boolean",
+            "description" : "Whether the notification has been read by the recipient"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "description" : "Timestamp when the notification was created",
+            "format" : "date-time"
+          }
+        },
+        "description" : "A user notification (vote event or milestone)"
+      },
+      "MessageResponse" : {
+        "type" : "object",
+        "properties" : {
+          "message" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ResetPasswordRequest" : {
+        "required" : [ "newPassword", "token" ],
+        "type" : "object",
+        "properties" : {
+          "token" : {
+            "type" : "string"
+          },
+          "newPassword" : {
+            "type" : "string"
+          }
+        }
+      },
+      "RegisterRequest" : {
+        "required" : [ "displayName", "email", "password" ],
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "description" : "E-mail address (used as login)",
+            "example" : "alice@example.com"
+          },
+          "password" : {
+            "minLength" : 10,
+            "type" : "string",
+            "description" : "Password — at least 10 characters, including a letter and a digit, and at most 72 UTF-8 bytes",
+            "example" : "s3cr3tP@ssphrase"
+          },
+          "displayName" : {
+            "maxLength" : 50,
+            "minLength" : 2,
+            "type" : "string",
+            "description" : "Public display name shown to other users",
+            "example" : "Alice"
+          }
+        },
+        "description" : "Request body for creating a new user account"
+      },
+      "AuthResponse" : {
+        "type" : "object",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string",
+            "description" : "Short-lived JWT access token — include in Authorization: Bearer header"
+          },
+          "refreshToken" : {
+            "type" : "string",
+            "description" : "Single-use refresh token used to obtain a new pair"
+          },
+          "expiresIn" : {
+            "type" : "integer",
+            "description" : "Access-token validity in milliseconds",
+            "format" : "int64",
+            "example" : 86400000
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserResponse"
+          }
+        },
+        "description" : "Authentication tokens returned after a successful login or registration"
+      },
+      "UserResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "Stable user identifier",
+            "format" : "uuid"
+          },
+          "email" : {
+            "type" : "string",
+            "description" : "E-mail address",
+            "example" : "alice@example.com"
+          },
+          "displayName" : {
+            "type" : "string",
+            "description" : "Display name shown to other users",
+            "example" : "Alice"
+          },
+          "role" : {
+            "type" : "string",
+            "description" : "Assigned role",
+            "example" : "USER",
+            "enum" : [ "USER", "MODERATOR", "ADMIN" ]
+          },
+          "emailVerified" : {
+            "type" : "boolean",
+            "description" : "Whether the email address has been verified"
+          },
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "Whether the account may sign in — an admin can switch this off"
+          },
+          "notificationRadiusKm" : {
+            "type" : "integer",
+            "description" : "Configured notification radius in kilometres",
+            "format" : "int32",
+            "example" : 5
+          }
+        },
+        "description" : "Public profile of a user"
+      },
+      "RefreshTokenRequest" : {
+        "required" : [ "refreshToken" ],
+        "type" : "object",
+        "properties" : {
+          "refreshToken" : {
+            "type" : "string"
+          }
+        }
+      },
+      "RefreshTokenResponse" : {
+        "type" : "object",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "refreshToken" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "required" : [ "email", "password" ],
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "description" : "Registered e-mail address",
+            "example" : "alice@example.com"
+          },
+          "password" : {
+            "type" : "string",
+            "description" : "Account password",
+            "example" : "s3cr3tP@ss"
+          }
+        },
+        "description" : "Credentials for logging in"
+      },
+      "ForgotPasswordRequest" : {
+        "required" : [ "email" ],
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CreateAlertRequest" : {
+        "required" : [ "description", "latitude", "longitude", "severity", "title", "type" ],
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Short title of the alert",
+            "example" : "Gas leak on Main St"
+          },
+          "description" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string",
+            "description" : "Detailed description of the alert",
+            "example" : "Strong smell of gas near intersection"
+          },
+          "type" : {
+            "type" : "string",
+            "description" : "Category of the alert",
+            "example" : "GAS_LEAK",
+            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+          },
+          "severity" : {
+            "type" : "string",
+            "description" : "Severity level",
+            "example" : "HIGH",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "CRITICAL" ]
+          },
+          "latitude" : {
+            "maximum" : 90.0,
+            "exclusiveMaximum" : false,
+            "minimum" : -90.0,
+            "exclusiveMinimum" : false,
+            "type" : "number",
+            "description" : "WGS-84 latitude of the incident",
+            "format" : "double",
+            "example" : 40.7128
+          },
+          "longitude" : {
+            "maximum" : 180.0,
+            "exclusiveMaximum" : false,
+            "minimum" : -180.0,
+            "exclusiveMinimum" : false,
+            "type" : "number",
+            "description" : "WGS-84 longitude of the incident",
+            "format" : "double",
+            "example" : -74.006
+          },
+          "photoUrl" : {
+            "type" : "string",
+            "description" : "URL of an uploaded photo for this alert",
+            "example" : "/api/v1/uploads/uuid.jpg"
+          }
+        },
+        "description" : "Request body for creating a new safety alert"
+      },
+      "AlertResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "Unique identifier of the alert",
+            "format" : "uuid"
+          },
+          "title" : {
+            "type" : "string",
+            "description" : "Short title"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Full description"
+          },
+          "type" : {
+            "type" : "string",
+            "description" : "Alert category",
+            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+          },
+          "severity" : {
+            "type" : "string",
+            "description" : "Severity level",
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "CRITICAL" ]
+          },
+          "latitude" : {
+            "type" : "number",
+            "description" : "Latitude of the incident location",
+            "format" : "double",
+            "example" : 40.7128
+          },
+          "longitude" : {
+            "type" : "number",
+            "description" : "Longitude of the incident location",
+            "format" : "double",
+            "example" : -74.006
+          },
+          "createdAt" : {
+            "type" : "string",
+            "description" : "Timestamp when the alert was created",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "Current lifecycle status",
+            "enum" : [ "ACTIVE", "RESOLVED" ]
+          },
+          "reportedBy" : {
+            "type" : "string",
+            "description" : "ID of the user who reported the alert",
+            "format" : "uuid"
+          },
+          "upvoteCount" : {
+            "type" : "integer",
+            "description" : "Number of upvotes",
+            "format" : "int32"
+          },
+          "downvoteCount" : {
+            "type" : "integer",
+            "description" : "Number of downvotes",
+            "format" : "int32"
+          },
+          "confirmationCount" : {
+            "type" : "integer",
+            "description" : "Number of confirmations",
+            "format" : "int32"
+          },
+          "credibilityScore" : {
+            "type" : "integer",
+            "description" : "Credibility score as computed by the voting service",
+            "format" : "int32"
+          },
+          "resolvedAt" : {
+            "type" : "string",
+            "description" : "Timestamp when the alert was resolved; null if still active",
+            "format" : "date-time"
+          },
+          "photoUrl" : {
+            "type" : "string",
+            "description" : "URL of the uploaded photo, if any"
+          }
+        },
+        "description" : "Alert details returned by the API"
+      },
+      "VoteRequest" : {
+        "required" : [ "voteType" ],
+        "type" : "object",
+        "properties" : {
+          "voteType" : {
+            "type" : "string",
+            "description" : "Type of vote to cast",
+            "example" : "UPVOTE",
+            "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ]
+          }
+        },
+        "description" : "Request body for casting a vote on an alert"
+      },
+      "VoteResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "Vote identifier",
+            "format" : "uuid"
+          },
+          "alertId" : {
+            "type" : "string",
+            "description" : "ID of the alert that was voted on",
+            "format" : "uuid"
+          },
+          "voteType" : {
+            "type" : "string",
+            "description" : "Type of vote",
+            "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ]
+          },
+          "createdAt" : {
+            "type" : "string",
+            "description" : "When the vote was recorded",
+            "format" : "date-time"
+          },
+          "stats" : {
+            "$ref" : "#/components/schemas/VoteStatsResponse"
+          }
+        },
+        "description" : "The recorded vote and the resulting tallies"
+      },
+      "VoteStatsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "upvotes" : {
+            "type" : "integer",
+            "description" : "Number of upvotes",
+            "format" : "int32"
+          },
+          "downvotes" : {
+            "type" : "integer",
+            "description" : "Number of downvotes",
+            "format" : "int32"
+          },
+          "confirmations" : {
+            "type" : "integer",
+            "description" : "Number of confirmations",
+            "format" : "int32"
+          },
+          "credibilityScore" : {
+            "type" : "integer",
+            "description" : "Credibility score as computed by the voting service",
+            "format" : "int32"
+          }
+        },
+        "description" : "Aggregate vote statistics for an alert"
+      },
+      "UpdateUserPreferencesRequest" : {
+        "required" : [ "notificationRadiusKm" ],
+        "type" : "object",
+        "properties" : {
+          "notificationRadiusKm" : {
+            "type" : "integer",
+            "description" : "Allowed radius preset in kilometres",
+            "format" : "int32",
+            "example" : 10
+          },
+          "lastKnownLat" : {
+            "maximum" : 90.0,
+            "exclusiveMaximum" : false,
+            "minimum" : -90.0,
+            "exclusiveMinimum" : false,
+            "type" : "number",
+            "description" : "Latest known latitude",
+            "format" : "double",
+            "example" : 42.3601
+          },
+          "lastKnownLng" : {
+            "maximum" : 180.0,
+            "exclusiveMaximum" : false,
+            "minimum" : -180.0,
+            "exclusiveMinimum" : false,
+            "type" : "number",
+            "description" : "Latest known longitude",
+            "format" : "double",
+            "example" : -71.0589
+          }
+        },
+        "description" : "Request body for updating notification preferences"
+      },
+      "ChangeRoleRequest" : {
+        "required" : [ "role" ],
+        "type" : "object",
+        "properties" : {
+          "role" : {
+            "type" : "string",
+            "description" : "The role to assign",
+            "example" : "MODERATOR",
+            "enum" : [ "USER", "MODERATOR", "ADMIN" ]
+          }
+        },
+        "description" : "Assigns a role to an account"
+      },
+      "SetEnabledRequest" : {
+        "required" : [ "enabled" ],
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "False disables the account and invalidates its sessions immediately",
+            "example" : false
+          }
+        },
+        "description" : "Enables or disables an account"
+      },
+      "UserVoteResponse" : {
+        "type" : "object",
+        "properties" : {
+          "hasVoted" : {
+            "type" : "boolean",
+            "description" : "true if the authenticated user has an active vote"
+          },
+          "voteType" : {
+            "type" : "string",
+            "description" : "The vote type, or null if hasVoted is false",
+            "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ]
+          }
+        },
+        "description" : "Indicates whether the current user has voted on an alert"
+      },
+      "NearbyAlertsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "alerts" : {
+            "type" : "array",
+            "description" : "Matching alerts, newest first",
+            "items" : {
+              "$ref" : "#/components/schemas/AlertResponse"
+            }
+          },
+          "count" : {
+            "type" : "integer",
+            "description" : "Number of alerts in this response",
+            "format" : "int32",
+            "example" : 42
+          },
+          "limit" : {
+            "type" : "integer",
+            "description" : "The cap that was applied",
+            "format" : "int32",
+            "example" : 100
+          },
+          "truncated" : {
+            "type" : "boolean",
+            "description" : "True when the cap was reached and older matches were dropped. Narrow the radius or filter by type/severity to see them.",
+            "example" : false
+          }
+        },
+        "description" : "Active alerts near a point, capped at `limit`"
+      },
+      "UserPageResponse" : {
+        "type" : "object",
+        "properties" : {
+          "users" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/UserResponse"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "description" : "One page of accounts, with the total so a caller knows there are more"
+      }
+    }
+  }
+}
