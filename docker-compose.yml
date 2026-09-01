@@ -422,6 +422,12 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      # Not ordering, a hard condition: this service registers its Avro schema at startup and
+      # treats a refusal as fatal, on purpose — an incompatible schema should stop it rather
+      # than reach a topic. A registry that is merely *starting* refuses in the same way a
+      # rejected schema does, so without waiting for healthy it crash-loops for no reason.
+      schema-registry:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://voting-postgres:5432/nabat_voting_db
       SPRING_DATASOURCE_USERNAME: nabat_voting_user
