@@ -20,6 +20,15 @@ public class UserAdministrationService implements AdministerUsersUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public UserPage listUsers(UserId actorId, int page, int size) {
+        requireActorWhoCanAdminister(actorId);
+
+        UserRepository.UserPage found = userRepository.findAll(page, size);
+        return new UserPage(found.users(), found.total());
+    }
+
+    @Override
     @Transactional
     public User changeRole(UserId actorId, UserId targetId, Role newRole) {
         if (newRole == null) {

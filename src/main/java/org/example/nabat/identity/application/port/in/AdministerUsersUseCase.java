@@ -16,6 +16,27 @@ import org.example.nabat.identity.domain.UserId;
 public interface AdministerUsersUseCase {
 
     /**
+     * One page of accounts for the admin screen, newest first.
+     *
+     * <p>Takes the actor like everything else here, and for the same reason: the controller's
+     * {@code @PreAuthorize} reads the role in the token, which is as old as the token, while
+     * this re-reads the row. An admin demoted a minute ago still presents {@code ROLE_ADMIN}.
+     *
+     * @param page zero-based; {@code size} is capped by the caller
+     */
+    UserPage listUsers(UserId actorId, int page, int size);
+
+    /**
+     * Deliberately not {@code UserRepository.UserPage}, though the shape is the same.
+     *
+     * <p>{@code ArchitectureTest} forbids a controller from importing an out-port, and a
+     * controller has to name this type to return it. Three lines of mapping in the service is
+     * the price of the rule holding.
+     */
+    record UserPage(java.util.List<User> users, long total) {
+    }
+
+    /**
      * Assigns a role.
      *
      * <p>Refuses when the actor is the target. An admin demoting themselves is how an

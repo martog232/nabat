@@ -20,6 +20,8 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -173,6 +175,44 @@ class AdminUserControllerIntegrationTest extends PostgresTestSupport {
                 .andExpect(status().isUnauthorized());
 
         assertFalse(userRepository.findById(UserId.of(target.user().id())).orElseThrow().enabled());
+    }
+
+    /**
+     * The endpoint the admin screen is built on. Without it the two PATCHes address accounts
+     * by an id nobody has, so listing is what makes the rest of this controller usable.
+     */
+    @Test
+    void anAdminListsAccountsAndSeesTheirRoleAndWhetherTheyAreEnabled() throws Exception {
+        register("role-listed@example.com", "Listing987654");
+
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                // Newest first, so the account registered a moment ago is the one on top.
+                .andExpect(jsonPath("$.users[0].email").value("role-listed@example.com"))
+                .andExpect(jsonPath("$.users[0].role").value("USER"))
+                .andExpect(jsonPath("$.users[0].enabled").value(true))
+                // The total is what tells a caller there is a second page at all.
+                .andExpect(jsonPath("$.total").value(greaterThanOrEqualTo(2)));
+    }
+
+    /** The size comes from a query string, so it is clamped rather than trusted. */
+    @Test
+    void aPageLargerThanTheCapIsCappedRatherThanRefused() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .param("size", "5000")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.users.length()").value(lessThanOrEqualTo(100)));
+    }
+
+    @Test
+    void aPlainUserCannotListAccounts() throws Exception {
+        AuthResponse plain = register("role-nosy@example.com", "Curious12345");
+
+        mockMvc.perform(get("/api/v1/admin/users")
+                        .header("Authorization", "Bearer " + plain.accessToken()))
+                .andExpect(status().isForbidden());
     }
 
     private AuthResponse register(String email, String password) throws Exception {

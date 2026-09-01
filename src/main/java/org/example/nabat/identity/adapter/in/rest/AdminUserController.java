@@ -11,12 +11,15 @@ import org.example.nabat.identity.domain.UserId;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -35,7 +38,41 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
 
+    /**
+     * The largest page this endpoint will return, whatever is asked for.
+     *
+     * <p>A cap rather than trust: {@code size} arrives from a query string, and without one a
+     * single request can ask the database for every account there has ever been and ship it
+     * to a browser. The admin screen asks for 25.
+     */
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final AdministerUsersUseCase administerUsersUseCase;
+
+    /**
+     * One page of accounts, newest first — what the admin screen lists.
+     *
+     * <p>The only endpoint here that reads rather than writes, and the reason the screen can
+     * exist at all: the two PATCHes address an account by id, which is no use to someone who
+     * does not already know the id.
+     */
+    @GetMapping
+    public ResponseEntity<UserPageResponse> listUsers(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "25") int size,
+        @AuthenticationPrincipal User actor
+    ) {
+        AdministerUsersUseCase.UserPage found = administerUsersUseCase.listUsers(
+            actor.id(), Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
+
+        return ResponseEntity.ok(new UserPageResponse(
+            found.users().stream().map(UserResponse::from).toList(),
+            found.total()));
+    }
+
+    @Schema(description = "One page of accounts, with the total so a caller knows there are more")
+    public record UserPageResponse(List<UserResponse> users, long total) {
+    }
 
     @PatchMapping("/{id}/role")
     public ResponseEntity<UserResponse> changeRole(
