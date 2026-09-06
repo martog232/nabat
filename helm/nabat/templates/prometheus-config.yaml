@@ -86,9 +86,13 @@ spec:
         app.kubernetes.io/component: prometheus
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.monitoring.prometheus.podSecurityContext | nindent 8 }}
       containers:
       - name: prometheus
         image: {{ .Values.monitoring.prometheus.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         args:
         - --config.file=/etc/prometheus/prometheus.yml
         - --storage.tsdb.path=/prometheus

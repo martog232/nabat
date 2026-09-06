@@ -29,6 +29,14 @@ global:
 
 postgres:
   image: postgis/postgis:16-3.4
+  podSecurityContext:
+    # uid/gid 999 is the `postgres` user the official image drops to. fsGroup makes the PVC
+    # group-writable for it: running as non-root means the entrypoint no longer chowns the
+    # data directory on the way past.
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
   database: nabat_db
   user: nabat_user
   # REQUIRED, no default, same reasoning as global.jwtSecret. `nabat_password` used to be
@@ -39,6 +47,11 @@ postgres:
 
 redis:
   image: redis:7-alpine
+  podSecurityContext:
+    # 999:1000 — the alpine image puts the redis user in a group of a different id.
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 1000
 
 # In-cluster object storage for alert photos. Only rendered when
 # nabatApp.storage.type is "s3"; set enabled: false to point at a managed bucket instead
@@ -49,6 +62,15 @@ redis:
 minio:
   enabled: true
   image: minio/minio:RELEASE.2024-08-29T01-40-52Z
+  podSecurityContext:
+    # The image declares no USER and would otherwise run as root. MinIO does not care which
+    # uid it is as long as the data directory is writable, which fsGroup arranges. Shared with
+    # the bucket-creation Job below, which additionally needs HOME pointed somewhere writable
+    # — see minio.yaml.
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
   # Same re-pin as docker-compose.yml: the 2024-08-26 tag has been pruned from Docker Hub,
   # so the bucket-creation Job would have gone straight to ImagePullBackOff — and with
   # --atomic that surfaces as a timed-out release rather than a missing image.
@@ -69,6 +91,11 @@ minio:
 kong:
   enabled: true
   image: kong:3.9
+  podSecurityContext:
+    # 1001, not 1000: the kong user's id in this image is easy to assume wrong.
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
   replicas: 1
   proxyPort: 8000
   # /status and /metrics. Deliberately distinct from the Admin API on 8001, which is bound
@@ -107,6 +134,13 @@ nabatApp:
   # pushed one anywhere, so on a clean cluster it never resolved at all. Deploy overrides the
   # tag with the commit SHA it published.
   image: ghcr.io/martog232/nabat-app:latest
+  podSecurityContext:
+    # Matches the `USER 1001:1001` in this repository's Dockerfile, which creates the uid
+    # numerically for exactly this reason — runAsNonRoot cannot verify a named user.
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    fsGroup: 1001
   imagePullPolicy: IfNotPresent
   replicas: 2
   port: 8080
@@ -177,6 +211,12 @@ nabatApp:
 
 votingPostgres:
   image: postgres:16
+  podSecurityContext:
+    # Same 999 as the postgis image nabat-app uses.
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
   database: nabat_voting_db
   user: nabat_voting_user
   # No committed default, for the same reason as postgres.password. Note the remaining flaw:
@@ -189,6 +229,11 @@ votingPostgres:
 
 kafka:
   image: apache/kafka:latest
+  podSecurityContext:
+    # `appuser` in the apache/kafka image.
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
   nodeId: "1"
   clusterId: "DWKW8vl4RI6tPZGCbhhHVg"
 
@@ -196,6 +241,11 @@ kafka:
 # serialise a vote event and nabat-app cannot read one.
 schemaRegistry:
   image: confluentinc/cp-schema-registry:8.0.0
+  podSecurityContext:
+    # `appuser`, same id as the Kafka image.
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
   # A new schema must read data written by every published version, not just the previous
   # one. See the template for why replaying the topic makes that the requirement.
   compatibility: backward_transitive
@@ -206,6 +256,15 @@ votingApp:
   # repository cannot know which voting build is current; pass `voting_image_tag` to
   # workflow_dispatch when a specific one is wanted.
   image: ghcr.io/martog232/nabat-voting-app:latest
+  podSecurityContext:
+    # nabat-voting's own Dockerfile declares no USER, so that image still runs as root under
+    # plain `docker run`; this pins the uid on the Kubernetes side, which is all this chart
+    # can do from here. The JVM needs no write access outside /tmp and app.jar is
+    # world-readable, so 1001 works without changing the image. Adding `USER 1001:1001`
+    # there is the other half of this fix and belongs in that repository.
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
   imagePullPolicy: IfNotPresent
   replicas: 1
   port: 8081
@@ -223,20 +282,54 @@ ingress:
 monitoring:
   prometheus:
     image: prom/prometheus:latest
+    podSecurityContext:
+      # `nobody` in the prom images.
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      fsGroup: 65534
     storage: 2Gi
   grafana:
     image: grafana/grafana:latest
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 472
+      runAsGroup: 472
+      fsGroup: 472
     adminPassword: admin
     storage: 1Gi
   loki:
     image: grafana/loki:latest
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      fsGroup: 10001
     storage: 2Gi
   promtail:
     image: grafana/promtail:latest
+    podSecurityContext:
+      # Root on purpose, and the only workload in this chart that is. Promtail tails the pod
+      # logs under /var/log/pods, which the kubelet writes root-owned and not world-readable.
+      # A non-root uid here does not fail — it ships nothing, which looks identical to a
+      # cluster with no log output. Its container context in promtail.yaml keeps the two
+      # capabilities that reading those files needs; see the comment there.
+      runAsUser: 0
+      runAsGroup: 0
   zipkin:
     image: openzipkin/zipkin:latest
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
   alertmanager:
     image: prom/alertmanager:latest
+    podSecurityContext:
+      # `nobody`, same as Prometheus.
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      fsGroup: 65534
     # Silences and notification state, not metrics — small, but losing it re-notifies
     # everything still firing and discards every silence someone set.
     storage: 1Gi
@@ -248,3 +341,7 @@ monitoring:
 mailhog:
   enabled: true
   image: mailhog/mailhog:latest
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000

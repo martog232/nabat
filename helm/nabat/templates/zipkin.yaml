@@ -17,9 +17,13 @@ spec:
         app.kubernetes.io/component: zipkin
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.monitoring.zipkin.podSecurityContext | nindent 8 }}
       containers:
       - name: zipkin
         image: {{ .Values.monitoring.zipkin.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         env:
         # Stated, not inherited. `mem` is an in-process ring buffer: traces are lost on
         # restart and bounded by heap, which is the right trade for a learning cluster and

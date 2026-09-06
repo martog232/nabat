@@ -103,9 +103,13 @@ spec:
         app.kubernetes.io/component: grafana
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.monitoring.grafana.podSecurityContext | nindent 8 }}
       containers:
       - name: grafana
         image: {{ .Values.monitoring.grafana.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         env:
         - name: GF_SECURITY_ADMIN_PASSWORD
           value: {{ .Values.monitoring.grafana.adminPassword }}

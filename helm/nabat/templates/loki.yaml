@@ -35,9 +35,13 @@ spec:
         app.kubernetes.io/component: loki
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.monitoring.loki.podSecurityContext | nindent 8 }}
       containers:
       - name: loki
         image: {{ .Values.monitoring.loki.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         args:
         - -config.file=/etc/loki/local-config.yaml
         ports:

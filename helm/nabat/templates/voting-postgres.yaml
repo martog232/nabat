@@ -20,6 +20,10 @@ metadata:
     app.kubernetes.io/component: voting-postgres
 spec:
   replicas: 1
+  # Same reasoning as the nabat-app Postgres: a ReadWriteOnce volume and a rolling update
+  # deadlock each other. See the comment in postgres.yaml.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/component: voting-postgres
@@ -29,9 +33,13 @@ spec:
         app.kubernetes.io/component: voting-postgres
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.votingPostgres.podSecurityContext | nindent 8 }}
       containers:
       - name: postgres
         image: {{ .Values.votingPostgres.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         env:
         - name: POSTGRES_DB
           value: {{ .Values.votingPostgres.database }}

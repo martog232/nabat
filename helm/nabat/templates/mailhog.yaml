@@ -31,9 +31,13 @@ spec:
         app.kubernetes.io/component: mailhog
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.mailhog.podSecurityContext | nindent 8 }}
       containers:
       - name: mailhog
         image: {{ .Values.mailhog.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         ports:
         - name: smtp
           containerPort: 1025
