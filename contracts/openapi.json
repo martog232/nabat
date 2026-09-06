@@ -1,12 +1,16 @@
 {
   "openapi" : "3.1.0",
   "info" : {
-    "title" : "OpenAPI definition",
-    "version" : "v0"
+    "title" : "Nabat API",
+    "description" : "Crowd-sourced safety alerts. All endpoints require a bearer access token except the six POST /api/v1/auth/* routes that issue or reset one.",
+    "version" : "v1"
   },
   "servers" : [ {
     "url" : "http://localhost",
     "description" : "Generated server url"
+  } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
   } ],
   "paths" : {
     "/api/v1/ws/tickets" : {
@@ -172,7 +176,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/auth/reset-password" : {
@@ -200,7 +205,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/auth/register" : {
@@ -228,7 +234,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/auth/refresh" : {
@@ -256,7 +263,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/auth/login" : {
@@ -284,7 +292,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/auth/forgot-password" : {
@@ -312,7 +321,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/alerts" : {
@@ -1529,6 +1539,15 @@
             "format" : "int64"
           }
         }
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "description" : "The access token from POST /api/v1/auth/login or /auth/refresh. Refresh tokens are rejected here: they carry a different token type and are only accepted by /auth/refresh.",
+        "in" : "header",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
       }
     }
   }

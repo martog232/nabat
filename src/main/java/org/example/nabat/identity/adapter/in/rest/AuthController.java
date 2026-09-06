@@ -1,5 +1,6 @@
 package org.example.nabat.identity.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.example.nabat.identity.application.port.in.ForgotPasswordUseCase;
@@ -50,6 +51,7 @@ public class AuthController {
         this.resetPasswordUseCase = resetPasswordUseCase;
     }
 
+    @SecurityRequirements
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         // Returns the session directly — no second round-trip through login() with the
@@ -72,12 +74,14 @@ public class AuthController {
             .body(AuthResponse.from(result));
     }
 
+    @SecurityRequirements
     @PostMapping("/verify")
     public ResponseEntity<MessageResponse> verifyEmail(@RequestParam String token) {
         verifyEmailUseCase.verifyEmail(token);
         return ResponseEntity.ok(new MessageResponse("Email verified successfully"));
     }
 
+    @SecurityRequirements
     @PostMapping("/forgot-password")
     public ResponseEntity<MessageResponse> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
@@ -87,6 +91,7 @@ public class AuthController {
                 "If that email is registered, a reset link has been sent"));
     }
 
+    @SecurityRequirements
     @PostMapping("/reset-password")
     public ResponseEntity<MessageResponse> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
@@ -95,12 +100,14 @@ public class AuthController {
                 "Password reset successfully. Existing sessions have been signed out."));
     }
 
+    @SecurityRequirements
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginUserUseCase.LoginResult result = loginUserUseCase.login(request.toCommand());
         return ResponseEntity.ok(AuthResponse.from(result));
     }
 
+    @SecurityRequirements
     @PostMapping("/refresh")
     public ResponseEntity<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         RefreshTokenUseCase.AuthTokens tokens = refreshTokenUseCase.refresh(request.refreshToken());
