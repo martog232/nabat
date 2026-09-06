@@ -1,6 +1,6 @@
 package org.example.nabat.realtime.adapter.out;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.example.nabat.realtime.spi.LocalWsDelivery;
 import org.example.nabat.realtime.spi.WsFrame;

@@ -1,5 +1,5 @@
 {
-  "openapi" : "3.0.1",
+  "openapi" : "3.1.0",
   "info" : {
     "title" : "OpenAPI definition",
     "version" : "v0"
@@ -35,14 +35,14 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "required" : [ "file" ],
                 "type" : "object",
                 "properties" : {
                   "file" : {
                     "type" : "string",
                     "format" : "binary"
                   }
-                }
+                },
+                "required" : [ "file" ]
               }
             }
           }
@@ -763,37 +763,31 @@
           "in" : "query",
           "required" : true,
           "schema" : {
-            "maximum" : 90.0,
-            "exclusiveMaximum" : false,
-            "minimum" : -90.0,
-            "exclusiveMinimum" : false,
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "maximum" : 90.0,
+            "minimum" : -90.0
           }
         }, {
           "name" : "longitude",
           "in" : "query",
           "required" : true,
           "schema" : {
-            "maximum" : 180.0,
-            "exclusiveMaximum" : false,
-            "minimum" : -180.0,
-            "exclusiveMinimum" : false,
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "maximum" : 180.0,
+            "minimum" : -180.0
           }
         }, {
           "name" : "radiusKm",
           "in" : "query",
           "required" : false,
           "schema" : {
-            "maximum" : 100.0,
-            "exclusiveMaximum" : false,
-            "minimum" : 0.0,
-            "exclusiveMinimum" : true,
             "type" : "number",
             "format" : "double",
-            "default" : 5.0
+            "default" : 5.0,
+            "maximum" : 100.0,
+            "minimum" : 0.0
           }
         }, {
           "name" : "since",
@@ -824,11 +818,11 @@
           "in" : "query",
           "required" : false,
           "schema" : {
-            "maximum" : 500,
-            "minimum" : 1,
             "type" : "integer",
             "format" : "int32",
-            "default" : 100
+            "default" : 100,
+            "maximum" : 500,
+            "minimum" : 1
           }
         } ],
         "responses" : {
@@ -918,48 +912,49 @@
         }
       },
       "SubscriptionRequest" : {
-        "required" : [ "alertType", "latitude", "longitude", "radiusKm" ],
         "type" : "object",
+        "description" : "Request body for creating an alert subscription",
         "properties" : {
           "alertType" : {
             "type" : "string",
             "description" : "Alert type to subscribe to",
-            "example" : "GAS_LEAK",
-            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ],
+            "example" : "GAS_LEAK"
           },
           "latitude" : {
             "type" : "number",
-            "description" : "Center latitude of the watch area",
             "format" : "double",
+            "description" : "Center latitude of the watch area",
             "example" : 40.7128
           },
           "longitude" : {
             "type" : "number",
-            "description" : "Center longitude of the watch area",
             "format" : "double",
+            "description" : "Center longitude of the watch area",
             "example" : -74.006
           },
           "radiusKm" : {
             "type" : "number",
-            "description" : "Radius in kilometres around the center point",
             "format" : "double",
+            "description" : "Radius in kilometres around the center point",
             "example" : 5.0
           }
         },
-        "description" : "Request body for creating an alert subscription"
+        "required" : [ "alertType", "latitude", "longitude", "radiusKm" ]
       },
       "SubscriptionResponse" : {
         "type" : "object",
+        "description" : "Active subscription details",
         "properties" : {
           "id" : {
             "type" : "string",
-            "description" : "Subscription identifier",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "Subscription identifier"
           },
           "userId" : {
             "type" : "string",
-            "description" : "Owner of the subscription",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "Owner of the subscription"
           },
           "alertType" : {
             "type" : "string",
@@ -968,18 +963,18 @@
           },
           "latitude" : {
             "type" : "number",
-            "description" : "Center latitude",
-            "format" : "double"
+            "format" : "double",
+            "description" : "Center latitude"
           },
           "longitude" : {
             "type" : "number",
-            "description" : "Center longitude",
-            "format" : "double"
+            "format" : "double",
+            "description" : "Center longitude"
           },
           "radiusKm" : {
             "type" : "number",
-            "description" : "Watch radius in km",
-            "format" : "double"
+            "format" : "double",
+            "description" : "Watch radius in km"
           },
           "active" : {
             "type" : "boolean",
@@ -987,30 +982,30 @@
           },
           "createdAt" : {
             "type" : "string",
-            "description" : "Creation timestamp",
-            "format" : "date-time"
+            "format" : "date-time",
+            "description" : "Creation timestamp"
           }
-        },
-        "description" : "Active subscription details"
+        }
       },
       "NotificationResponse" : {
         "type" : "object",
+        "description" : "A user notification (vote event or milestone)",
         "properties" : {
           "id" : {
             "type" : "string",
-            "description" : "Notification identifier",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "Notification identifier"
           },
           "recipientId" : {
             "type" : "string",
-            "description" : "ID of the user who receives this notification",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "ID of the user who receives this notification"
           },
           "type" : {
             "type" : "string",
             "description" : "What triggered the notification",
-            "example" : "VOTE",
-            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED" ]
+            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED" ],
+            "example" : "VOTE"
           },
           "title" : {
             "type" : "string",
@@ -1023,13 +1018,13 @@
           },
           "relatedAlertId" : {
             "type" : "string",
-            "description" : "Alert that triggered the notification; may be null",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "Alert that triggered the notification; may be null"
           },
           "triggeredByUserId" : {
             "type" : "string",
-            "description" : "User who caused the notification; may be null",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "User who caused the notification; may be null"
           },
           "read" : {
             "type" : "boolean",
@@ -1037,11 +1032,10 @@
           },
           "createdAt" : {
             "type" : "string",
-            "description" : "Timestamp when the notification was created",
-            "format" : "date-time"
+            "format" : "date-time",
+            "description" : "Timestamp when the notification was created"
           }
-        },
-        "description" : "A user notification (vote event or milestone)"
+        }
       },
       "MessageResponse" : {
         "type" : "object",
@@ -1052,44 +1046,49 @@
         }
       },
       "ResetPasswordRequest" : {
-        "required" : [ "newPassword", "token" ],
         "type" : "object",
         "properties" : {
           "token" : {
-            "type" : "string"
+            "type" : "string",
+            "minLength" : 1
           },
           "newPassword" : {
-            "type" : "string"
+            "type" : "string",
+            "minLength" : 1
           }
-        }
+        },
+        "required" : [ "newPassword", "token" ]
       },
       "RegisterRequest" : {
-        "required" : [ "displayName", "email", "password" ],
         "type" : "object",
+        "description" : "Request body for creating a new user account",
         "properties" : {
           "email" : {
             "type" : "string",
+            "format" : "email",
             "description" : "E-mail address (used as login)",
-            "example" : "alice@example.com"
+            "example" : "alice@example.com",
+            "minLength" : 1
           },
           "password" : {
-            "minLength" : 10,
             "type" : "string",
             "description" : "Password — at least 10 characters, including a letter and a digit, and at most 72 UTF-8 bytes",
-            "example" : "s3cr3tP@ssphrase"
+            "example" : "s3cr3tP@ssphrase",
+            "minLength" : 10
           },
           "displayName" : {
-            "maxLength" : 50,
-            "minLength" : 2,
             "type" : "string",
             "description" : "Public display name shown to other users",
-            "example" : "Alice"
+            "example" : "Alice",
+            "maxLength" : 50,
+            "minLength" : 2
           }
         },
-        "description" : "Request body for creating a new user account"
+        "required" : [ "displayName", "email", "password" ]
       },
       "AuthResponse" : {
         "type" : "object",
+        "description" : "Authentication tokens returned after a successful login or registration",
         "properties" : {
           "accessToken" : {
             "type" : "string",
@@ -1101,23 +1100,24 @@
           },
           "expiresIn" : {
             "type" : "integer",
-            "description" : "Access-token validity in milliseconds",
             "format" : "int64",
+            "description" : "Access-token validity in milliseconds",
             "example" : 86400000
           },
           "user" : {
-            "$ref" : "#/components/schemas/UserResponse"
+            "$ref" : "#/components/schemas/UserResponse",
+            "description" : "Basic profile of the authenticated user"
           }
-        },
-        "description" : "Authentication tokens returned after a successful login or registration"
+        }
       },
       "UserResponse" : {
         "type" : "object",
+        "description" : "Public profile of a user",
         "properties" : {
           "id" : {
             "type" : "string",
-            "description" : "Stable user identifier",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "Stable user identifier"
           },
           "email" : {
             "type" : "string",
@@ -1132,8 +1132,8 @@
           "role" : {
             "type" : "string",
             "description" : "Assigned role",
-            "example" : "USER",
-            "enum" : [ "USER", "MODERATOR", "ADMIN" ]
+            "enum" : [ "USER", "MODERATOR", "ADMIN" ],
+            "example" : "USER"
           },
           "emailVerified" : {
             "type" : "boolean",
@@ -1145,21 +1145,21 @@
           },
           "notificationRadiusKm" : {
             "type" : "integer",
-            "description" : "Configured notification radius in kilometres",
             "format" : "int32",
+            "description" : "Configured notification radius in kilometres",
             "example" : 5
           }
-        },
-        "description" : "Public profile of a user"
+        }
       },
       "RefreshTokenRequest" : {
-        "required" : [ "refreshToken" ],
         "type" : "object",
         "properties" : {
           "refreshToken" : {
-            "type" : "string"
+            "type" : "string",
+            "minLength" : 1
           }
-        }
+        },
+        "required" : [ "refreshToken" ]
       },
       "RefreshTokenResponse" : {
         "type" : "object",
@@ -1177,80 +1177,81 @@
         }
       },
       "LoginRequest" : {
-        "required" : [ "email", "password" ],
         "type" : "object",
+        "description" : "Credentials for logging in",
         "properties" : {
           "email" : {
             "type" : "string",
+            "format" : "email",
             "description" : "Registered e-mail address",
-            "example" : "alice@example.com"
+            "example" : "alice@example.com",
+            "minLength" : 1
           },
           "password" : {
             "type" : "string",
             "description" : "Account password",
-            "example" : "s3cr3tP@ss"
+            "example" : "s3cr3tP@ss",
+            "minLength" : 1
           }
         },
-        "description" : "Credentials for logging in"
+        "required" : [ "email", "password" ]
       },
       "ForgotPasswordRequest" : {
-        "required" : [ "email" ],
         "type" : "object",
         "properties" : {
           "email" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "email",
+            "minLength" : 1
           }
-        }
+        },
+        "required" : [ "email" ]
       },
       "CreateAlertRequest" : {
-        "required" : [ "description", "latitude", "longitude", "severity", "title", "type" ],
         "type" : "object",
+        "description" : "Request body for creating a new safety alert",
         "properties" : {
           "title" : {
-            "maxLength" : 200,
-            "minLength" : 0,
             "type" : "string",
             "description" : "Short title of the alert",
-            "example" : "Gas leak on Main St"
+            "example" : "Gas leak on Main St",
+            "maxLength" : 200,
+            "minLength" : 0
           },
           "description" : {
-            "maxLength" : 2000,
-            "minLength" : 0,
             "type" : "string",
             "description" : "Detailed description of the alert",
-            "example" : "Strong smell of gas near intersection"
+            "example" : "Strong smell of gas near intersection",
+            "maxLength" : 2000,
+            "minLength" : 0
           },
           "type" : {
             "type" : "string",
             "description" : "Category of the alert",
-            "example" : "GAS_LEAK",
-            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ],
+            "example" : "GAS_LEAK"
           },
           "severity" : {
             "type" : "string",
             "description" : "Severity level",
-            "example" : "HIGH",
-            "enum" : [ "LOW", "MEDIUM", "HIGH", "CRITICAL" ]
+            "enum" : [ "LOW", "MEDIUM", "HIGH", "CRITICAL" ],
+            "example" : "HIGH"
           },
           "latitude" : {
-            "maximum" : 90.0,
-            "exclusiveMaximum" : false,
-            "minimum" : -90.0,
-            "exclusiveMinimum" : false,
             "type" : "number",
-            "description" : "WGS-84 latitude of the incident",
             "format" : "double",
-            "example" : 40.7128
+            "description" : "WGS-84 latitude of the incident",
+            "example" : 40.7128,
+            "maximum" : 90.0,
+            "minimum" : -90.0
           },
           "longitude" : {
-            "maximum" : 180.0,
-            "exclusiveMaximum" : false,
-            "minimum" : -180.0,
-            "exclusiveMinimum" : false,
             "type" : "number",
-            "description" : "WGS-84 longitude of the incident",
             "format" : "double",
-            "example" : -74.006
+            "description" : "WGS-84 longitude of the incident",
+            "example" : -74.006,
+            "maximum" : 180.0,
+            "minimum" : -180.0
           },
           "photoUrl" : {
             "type" : "string",
@@ -1258,15 +1259,16 @@
             "example" : "/api/v1/uploads/uuid.jpg"
           }
         },
-        "description" : "Request body for creating a new safety alert"
+        "required" : [ "description", "latitude", "longitude", "severity", "title", "type" ]
       },
       "AlertResponse" : {
         "type" : "object",
+        "description" : "Alert details returned by the API",
         "properties" : {
           "id" : {
             "type" : "string",
-            "description" : "Unique identifier of the alert",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "Unique identifier of the alert"
           },
           "title" : {
             "type" : "string",
@@ -1288,20 +1290,20 @@
           },
           "latitude" : {
             "type" : "number",
-            "description" : "Latitude of the incident location",
             "format" : "double",
+            "description" : "Latitude of the incident location",
             "example" : 40.7128
           },
           "longitude" : {
             "type" : "number",
-            "description" : "Longitude of the incident location",
             "format" : "double",
+            "description" : "Longitude of the incident location",
             "example" : -74.006
           },
           "createdAt" : {
             "type" : "string",
-            "description" : "Timestamp when the alert was created",
-            "format" : "date-time"
+            "format" : "date-time",
+            "description" : "Timestamp when the alert was created"
           },
           "status" : {
             "type" : "string",
@@ -1310,66 +1312,66 @@
           },
           "reportedBy" : {
             "type" : "string",
-            "description" : "ID of the user who reported the alert",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "ID of the user who reported the alert"
           },
           "upvoteCount" : {
             "type" : "integer",
-            "description" : "Number of upvotes",
-            "format" : "int32"
+            "format" : "int32",
+            "description" : "Number of upvotes"
           },
           "downvoteCount" : {
             "type" : "integer",
-            "description" : "Number of downvotes",
-            "format" : "int32"
+            "format" : "int32",
+            "description" : "Number of downvotes"
           },
           "confirmationCount" : {
             "type" : "integer",
-            "description" : "Number of confirmations",
-            "format" : "int32"
+            "format" : "int32",
+            "description" : "Number of confirmations"
           },
           "credibilityScore" : {
             "type" : "integer",
-            "description" : "Credibility score as computed by the voting service",
-            "format" : "int32"
+            "format" : "int32",
+            "description" : "Credibility score as computed by the voting service"
           },
           "resolvedAt" : {
             "type" : "string",
-            "description" : "Timestamp when the alert was resolved; null if still active",
-            "format" : "date-time"
+            "format" : "date-time",
+            "description" : "Timestamp when the alert was resolved; null if still active"
           },
           "photoUrl" : {
             "type" : "string",
             "description" : "URL of the uploaded photo, if any"
           }
-        },
-        "description" : "Alert details returned by the API"
+        }
       },
       "VoteRequest" : {
-        "required" : [ "voteType" ],
         "type" : "object",
+        "description" : "Request body for casting a vote on an alert",
         "properties" : {
           "voteType" : {
             "type" : "string",
             "description" : "Type of vote to cast",
-            "example" : "UPVOTE",
-            "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ]
+            "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ],
+            "example" : "UPVOTE"
           }
         },
-        "description" : "Request body for casting a vote on an alert"
+        "required" : [ "voteType" ]
       },
       "VoteResponse" : {
         "type" : "object",
+        "description" : "The recorded vote and the resulting tallies",
         "properties" : {
           "id" : {
             "type" : "string",
-            "description" : "Vote identifier",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "Vote identifier"
           },
           "alertId" : {
             "type" : "string",
-            "description" : "ID of the alert that was voted on",
-            "format" : "uuid"
+            "format" : "uuid",
+            "description" : "ID of the alert that was voted on"
           },
           "voteType" : {
             "type" : "string",
@@ -1378,90 +1380,86 @@
           },
           "createdAt" : {
             "type" : "string",
-            "description" : "When the vote was recorded",
-            "format" : "date-time"
+            "format" : "date-time",
+            "description" : "When the vote was recorded"
           },
           "stats" : {
-            "$ref" : "#/components/schemas/VoteStatsResponse"
+            "$ref" : "#/components/schemas/VoteStatsResponse",
+            "description" : "Tallies after this vote"
           }
-        },
-        "description" : "The recorded vote and the resulting tallies"
+        }
       },
       "VoteStatsResponse" : {
         "type" : "object",
+        "description" : "Aggregate vote statistics for an alert",
         "properties" : {
           "upvotes" : {
             "type" : "integer",
-            "description" : "Number of upvotes",
-            "format" : "int32"
+            "format" : "int32",
+            "description" : "Number of upvotes"
           },
           "downvotes" : {
             "type" : "integer",
-            "description" : "Number of downvotes",
-            "format" : "int32"
+            "format" : "int32",
+            "description" : "Number of downvotes"
           },
           "confirmations" : {
             "type" : "integer",
-            "description" : "Number of confirmations",
-            "format" : "int32"
+            "format" : "int32",
+            "description" : "Number of confirmations"
           },
           "credibilityScore" : {
             "type" : "integer",
-            "description" : "Credibility score as computed by the voting service",
-            "format" : "int32"
+            "format" : "int32",
+            "description" : "Credibility score as computed by the voting service"
           }
-        },
-        "description" : "Aggregate vote statistics for an alert"
+        }
       },
       "UpdateUserPreferencesRequest" : {
-        "required" : [ "notificationRadiusKm" ],
         "type" : "object",
+        "description" : "Request body for updating notification preferences",
         "properties" : {
           "notificationRadiusKm" : {
             "type" : "integer",
-            "description" : "Allowed radius preset in kilometres",
             "format" : "int32",
+            "description" : "Allowed radius preset in kilometres",
             "example" : 10
           },
           "lastKnownLat" : {
-            "maximum" : 90.0,
-            "exclusiveMaximum" : false,
-            "minimum" : -90.0,
-            "exclusiveMinimum" : false,
             "type" : "number",
-            "description" : "Latest known latitude",
             "format" : "double",
-            "example" : 42.3601
+            "description" : "Latest known latitude",
+            "example" : 42.3601,
+            "maximum" : 90.0,
+            "minimum" : -90.0
           },
           "lastKnownLng" : {
-            "maximum" : 180.0,
-            "exclusiveMaximum" : false,
-            "minimum" : -180.0,
-            "exclusiveMinimum" : false,
             "type" : "number",
-            "description" : "Latest known longitude",
             "format" : "double",
-            "example" : -71.0589
+            "description" : "Latest known longitude",
+            "example" : -71.0589,
+            "maximum" : 180.0,
+            "minimum" : -180.0
           }
         },
-        "description" : "Request body for updating notification preferences"
+        "required" : [ "notificationRadiusKm" ]
       },
       "ChangeRoleRequest" : {
-        "required" : [ "role" ],
         "type" : "object",
+        "description" : "Assigns a role to an account",
         "properties" : {
           "role" : {
             "type" : "string",
             "description" : "The role to assign",
-            "example" : "MODERATOR",
-            "enum" : [ "USER", "MODERATOR", "ADMIN" ]
+            "enum" : [ "USER", "MODERATOR", "ADMIN" ],
+            "example" : "MODERATOR"
           }
         },
-        "description" : "Assigns a role to an account"
+        "required" : [ "role" ]
       },
       "SetEnabledRequest" : {
-        "required" : [ "enabled" ],
         "type" : "object",
+        "description" : "Enables or disables an account",
         "properties" : {
           "enabled" : {
             "type" : "boolean",
@@ -1469,10 +1467,11 @@
             "example" : false
           }
         },
-        "description" : "Enables or disables an account"
+        "required" : [ "enabled" ]
       },
       "UserVoteResponse" : {
         "type" : "object",
+        "description" : "Indicates whether the current user has voted on an alert",
         "properties" : {
           "hasVoted" : {
             "type" : "boolean",
@@ -1483,11 +1482,11 @@
             "description" : "The vote type, or null if hasVoted is false",
             "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ]
           }
-        },
-        "description" : "Indicates whether the current user has voted on an alert"
+        }
       },
       "NearbyAlertsResponse" : {
         "type" : "object",
+        "description" : "Active alerts near a point, capped at `limit`",
         "properties" : {
           "alerts" : {
             "type" : "array",
@@ -1498,14 +1497,14 @@
           },
           "count" : {
             "type" : "integer",
-            "description" : "Number of alerts in this response",
             "format" : "int32",
+            "description" : "Number of alerts in this response",
             "example" : 42
           },
           "limit" : {
             "type" : "integer",
-            "description" : "The cap that was applied",
             "format" : "int32",
+            "description" : "The cap that was applied",
             "example" : 100
           },
           "truncated" : {
@@ -1513,11 +1512,11 @@
             "description" : "True when the cap was reached and older matches were dropped. Narrow the radius or filter by type/severity to see them.",
             "example" : false
           }
-        },
-        "description" : "Active alerts near a point, capped at `limit`"
+        }
       },
       "UserPageResponse" : {
         "type" : "object",
+        "description" : "One page of accounts, with the total so a caller knows there are more",
         "properties" : {
           "users" : {
             "type" : "array",
@@ -1529,8 +1528,7 @@
             "type" : "integer",
             "format" : "int64"
           }
-        },
-        "description" : "One page of accounts, with the total so a caller knows there are more"
+        }
       }
     }
   }

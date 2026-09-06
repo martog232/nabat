@@ -19,7 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.modulith.events.IncompleteEventPublications;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -82,15 +82,15 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
      * Mocked so the test controls whether delivery succeeds. This is the seam that stands
      * in for a crash between commit and push.
      */
-    @MockBean
+    @MockitoBean
     private AlertNotificationPort notificationPort;
 
     /** Mocked so there is always an audience; the real adapter would need seeded subscriptions. */
-    @MockBean
+    @MockitoBean
     private AlertAudiencePort audiencePort;
 
     /** Prevent real SMTP during integration tests. */
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
     private UUID reporterId;

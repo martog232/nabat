@@ -4,11 +4,11 @@ import org.example.nabat.PostgresTestSupport;
 import org.example.nabat.identity.application.port.out.EmailSender;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.health.HealthEndpointGroup;
-import org.springframework.boot.actuate.health.HealthEndpointGroups;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpointGroup;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpointGroups;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -45,7 +45,7 @@ class HealthProbesIntegrationTest extends PostgresTestSupport {
     private HealthEndpointGroups groups;
 
     /** Prevent real SMTP during integration tests. */
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
     @Test

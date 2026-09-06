@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -82,11 +82,11 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
     @Autowired
     private AlertJpaRepository alerts;
 
-    @MockBean
+    @MockitoBean
     private AlertAudiencePort audiencePort;
 
     /** Prevent real SMTP during integration tests. */
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
     /**

@@ -4,8 +4,8 @@ import org.example.nabat.realtime.spi.WsBroadcaster;
 import org.example.nabat.realtime.spi.WsFrame;
 import org.example.nabat.realtime.spi.WsClusterRelay;
 import org.example.nabat.realtime.spi.LocalWsDelivery;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -174,7 +174,7 @@ public class AlertWebSocketHandler extends TextWebSocketHandler
     private String serialize(WsFrame frame) {
         try {
             return objectMapper.writeValueAsString(frame.forClient());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.warn("Failed to serialize {} frame: {}", frame.type(), e.getMessage());
             return null;
         }

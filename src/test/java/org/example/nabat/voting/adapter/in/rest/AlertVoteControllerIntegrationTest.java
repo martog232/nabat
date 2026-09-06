@@ -1,7 +1,7 @@
 package org.example.nabat.voting.adapter.in.rest;
 
 import org.example.nabat.PostgresTestSupport;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.example.nabat.incident.adapter.in.rest.AlertResponse;
 import org.example.nabat.identity.adapter.in.rest.AuthResponse;
 import org.example.nabat.incident.adapter.in.rest.CreateAlertRequest;
@@ -15,9 +15,9 @@ import org.example.nabat.voting.domain.VoteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -51,10 +51,10 @@ class AlertVoteControllerIntegrationTest extends PostgresTestSupport {
     private UserJpaRepository userRepository;
 
     /** Prevent real SMTP during integration tests. */
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
-    @MockBean
+    @MockitoBean
     private ExternalVotingPort externalVotingPort;
 
     @BeforeEach

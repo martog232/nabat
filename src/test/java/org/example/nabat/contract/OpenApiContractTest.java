@@ -1,13 +1,14 @@
 package org.example.nabat.contract;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.SerializationFeature;
 import org.example.nabat.PostgresTestSupport;
 import org.example.nabat.identity.application.port.out.EmailSender;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -64,7 +65,8 @@ class OpenApiContractTest extends PostgresTestSupport {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+        // Jackson 3 mappers are immutable; features are set on the builder, not after.
+        ObjectMapper mapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
         JsonNode servedSpec = mapper.readTree(served);
 
         if (Boolean.getBoolean(UPDATE_PROPERTY)) {
