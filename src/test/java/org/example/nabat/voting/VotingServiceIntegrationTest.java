@@ -34,6 +34,11 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -89,6 +94,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class VotingServiceIntegrationTest extends PostgresTestSupport {
+
+    /**
+     * How many times {@link #twoConcurrentVotersOnOneAlertBothEndUpInTheScore()} races a pair
+     * of voters, each round on its own alert. The window it aims at is a few milliseconds
+     * wide, so one attempt proves little; this is a detection budget, not a correctness
+     * threshold, and raising it only makes an existing defect easier to see.
+     */
+    private static final int RACE_ROUNDS =
+        Integer.getInteger("nabat.voting.race-rounds", 8);
 
     /** Shared by nabat-app's test context and the container, or every forwarded token is a 401. */
     private static final String JWT_SECRET =
@@ -380,9 +394,104 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
             });
     }
 
-    /** Casting the same vote twice is a conflict there, and must arrive here as 409, not 503. */
+    /**
+     * Two voters on one alert at the same time, and the score still has to end up at both.
+     *
+     * <p>Everything above votes once, sequentially, which is the one shape that cannot expose
+     * how the outbox decides what order to send in. {@code OutboxRelay} drains pending rows
+     * {@code order by occurredAt asc}, and {@code occurred_at} is stamped at the *start* of
+     * the transaction — before the vote is written and before the tallies are read. Commit
+     * order and {@code occurred_at} order are therefore free to disagree:
+     *
+     * <pre>
+     *   T1 begins        (occurred_at = t0)
+     *   T2 begins        (occurred_at = t1, t1 &gt; t0)
+     *   T2 writes, reads tallies = 1, commits      // does not see T1 yet
+     *   T1 writes, reads tallies = 2, commits      // sees T2, which has committed
+     *   relay sends t0 (carrying 2), then t1 (carrying 1)
+     * </pre>
+     *
+     * <p>The messages carry <em>absolute</em> tallies, which is what makes redelivery
+     * idempotent — and also what makes the last message win outright. nabat-app applies 2,
+     * then applies 1, and the alert displays one confirmation while two people confirmed it.
+     * Nothing retries, because recomputation only runs on the next event for that alert, so
+     * the wrong number stays on screen until somebody votes again.
+     *
+     * <p><b>This test cannot fail on correct code.</b> It asserts an invariant that must hold
+     * under every interleaving — two committed votes eventually read back as two — rather
+     * than pinning one side of a race, which is the trap the class comment describes. What it
+     * cannot promise is the opposite: the inversion needs T2 to begin and commit inside T1's
+     * window, so a green run means "not observed", not "cannot happen". Hence several rounds,
+     * each on a fresh alert. It checks nabat-voting's own write model first, so a failure
+     * distinguishes a projection that disagrees with the votes from a vote that never landed.
+     */
     @Test
     @Order(5)
+    void twoConcurrentVotersOnOneAlertBothEndUpInTheScore() throws Exception {
+        String voterA = register("voting-race-a@example.com", "Votingtest123");
+        String voterB = register("voting-race-b@example.com", "Votingtest123");
+
+        for (int round = 1; round <= RACE_ROUNDS; round++) {
+            String racedAlertId = createAlert(voterA);
+
+            // One latch so both requests are released together; two threads so they are
+            // actually in flight at once rather than merely started in the same loop.
+            CountDownLatch startLine = new CountDownLatch(1);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                Future<Integer> first = pool.submit(() -> confirmOnRelease(racedAlertId, voterA, startLine));
+                Future<Integer> second = pool.submit(() -> confirmOnRelease(racedAlertId, voterB, startLine));
+                startLine.countDown();
+
+                assertThat(first.get(30, TimeUnit.SECONDS))
+                    .as("round %d: first voter's POST", round).isEqualTo(201);
+                assertThat(second.get(30, TimeUnit.SECONDS))
+                    .as("round %d: second voter's POST", round).isEqualTo(201);
+            } finally {
+                pool.shutdownNow();
+            }
+
+            assertThat(voteRowsFor(racedAlertId))
+                .as("round %d: both votes committed in nabat-voting's write model — anything "
+                    + "below is a projection defect, not a lost vote", round)
+                .isEqualTo(2);
+
+            int currentRound = round;
+            await().atMost(Duration.ofSeconds(30))
+                .pollInterval(Duration.ofMillis(500))
+                .untilAsserted(() -> {
+                    JsonNode alert = objectMapper.readTree(mockMvc
+                        .perform(get("/api/v1/alerts/{id}", racedAlertId)
+                                     .header("Authorization", "Bearer " + voterA))
+                        .andExpect(status().isOk())
+                        .andReturn().getResponse().getContentAsString());
+
+                    assertThat(alert.get("confirmationCount").asInt())
+                        .as("round %d: two committed confirmations must both be counted",
+                            currentRound)
+                        .isEqualTo(2);
+                    // confirmations weigh double, and that rule has one owner in nabat-voting.
+                    assertThat(alert.get("credibilityScore").asInt())
+                        .as("round %d: credibility score for two confirmations", currentRound)
+                        .isEqualTo(4);
+                });
+        }
+    }
+
+    /** Blocks until the latch opens, then votes. Returns the status so the caller can assert it. */
+    private int confirmOnRelease(String alertId, String token, CountDownLatch startLine)
+            throws Exception {
+        startLine.await();
+        return mockMvc.perform(post("/api/v1/alerts/{id}/votes", alertId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"voteType\":\"CONFIRM\"}"))
+                .andReturn().getResponse().getStatus();
+    }
+
+    /** Casting the same vote twice is a conflict there, and must arrive here as 409, not 503. */
+    @Test
+    @Order(6)
     void aDuplicateVoteIsAConflictRatherThanAnOutage() throws Exception {
         mockMvc.perform(post("/api/v1/alerts/{id}/votes", alertId)
                         .header("Authorization", "Bearer " + accessToken)
@@ -399,7 +508,7 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
      * the only way to check it is to actually take the dependency away.
      */
     @Test
-    @Order(6)
+    @Order(7)
     void anOutageIsA503() throws Exception {
         VOTING.stop();
 
