@@ -434,6 +434,12 @@ services:
       # turns every vote into a 401 there and a 503 here — the shared-secret weakness and
       # the reason it currently has to be shared, both in one line.
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required and must match nabat-app. Generate with `openssl rand -base64 48` and set it in .env}
+      # Same variable, same reason, as nabat-app above: the application default is the
+      # literal host `nabat-zipkin`, which resolves here only by coincidence with a
+      # container_name. Spans that go nowhere make the backend look like a system with
+      # no traffic, and until this was set Zipkin knew a single service — a vote could
+      # be followed through nabat-app and vanished at the boundary between the two.
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8081:8081"
     restart: unless-stopped
