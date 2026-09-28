@@ -96,6 +96,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 .andExpect(jsonPath("$.id").value(notNullValue()))
                 .andExpect(jsonPath("$.title").value("Integration Test Alert"))
                 .andExpect(jsonPath("$.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.districtCode").value(notNullValue()))
                 .andReturn();
 
         // Verify the alert was created with the authenticated user's ID
@@ -106,6 +107,30 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         org.junit.jupiter.api.Assertions.assertEquals(userId, response.reportedBy());
     }
 
+
+    /**
+     * Plovdiv: well-formed, and nowhere nabat can send a report. 422 with its own code, so
+     * a client can say "outside Sofia" rather than "invalid request" — and nothing stored.
+     */
+    @Test
+    void refusesAReportOutsideSofia() throws Exception {
+        String token = registerAndGetAuth().accessToken();
+        long before = alertRepository.count();
+
+        CreateAlertRequest request = new CreateAlertRequest(
+                "Pothole in Plovdiv", "Not ours to route", AlertType.POTHOLE,
+                42.1354, 24.7453, null
+        );
+
+        mockMvc.perform(post("/api/v1/alerts")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("OUTSIDE_SERVICE_AREA"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(before, alertRepository.count());
+    }
     @Test
     void shouldReturnNearbyAlertsAfterCreation() throws Exception {
         AuthResponse auth = registerAndGetAuth();
@@ -188,8 +213,8 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 "Security Test Alert",
                 "Verifying reporter is from token, not request body",
                 AlertType.OTHER,
-                40.0,
-                20.0,
+                42.6515,
+                23.3455,
                 null
         );
 

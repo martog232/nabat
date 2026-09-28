@@ -46,7 +46,7 @@ class NewAlertFanoutTest {
             UUID.randomUUID(),
             0, 0, 0, 0,
             null,
-            null
+            null, "LOZENETS"
         );
 
         new NewAlertFanout(notificationPort).on(new AlertCreated(alert));

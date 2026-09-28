@@ -48,7 +48,7 @@ class AlertLifecycleServiceTest {
         return new Alert(alertId, "T", "D", AlertType.POTHOLE,
                 Location.of(0, 0), Instant.now(), AlertStatus.SUBMITTED,
                 ownerId, 0, 0, 0,
-        0, null, null);
+        0, null, null, "LOZENETS");
     }
 
     private User user(UUID id, Role role) {
@@ -95,7 +95,7 @@ class AlertLifecycleServiceTest {
         Alert resolved = new Alert(alertId, "T", "D", AlertType.POTHOLE,
                 Location.of(0, 0), Instant.now(), AlertStatus.RESOLVED,
                 ownerId, 0, 0, 0,
-        0, Instant.now(), null);
+        0, Instant.now(), null, "LOZENETS");
         when(alertRepository.findById(alertId)).thenReturn(Optional.of(resolved));
 
         assertThrows(IllegalStateException.class,

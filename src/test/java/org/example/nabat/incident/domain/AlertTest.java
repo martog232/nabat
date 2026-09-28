@@ -23,7 +23,7 @@ class AlertTest {
                 AlertType.POTHOLE,
                 Location.of(42.0, 23.0),
                 reportedBy,
-                null
+                null, "LOZENETS"
         );
 
         assertNotNull(alert.id());
@@ -44,7 +44,7 @@ class AlertTest {
                 AlertType.POTHOLE,
                 location,
                 reportedBy,
-                null
+                null, "LOZENETS"
         );
 
         assertEquals("Pothole on Shipka", alert.title());
@@ -62,7 +62,7 @@ class AlertTest {
                 AlertType.WASTE,
                 Location.of(42.0, 23.0),
                 UUID.randomUUID(),
-                null
+                null, "LOZENETS"
         );
 
         assertEquals(0, alert.upvoteCount());
@@ -72,8 +72,8 @@ class AlertTest {
 
     @Test
     void shouldGenerateUniqueIds() {
-        Alert alert1 = Alert.create("A1", "D1", AlertType.POTHOLE, Location.of(42.0, 23.0), UUID.randomUUID(), null);
-        Alert alert2 = Alert.create("A2", "D2", AlertType.WASTE, Location.of(42.0, 23.0), UUID.randomUUID(), null);
+        Alert alert1 = Alert.create("A1", "D1", AlertType.POTHOLE, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS");
+        Alert alert2 = Alert.create("A2", "D2", AlertType.WASTE, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS");
 
         assertNotEquals(alert1.id(), alert2.id());
     }
@@ -83,7 +83,7 @@ class AlertTest {
 
         private final Alert submitted = Alert.create(
                 "T", "D", AlertType.POTHOLE,
-                Location.of(42.69, 23.32), UUID.randomUUID(), null);
+                Location.of(42.69, 23.32), UUID.randomUUID(), null, "LOZENETS");
 
         @Test
         void walksTheForwardPathOneStepAtATime() {

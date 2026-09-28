@@ -100,7 +100,7 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
                 reportedBy,
                 0, 0, 0, 0,
                 null,
-                null
+                null, "LOZENETS"
         );
         return alertRepository.saveAndFlush(AlertJpaEntity.from(alert)).getId();
     }

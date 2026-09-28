@@ -103,7 +103,7 @@ class AlertPhotoReferenceQueryIntegrationTest extends PostgresTestSupport {
             reporterId,
             0, 0, 0, 0,
             null,
-            photoUrl
+            photoUrl, "LOZENETS"
         );
         alerts.saveAndFlush(AlertJpaEntity.from(alert));
     }

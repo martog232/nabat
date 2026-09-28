@@ -81,6 +81,9 @@ public class AlertJpaEntity {
     @Column(name = "photo_url", length = 500)
     private String photoUrl;
 
+    @Column(name = "district_code", length = 32)
+    private String districtCode;
+
     // JPA requires default constructor
     protected AlertJpaEntity() {
     }
@@ -103,6 +106,7 @@ public class AlertJpaEntity {
         entity.credibilityScore = alert.credibilityScore();
         entity.resolvedAt = alert.resolvedAt();
         entity.photoUrl = alert.photoUrl();
+        entity.districtCode = alert.districtCode();
         return entity;
     }
 
@@ -121,7 +125,8 @@ public class AlertJpaEntity {
                 confirmationCount,
                 credibilityScore,
                 resolvedAt,
-                photoUrl
+                photoUrl,
+                districtCode
         );
     }
 }

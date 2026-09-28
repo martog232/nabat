@@ -86,7 +86,7 @@ class AlertControllerTest {
 
                 0,
                 null,
-                null
+                null, "LOZENETS"
         );
     }
 

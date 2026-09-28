@@ -27,7 +27,8 @@ public record AlertResponse(
     // extra requests per alert — and then recomputed the score locally anyway.
     @Schema(description = "Credibility score as computed by the voting service") int credibilityScore,
     @Schema(description = "Timestamp when the alert was resolved; null if still active") Instant resolvedAt,
-    @Schema(description = "URL of the uploaded photo, if any") String photoUrl
+    @Schema(description = "URL of the uploaded photo, if any") String photoUrl,
+    @Schema(description = "Code of the Sofia district the report is in; null only on reports older than districts", example = "LOZENETS") String districtCode
 ) {
     public static AlertResponse from(Alert alert) {
         return new AlertResponse(
@@ -45,7 +46,8 @@ public record AlertResponse(
             alert.confirmationCount(),
             alert.credibilityScore(),
             alert.resolvedAt(),
-            alert.photoUrl()
+            alert.photoUrl(),
+            alert.districtCode()
         );
     }
 }

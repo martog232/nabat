@@ -18,6 +18,7 @@ Each direct sub-package of `org.example.nabat` is a Spring Modulith module. `Mod
 | `notification` | notification records, delivery, milestone policy |
 | `realtime` | WebSocket transport: sessions, tickets, cross-instance relay |
 | `media` | photo upload and retrieval |
+| `jurisdiction` | the 24 districts of Sofia and their boundaries; answers `incident`'s `DistrictLookupPort` |
 | `shared` | value types every module needs (`Location`, `NotAuthorizedException`, `@UseCase`) plus infrastructure beans. **Depends on nothing.** |
 | `events` | the Avro event contract shared with nabat-voting, **generated** from `src/main/avro` into `org.example.nabat.events.*`. An **open** module (`@ApplicationModule(type = OPEN)`): every type is public, because the package holds nothing but generated classes whose shape another repository also owns. |
 | `platform` | app-wide composition: `GlobalExceptionHandler`, request logging, use-case metrics, async enablement. **Depended on by nothing.** |
@@ -59,6 +60,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 ### Spatial queries (`incident` persistence + migrations)
 - `V4__postgis_spatial_indexes.sql` enables the `postgis` extension and adds a `GEOGRAPHY(Point, 4326)` column + GiST index on `alerts`. Nearby-alert queries use `ST_DWithin` instead of Haversine.
 - Tests that exercise spatial queries use **Testcontainers** with a PostGIS image (`@DataJpaTest`). Docker is required for those tests.
+- **PostGIS is required since V18.** V4 was written to no-op without the extension and the application falls back to Haversine for distances, but there is no fallback for which polygon a point is in, so V18 runs `CREATE EXTENSION postgis` unconditionally and fails without it. The Haversine query variants and `SpatialCapabilityDetector` are now dead weight on any database V18 accepts; removing them is a separate cleanup.
 
 ### Voting via Kafka microservice (`voting/application/ExternalVoteService.java`)
 - **Running it: `docker compose --profile voting up`.** Kafka, a second Postgres and nabat-voting itself are behind a profile, because Kafka plus another JVM on top of twelve containers is a lot to ask of a laptop for work that usually does not touch voting. **Without the profile every vote answers 503** — `V7` dropped the local `alert_votes` table, so there is no fallback path and that is the honest answer rather than a pretence that the feature is absent.
@@ -92,6 +94,14 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `NotificationService` — creates and persists `Notification` records; delivers them in real time via `NotificationSender` if the user is reachable, and relies on the persisted row otherwise.
 - `NotificationMilestones` (in `notification/domain`) — the confirmation thresholds that trigger milestone notifications.
 - `ExternalVoteService` calls `SendNotificationUseCase.sendVoteNotification` and `sendMilestoneNotification` after each vote. It passes a `NotificationType`, **not** a `VoteType`: this module must not know what a vote is, or it would depend on the module already calling it.
+
+### Districts (`jurisdiction` + `incident`)
+- **Every new report is placed in one of the 24 districts of Stolichna obshtina, or refused.** `CreateAlertService` asks `DistrictLookupPort` before writing anything; no district means `OutsideServiceAreaException` → **422 `OUTSIDE_SERVICE_AREA`**, not 400 — nothing in the request is malformed. Refused before the save and before `AlertCreated`, so a report nobody will receive is never stored as `SUBMITTED` or put on a map.
+- `alerts.district_code` is written once, at creation, and never changes. It is **not** a foreign key to `districts` — the tables belong to different modules. NULL only on reports older than V18 that lie outside the city.
+- Containment is `ST_Covers`, not `ST_Contains`: a point on the line between two districts must be in one of them, not in neither. Ties go to the lowest code, so the answer is stable. The point is built **longitude first**.
+- `DistrictJpaEntity` does not map `boundary`. Java never reads the polygon, and mapping it would pull in hibernate-spatial for nothing; `ddl-auto=validate` only checks mapped columns.
+- The boundaries are OSM data (ODbL), relation ids kept in `osm_relation_id` for refreshing. `DistrictBoundariesIntegrationTest` holds the invariants checked on import — all valid, no overlaps, one piece, ~1342 km² — so a refresh cannot quietly break routing.
+- `GET /api/v1/districts` lists code and name, for clients turning a `districtCode` into something to show.
 
 ### New-report push (`incident`)
 - `CreateAlertService` saves the alert and publishes `AlertCreated`. It pushes nothing itself.
@@ -187,6 +197,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V15 | Civic categories (`POTHOLE`, ...) and the `SUBMITTED → … → RESOLVED` / `REJECTED` lifecycle, with CHECKs on both |
 | V16 | Drop `alerts.severity` |
 | V17 | Drop `user_subscriptions` and the notification radius and location columns on `users` — the proximity push is gone |
+| V18 | `districts` — the 24 Sofia district boundaries from OSM (PostGIS now required), and `alerts.district_code`, backfilled |
 
 ---
 

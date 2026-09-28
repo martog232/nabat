@@ -2,6 +2,7 @@ package org.example.nabat.platform;
 
 import org.example.nabat.shared.exception.ExternalServiceUnavailableException;
 import org.example.nabat.incident.domain.AlertNotFoundException;
+import org.example.nabat.incident.domain.OutsideServiceAreaException;
 import org.example.nabat.identity.domain.AuthenticationFailedException;
 import org.example.nabat.identity.domain.EmailAlreadyRegisteredException;
 import org.example.nabat.shared.domain.NotAuthorizedException;
@@ -61,6 +62,7 @@ public class GlobalExceptionHandler {
     static final String MSG_VOTE_CONFLICT   = "You have already cast this vote";
     static final String MSG_PAYLOAD_TOO_LARGE = "File is too large";
     static final String MSG_UNSUPPORTED_MEDIA = "Unsupported file type";
+    static final String MSG_OUTSIDE_AREA    = "nabat only accepts reports inside Sofia";
     static final String MSG_UNAVAILABLE     = "A required service is temporarily unavailable. Please try again.";
     static final String MSG_INTERNAL        = "Something went wrong. Please try again.";
 
@@ -90,6 +92,17 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, "BAD_CREDENTIALS", MSG_BAD_CREDENTIALS);
     }
 
+
+    /**
+     * A well-formed report somewhere nabat does not cover. 422, not 400: nothing in the
+     * request is malformed, and a client that shows "invalid request" for a place outside
+     * Sofia tells the user the wrong thing to fix.
+     */
+    @ExceptionHandler(OutsideServiceAreaException.class)
+    public ResponseEntity<ErrorResponse> handleOutsideServiceArea(OutsideServiceAreaException ex) {
+        log.info("Rejected report: {}", ex.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, "OUTSIDE_SERVICE_AREA", MSG_OUTSIDE_AREA);
+    }
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("IllegalArgument: {}", ex.getMessage());

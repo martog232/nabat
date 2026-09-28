@@ -34,7 +34,13 @@ public record Alert(
         int confirmationCount,
         int credibilityScore,
         Instant resolvedAt,
-        String photoUrl
+        String photoUrl,
+        /**
+         * The district the report is in, which decides who is responsible for it. Written
+         * once at creation and never changed: the report does not move. Null only on reports
+         * that predate districts and lie outside the city (V18).
+         */
+        String districtCode
 ) {
     public static Alert create(
             String title,
@@ -42,7 +48,8 @@ public record Alert(
             AlertType type,
             Location location,
             UUID reportedBy,
-            String photoUrl
+            String photoUrl,
+            String districtCode
     ) {
         return new Alert(
                 AlertId.generate(),
@@ -55,7 +62,8 @@ public record Alert(
                 reportedBy,
                 0, 0, 0, 0,
                 null,
-                photoUrl
+                photoUrl,
+                districtCode
         );
     }
 
@@ -103,7 +111,7 @@ public record Alert(
                 id, title, description, type, location,
                 createdAt, target, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount, credibilityScore,
-                resolvedAt, photoUrl
+                resolvedAt, photoUrl, districtCode
         );
     }
 
@@ -118,7 +126,7 @@ public record Alert(
                 id, title, description, type, location,
                 createdAt, status, reportedBy,
                 upvotes, downvotes, confirmations, credibilityScore,
-                resolvedAt, photoUrl
+                resolvedAt, photoUrl, districtCode
         );
     }
 }
