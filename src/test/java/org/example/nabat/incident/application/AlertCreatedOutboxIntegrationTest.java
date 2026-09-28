@@ -6,7 +6,6 @@ import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.application.port.out.EmailSender;
 import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
-import org.example.nabat.incident.application.port.out.AlertAudiencePort;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
@@ -24,7 +23,6 @@ import org.springframework.modulith.events.IncompleteEventPublications;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -33,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -60,7 +57,6 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
     /** How long an assertion waits on the async listener before failing. */
     private static final Duration DELIVERY_TIMEOUT = Duration.ofSeconds(10);
 
-    private static final UUID RECIPIENT = UUID.randomUUID();
 
     @Autowired
     private CreateAlertUseCase createAlert;
@@ -84,10 +80,6 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
     @MockitoBean
     private AlertNotificationPort notificationPort;
 
-    /** Mocked so there is always an audience; the real adapter would need seeded subscriptions. */
-    @MockitoBean
-    private AlertAudiencePort audiencePort;
-
     /** Prevent real SMTP during integration tests. */
     @MockitoBean
     private EmailSender emailSender;
@@ -100,8 +92,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
         alerts.deleteAll();
         users.deleteAll();
 
-        Mockito.reset(notificationPort, audiencePort);
-        when(audiencePort.recipientsFor(any(), any(), anyDouble())).thenReturn(List.of(RECIPIENT));
+        Mockito.reset(notificationPort);
 
         var reporter = Fixtures.user("outbox-reporter@example.com");
         users.save(UserJpaEntity.from(reporter));
@@ -113,7 +104,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
         createAlert.createAlert(command("Delivered"));
 
         verify(notificationPort, timeout(DELIVERY_TIMEOUT.toMillis()))
-            .broadcastAlert(any(Alert.class), any());
+            .broadcastNewAlert(any(Alert.class));
 
         // The registry records one row per (event, listener), stamped complete once the
         // listener returns. `update` completion mode keeps the row rather than deleting it.
@@ -124,12 +115,12 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
     @Test
     void aFailedDeliveryLeavesThePublicationOutstanding() {
         doThrow(new IllegalStateException("socket write failed"))
-            .when(notificationPort).broadcastAlert(any(Alert.class), any());
+            .when(notificationPort).broadcastNewAlert(any(Alert.class));
 
         createAlert.createAlert(command("Lost push"));
 
         verify(notificationPort, timeout(DELIVERY_TIMEOUT.toMillis()))
-            .broadcastAlert(any(Alert.class), any());
+            .broadcastNewAlert(any(Alert.class));
 
         // The point of the whole change: the failure is not silent. Without the registry
         // this row would not exist and the alert would simply never have been pushed.
@@ -150,7 +141,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
     void anOutstandingPublicationIsRedeliveredOnResubmit() {
         doThrow(new IllegalStateException("socket write failed"))
             .doNothing()
-            .when(notificationPort).broadcastAlert(any(Alert.class), any());
+            .when(notificationPort).broadcastNewAlert(any(Alert.class));
 
         createAlert.createAlert(command("Replayed"));
         await(() -> outstandingPublications() == 1);
@@ -160,7 +151,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
         incompletePublications.resubmitIncompletePublications(publication -> true);
 
         verify(notificationPort, timeout(DELIVERY_TIMEOUT.toMillis()).times(2))
-            .broadcastAlert(any(Alert.class), any());
+            .broadcastNewAlert(any(Alert.class));
         await(() -> outstandingPublications() == 0);
     }
 
@@ -173,7 +164,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
     void theStoredPayloadRoundTripsBackIntoTheHandler() {
         doThrow(new IllegalStateException("socket write failed"))
             .doNothing()
-            .when(notificationPort).broadcastAlert(any(Alert.class), any());
+            .when(notificationPort).broadcastNewAlert(any(Alert.class));
 
         Alert created = createAlert.createAlert(command("Round trip"));
         await(() -> outstandingPublications() == 1);
@@ -182,7 +173,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
 
         ArgumentCaptor<Alert> rebuilt = ArgumentCaptor.forClass(Alert.class);
         verify(notificationPort, timeout(DELIVERY_TIMEOUT.toMillis()).times(2))
-            .broadcastAlert(rebuilt.capture(), any());
+            .broadcastNewAlert(rebuilt.capture());
 
         // Equality across the whole record, not just the id: an Instant that loses
         // precision or a Location that comes back transposed would still "work" here

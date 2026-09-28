@@ -5,9 +5,8 @@ import java.util.Set;
 /**
  * Answers which stored photos something still points at.
  *
- * <p>Declared here and implemented in {@code incident}, following the same direction as
- * {@code AlertAudiencePort}: the module that needs the answer owns the question, and the
- * module holding the data implements it. {@code media} must not query the alerts table
+ * <p>Declared here and implemented in {@code incident}: the module that needs the answer
+ * owns the question, and the module holding the data implements it. {@code media} must not query the alerts table
  * itself, and {@code incident} does not depend on {@code media} today — so the port keeps
  * the dependency pointing one way.
  *

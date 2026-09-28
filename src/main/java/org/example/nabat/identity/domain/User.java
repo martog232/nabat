@@ -1,6 +1,5 @@
 package org.example.nabat.identity.domain;
 
-import org.example.nabat.shared.domain.Location;
 import java.time.Instant;
 
 /**
@@ -9,13 +8,16 @@ import java.time.Instant;
  * <p>Copies are made through {@link #toBuilder()}. The six {@code withX} methods
  * this record used to expose each re-listed all of its components, so every new
  * field meant editing seven places — and a copy that forgot a field would compile
- * silently. {@code UpdateUserPreferencesService} had accumulated a seventh,
- * hand-inlined copy for the same reason.
+ * silently.
  *
  * <p>{@code password} is the bcrypt hash. It is a component of this record because
  * the record doubles as the Spring Security principal; take care never to serialise
  * a {@code User} directly to a client — the REST layer has {@code UserResponse} for
  * that, and the WebSocket layer must use response DTOs too.
+ *
+ * <p>A user used to carry a last known location and a notification radius, so that a
+ * new alert could be pushed to whoever was near it. Reports about the city are not
+ * something a passer-by needs pushed to them, and both went with that fan-out (V17).
  */
 public record User(
     UserId id,
@@ -27,10 +29,6 @@ public record User(
     boolean emailVerified,
     Instant createdAt,
     Instant updatedAt,
-    int notificationRadiusKm,
-    Double lastKnownLat,
-    Double lastKnownLng,
-    Instant locationUpdatedAt,
     /**
      * Incremented to invalidate every token previously issued to this user.
      *
@@ -42,8 +40,6 @@ public record User(
      */
     int tokenVersion
 ) {
-    private static final int DEFAULT_NOTIFICATION_RADIUS_KM = 5;
-
     public static User create(
         String email,
         String password,
@@ -60,10 +56,6 @@ public record User(
             false,   // emailVerified = false until they click the link
             now,
             now,
-            DEFAULT_NOTIFICATION_RADIUS_KM,
-            null,
-            null,
-            null,
             0
         );
     }
@@ -98,22 +90,6 @@ public record User(
         return toBuilder().emailVerified(true).touch().build();
     }
 
-    public User withNotificationRadius(int radiusKm) {
-        return toBuilder().notificationRadiusKm(radiusKm).touch().build();
-    }
-
-    public User withLocation(double lat, double lng, int radiusKm) {
-        Location validated = Location.of(lat, lng);
-        Instant now = Instant.now();
-        return toBuilder()
-            .notificationRadiusKm(radiusKm)
-            .lastKnownLat(validated.latitude())
-            .lastKnownLng(validated.longitude())
-            .locationUpdatedAt(now)
-            .updatedAt(now)
-            .build();
-    }
-
     /** Invalidates every token issued to this user so far. */
     public User invalidateSessions() {
         return toBuilder().tokenVersion(tokenVersion + 1).touch().build();
@@ -129,10 +105,6 @@ public record User(
         private boolean emailVerified;
         private Instant createdAt;
         private Instant updatedAt;
-        private int notificationRadiusKm;
-        private Double lastKnownLat;
-        private Double lastKnownLng;
-        private Instant locationUpdatedAt;
         private int tokenVersion;
 
         private Builder(User source) {
@@ -145,10 +117,6 @@ public record User(
             this.emailVerified = source.emailVerified;
             this.createdAt = source.createdAt;
             this.updatedAt = source.updatedAt;
-            this.notificationRadiusKm = source.notificationRadiusKm;
-            this.lastKnownLat = source.lastKnownLat;
-            this.lastKnownLng = source.lastKnownLng;
-            this.locationUpdatedAt = source.locationUpdatedAt;
             this.tokenVersion = source.tokenVersion;
         }
 
@@ -161,10 +129,6 @@ public record User(
         public Builder emailVerified(boolean value) { this.emailVerified = value; return this; }
         public Builder createdAt(Instant value) { this.createdAt = value; return this; }
         public Builder updatedAt(Instant value) { this.updatedAt = value; return this; }
-        public Builder notificationRadiusKm(int value) { this.notificationRadiusKm = value; return this; }
-        public Builder lastKnownLat(Double value) { this.lastKnownLat = value; return this; }
-        public Builder lastKnownLng(Double value) { this.lastKnownLng = value; return this; }
-        public Builder locationUpdatedAt(Instant value) { this.locationUpdatedAt = value; return this; }
         public Builder tokenVersion(int value) { this.tokenVersion = value; return this; }
 
         /** Sets {@code updatedAt} to now. */
@@ -173,8 +137,7 @@ public record User(
         public User build() {
             return new User(
                 id, email, password, displayName, role, enabled, emailVerified,
-                createdAt, updatedAt, notificationRadiusKm,
-                lastKnownLat, lastKnownLng, locationUpdatedAt, tokenVersion
+                createdAt, updatedAt, tokenVersion
             );
         }
     }

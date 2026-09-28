@@ -137,12 +137,6 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
             true,
             Instant.now(),
             Instant.now(),
-            5,
-            null,
-            null,
-            null
-        ,
-
             0);
         userRepository.saveAndFlush(UserJpaEntity.from(user));
         return user.id();

@@ -58,7 +58,6 @@ class VerificationTokenJpaRepositoryTest extends PostgresTestSupport {
         user.setEmailVerified(false);
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
-        user.setNotificationRadiusKm(5);
         userRepository.save(user);
         userId = UserId.of(user.getId());
     }

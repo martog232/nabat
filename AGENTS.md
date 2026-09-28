@@ -13,10 +13,9 @@ Each direct sub-package of `org.example.nabat` is a Spring Modulith module. `Mod
 | Module | Owns |
 |---|---|
 | `identity` | users, verification tokens, JWT issuing and verification, login-attempt tracking, the security filter chain |
-| `incident` | alerts: the write model, the state machine, nearby queries, the creation fan-out |
+| `incident` | alerts: the write model, the state machine, nearby queries, the new-report push |
 | `voting` | the HTTP bridge to nabat-voting and the local vote-count projection |
 | `notification` | notification records, delivery, milestone policy |
-| `subscription` | user ↔ alert-type subscriptions and the alert audience they imply |
 | `realtime` | WebSocket transport: sessions, tickets, cross-instance relay |
 | `media` | photo upload and retrieval |
 | `shared` | value types every module needs (`Location`, `NotAuthorizedException`, `@UseCase`) plus infrastructure beans. **Depends on nothing.** |
@@ -31,7 +30,7 @@ Each direct sub-package of `org.example.nabat` is a Spring Modulith module. `Mod
 
 - `<module>/domain` — pure Java **records**, value-object IDs and enums. No Spring/JPA/Lombok/Jackson. Domain logic lives on the records (`Alert.create(...)`, `Alert.resolve()`). Domain events live here too (`AlertCreated`).
 - `<module>/application/port/in` — use-case interfaces, with a nested `Command` record where needed (`CreateAlertUseCase.CreateAlertCommand`).
-- `<module>/application/port/out` — driven ports, implemented under `<module>/adapter/out/**`. A port may be implemented by **another** module when that module owns the data: `subscription` implements `incident`'s `AlertAudiencePort`. That is the intended direction — the module that needs something declares the port, the module that has it implements it.
+- `<module>/application/port/out` — driven ports, implemented under `<module>/adapter/out/**`. A port may be implemented by **another** module when that module owns the data: `incident` implements `media`'s `PhotoReferencePort`. That is the intended direction — the module that needs something declares the port, the module that has it implements it.
 - `<module>/application` — use-case implementations. **Always annotate with `@UseCase`** (`shared/UseCase.java`). Not `@Service`, and never registered as explicit `@Bean` methods; `@UseCase` is itself a `@Component`. Event handlers here are plain `@Component`.
 - `<module>/adapter/in/rest` — `@RestController` plus request/response DTO records in the same package.
 - `<module>/adapter/out/persistence` — `*JpaEntity` (Lombok `@Getter` only — **no `@Setter`**, so state transitions go through the domain record; protected no-arg ctor) + `*JpaRepository` + `*RepositoryAdapter` (`@Component` implementing the out-port). Migrations in `src/main/resources/db/migration/`.
@@ -57,7 +56,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `AlertWebSocketHandler` reads `userId` exclusively from `session.getAttributes()` — never from query params.
 - **Revocation still does not close sockets that are already open.** The handshake is the only gate; nothing re-authenticates a live session, so a password reset takes effect on the next connect. Closing live sessions needs a revocation event routed through `WsClusterRelay` — every replica holds its own sessions.
 
-### Spatial queries (`incident`/`subscription`/`identity` persistence + migrations)
+### Spatial queries (`incident` persistence + migrations)
 - `V4__postgis_spatial_indexes.sql` enables the `postgis` extension and adds a `GEOGRAPHY(Point, 4326)` column + GiST index on `alerts`. Nearby-alert queries use `ST_DWithin` instead of Haversine.
 - Tests that exercise spatial queries use **Testcontainers** with a PostGIS image (`@DataJpaTest`). Docker is required for those tests.
 
@@ -94,11 +93,11 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `NotificationMilestones` (in `notification/domain`) — the confirmation thresholds that trigger milestone notifications.
 - `ExternalVoteService` calls `SendNotificationUseCase.sendVoteNotification` and `sendMilestoneNotification` after each vote. It passes a `NotificationType`, **not** a `VoteType`: this module must not know what a vote is, or it would depend on the module already calling it.
 
-### Subscription fan-out (`incident` + `subscription`)
-- `SubscriptionService` manages `UserSubscription` records (user ↔ alert-type pairs).
-- `CreateAlertService` saves the alert and publishes `AlertCreated`. It resolves no audience and pushes nothing.
-- `NewAlertFanout` handles that event with **`@ApplicationModuleListener`** — after commit, async, in a new transaction. It asks `AlertAudiencePort` for recipients, drops the reporter, and broadcasts.
-- `AlertAudienceAdapter` (in `subscription`) implements that port, merging subscribers-by-type with users whose own notification radius covers the incident.
+### New-report push (`incident`)
+- `CreateAlertService` saves the alert and publishes `AlertCreated`. It pushes nothing itself.
+- `NewAlertFanout` handles that event with **`@ApplicationModuleListener`** — after commit, async, in a new transaction — and broadcasts a `NEW_ALERT` frame to **every connected client**, the same way an update goes out. It is how a new report appears on open maps.
+- **There is no audience any more, and no proximity.** This used to push only to subscribers of the type within a circle, plus users whose last known location fell inside their own notification radius — the `subscription` module, `users.notification_radius_km` and three location columns, all dropped in V17. That was a safety feed's question; who is standing near a pothole is not who should hear about it. People who will be *notified* are the ones connected to a report (its reporter, later its confirmers), on status changes — not built yet. Following a district is the likely replacement for subscriptions, once districts exist.
+- **Do not rename `NewAlertFanout` or its `on` method** without clearing outstanding publications: the registry identifies a listener by them.
 - **Do not move the fan-out back inside `createAlert`.** It was there, in the transaction: it held a pooled connection across socket writes, and because the push preceded the commit, a rollback left clients displaying an alert that did not exist.
 - The listener **is durable**, via Modulith's Event Publication Registry (`spring-modulith-events-jpa`, table `event_publication`, V11). Publishing writes one row per (event, listener) in the publishing transaction; it is completed when the listener returns. Outstanding rows are replayed on startup — `spring.modulith.events.republish-outstanding-events-on-restart=true`. Delivery is therefore **at-least-once, not exactly-once**: a crash after the socket write but before completion replays the push, which is safe only because the frontend upserts by alert id.
 - The registry needs an `EventSerializer`; `spring-modulith-events-jpa` ships none, so `spring-modulith-events-jackson` is a required companion dependency. Without it the context fails at startup.
@@ -126,7 +125,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `FileSystemStorageAdapter` saves to `nabat.storage.upload-dir` (default `./uploads`). Uploads are validated by **magic bytes** (`ImageContentType`), stored under a generated UUID name with a canonical extension, and served as `Content-Disposition: attachment` with `nosniff` and a locked-down CSP. Never trust the client's filename or `Content-Type`.
 - `CreateAlertRequest` / `CreateAlertCommand` / `Alert` include optional `photoUrl` field.
 - **Orphan reclamation** (`OrphanedPhotoReclaimService`): the two-step upload means a photo whose alert is never submitted has nothing referencing it. The sweep deletes from the *absence* of a reference, which makes two rules non-negotiable. **A failure to determine references must propagate, never degrade to an empty set** — the caller deletes everything not in that set, so "the database is down" would otherwise read as "nothing is referenced" and erase the volume. And **only files older than the grace period are candidates**, because a fresh upload is usually sitting in an unsubmitted form.
-- `media` declares `PhotoReferencePort`; `incident` implements it (`AlertPhotoReferenceAdapter`) because it owns `alerts.photo_url`. Same direction as `AlertAudiencePort`. The SQL matches the **last path segment**, not a `LIKE '%' || name` suffix — the latter reports `graph.jpg` as referenced whenever some alert points at `photograph.jpg`, so orphans are never reclaimed.
+- `media` declares `PhotoReferencePort`; `incident` implements it (`AlertPhotoReferenceAdapter`) because it owns `alerts.photo_url`. The SQL matches the **last path segment**, not a `LIKE '%' || name` suffix — the latter reports `graph.jpg` as referenced whenever some alert points at `photograph.jpg`, so orphans are never reclaimed.
 - `V8__add_photo_url_to_alerts.sql` adds `photo_url VARCHAR(500)` to the `alerts` table.
 
 ---
@@ -145,7 +144,6 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - **`POST /api/v1/alerts`** must extract `reportedBy` from the authenticated principal, **not** from the request body.
 - **`GET /api/v1/alerts/nearby` returns an envelope, not a bare array**: `{ alerts, count, limit, truncated }`. It is capped (`limit`, default 100, max 500) and accepts an optional `type` filter. The cap and the filters are applied **in SQL** — trimming in Java would still make the database materialise every row in the radius. Not Spring Data `Page`: nothing pages through a map, and its internals would become a public contract. A client seeing `truncated` should narrow the radius or filter, not fetch a next page.
 - **Anything that narrows the nearby result set must be in `NearbyAlertsQuery.cacheKey()`.** The response is cached for 15s on a ~110 m grid, so a filter missing from the key means a request for `type=POTHOLE` can be served an unfiltered neighbour's cached answer — wrong signals on the map, visible only under mixed concurrent traffic.
-- **`PATCH /api/v1/users/me/preferences`** updates the authenticated user's `notificationRadiusKm` (allow-list in `NotificationRadius`, mirroring the DB CHECK constraint) and optionally refreshes `lastKnownLat`/`lastKnownLng`.
 - **Liveness and readiness are separate groups and must stay separate.** `/actuator/health/liveness` carries no external dependency — a restart does not repair Postgres, and both probes used to point at the aggregate, so an outage got the pod restarted in a loop. `/actuator/health/readiness` adds `db`. **Redis is deliberately not in readiness**: every replica shares one, so including it turns a partial degradation into every pod leaving the load balancer at once. Both paths are enumerated in `SecurityConfig` (the fallback is `denyAll()`, and probes are unauthenticated). Pinned by `HealthProbesIntegrationTest`.
 - **`src/test/resources/application.properties` replaces the main one, it does not merge.** Anything a test needs to see must be repeated there. The health-group settings are duplicated for this reason, and a change in only one file leaves the test green while production drifts.
 - **Logs are JSON in deployments, plain text locally.** `logging.structured.format.console=${NABAT_LOG_FORMAT:}` — empty by default, `ecs` in `docker-compose.yml` and the Helm chart. Boot has the formatter built in; no `logstash-logback-encoder`. Setting it makes `logging.pattern.console` inert. Two things worth knowing before editing it: ECS fields are **nested objects** (`service: { name: ... }`) — they were flat keys literally named `service.name` until Boot 4, and the upgrade flipped it, which is why Promtail’s JMESPath expressions are no longer quoted — and tracing arrives as **`traceId`/`spanId`, not the ECS-canonical `trace.id`** — MDC is emitted as dynamic pairs, so `logging.structured.json.rename.*` silently does not reach it. Query `traceId`. Pinned by `StructuredLoggingIntegrationTest`.
@@ -158,7 +156,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - Config is env-var driven; **no Spring profiles**. Defaults in `application.properties`.
 - **`JWT_SECRET` has no default and the app refuses to start without it.** It must be ≥ 32 chars, have ≥ 16 distinct characters, and not look like a placeholder. nabat-app and nabat-voting must share the same value. Do not reintroduce a fallback: a committed default is a publicly-known signing key.
 - **Roles are three, and rights are asked as capabilities, never compared as roles.** `Role.canModerateContent()` (MODERATOR, ADMIN) and `Role.canAdministerUsers()` (ADMIN) live on the enum in `identity/domain`. Write `actor.role().canModerateContent()`, not `role == Role.ADMIN` — that comparison is what tied "close a false alarm" to the one role that can also disable accounts. Do **not** replace the capabilities with an ordinal rank: `>=` reads naturally until the first role that does not sit on the line (an auditor who reads everything and moderates nothing), and then every comparison in the codebase is quietly wrong.
-- **The role names are duplicated into a `CHECK` constraint on `users.role` (V12), deliberately.** Same reasoning as `notification_radius_km` in V6: without it the column took any string, and since Hibernate maps it to the enum, a bad value failed on *read*, inside the authentication path, making the account unloadable rather than under-privileged. A constant added to `Role` without a migration fails on first assignment.
+- **The role names are duplicated into a `CHECK` constraint on `users.role` (V12), deliberately.** Same reasoning as the CHECK V6 once put on the notification radius: without it the column took any string, and since Hibernate maps it to the enum, a bad value failed on *read*, inside the authentication path, making the account unloadable rather than under-privileged. A constant added to `Role` without a migration fails on first assignment.
 - **Authorisation about a relationship between two accounts cannot live in `@PreAuthorize`.** `/api/v1/admin/users/**` has both gates: the annotation refuses a token that does not claim the role, and `UserAdministrationService` re-reads the actor's current row — a token carries the role it was minted with, so an admin demoted a minute ago still presents `ROLE_ADMIN` until it expires. Token version invalidates sessions on a *credential* change, not on a role change.
 - **An admin cannot demote or disable themselves.** There is no break-glass path, so the last step has to be taken by someone else. Disabling someone else bumps their token version, which stops sessions immediately — including WebSocket handshakes, which ask the same question; re-enabling deliberately does not, so a switch off and back on does not also drop every session.
 - **Roles take effect on the next sign-in**, because they ride in the token. Pinned by `AdminUserControllerIntegrationTest`. If that ever needs to be immediate, the change is to invalidate sessions on role change, not to re-read the role per request.
@@ -186,6 +184,9 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V12 | `users_role_check` — CHECK constraint on `users.role`, adding MODERATOR |
 | V13 | Widen `verification_tokens.id` to VARCHAR(64) — it holds a 43-char hash, not a UUID |
 | V14 | `event_publication` gains `status`, `completion_attempts`, `last_resubmission_date` — the Spring Modulith 2 registry |
+| V15 | Civic categories (`POTHOLE`, ...) and the `SUBMITTED → … → RESOLVED` / `REJECTED` lifecycle, with CHECKs on both |
+| V16 | Drop `alerts.severity` |
+| V17 | Drop `user_subscriptions` and the notification radius and location columns on `users` — the proximity push is gone |
 
 ---
 

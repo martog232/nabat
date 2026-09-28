@@ -68,53 +68,6 @@
         }
       }
     },
-    "/api/v1/subscriptions" : {
-      "get" : {
-        "tags" : [ "subscription-controller" ],
-        "operationId" : "listMine",
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/SubscriptionResponse"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post" : {
-        "tags" : [ "subscription-controller" ],
-        "operationId" : "create",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/SubscriptionRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/SubscriptionResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/notifications/{id}/read" : {
       "post" : {
         "tags" : [ "notification-controller" ],
@@ -437,34 +390,6 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/VoteStatsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/me/preferences" : {
-      "patch" : {
-        "tags" : [ "user-controller" ],
-        "operationId" : "updatePreferences",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/UpdateUserPreferencesRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/UserResponse"
                 }
               }
             }
@@ -877,26 +802,6 @@
           }
         }
       }
-    },
-    "/api/v1/subscriptions/{id}" : {
-      "delete" : {
-        "tags" : [ "subscription-controller" ],
-        "operationId" : "delete",
-        "parameters" : [ {
-          "name" : "id",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          }
-        }
-      }
     }
   },
   "components" : {
@@ -910,82 +815,6 @@
           "expiresAt" : {
             "type" : "string",
             "format" : "date-time"
-          }
-        }
-      },
-      "SubscriptionRequest" : {
-        "type" : "object",
-        "description" : "Request body for creating an alert subscription",
-        "properties" : {
-          "alertType" : {
-            "type" : "string",
-            "description" : "Alert type to subscribe to",
-            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ],
-            "example" : "GAS_LEAK"
-          },
-          "latitude" : {
-            "type" : "number",
-            "format" : "double",
-            "description" : "Center latitude of the watch area",
-            "example" : 40.7128
-          },
-          "longitude" : {
-            "type" : "number",
-            "format" : "double",
-            "description" : "Center longitude of the watch area",
-            "example" : -74.006
-          },
-          "radiusKm" : {
-            "type" : "number",
-            "format" : "double",
-            "description" : "Radius in kilometres around the center point",
-            "example" : 5.0
-          }
-        },
-        "required" : [ "alertType", "latitude", "longitude", "radiusKm" ]
-      },
-      "SubscriptionResponse" : {
-        "type" : "object",
-        "description" : "Active subscription details",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid",
-            "description" : "Subscription identifier"
-          },
-          "userId" : {
-            "type" : "string",
-            "format" : "uuid",
-            "description" : "Owner of the subscription"
-          },
-          "alertType" : {
-            "type" : "string",
-            "description" : "Subscribed alert type",
-            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ]
-          },
-          "latitude" : {
-            "type" : "number",
-            "format" : "double",
-            "description" : "Center latitude"
-          },
-          "longitude" : {
-            "type" : "number",
-            "format" : "double",
-            "description" : "Center longitude"
-          },
-          "radiusKm" : {
-            "type" : "number",
-            "format" : "double",
-            "description" : "Watch radius in km"
-          },
-          "active" : {
-            "type" : "boolean",
-            "description" : "Whether the subscription is active"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time",
-            "description" : "Creation timestamp"
           }
         }
       },
@@ -1144,12 +973,6 @@
           "enabled" : {
             "type" : "boolean",
             "description" : "Whether the account may sign in — an admin can switch this off"
-          },
-          "notificationRadiusKm" : {
-            "type" : "integer",
-            "format" : "int32",
-            "description" : "Configured notification radius in kilometres",
-            "example" : 5
           }
         }
       },
@@ -1405,35 +1228,6 @@
             "description" : "Credibility score as computed by the voting service"
           }
         }
-      },
-      "UpdateUserPreferencesRequest" : {
-        "type" : "object",
-        "description" : "Request body for updating notification preferences",
-        "properties" : {
-          "notificationRadiusKm" : {
-            "type" : "integer",
-            "format" : "int32",
-            "description" : "Allowed radius preset in kilometres",
-            "example" : 10
-          },
-          "lastKnownLat" : {
-            "type" : "number",
-            "format" : "double",
-            "description" : "Latest known latitude",
-            "example" : 42.3601,
-            "maximum" : 90.0,
-            "minimum" : -90.0
-          },
-          "lastKnownLng" : {
-            "type" : "number",
-            "format" : "double",
-            "description" : "Latest known longitude",
-            "example" : -71.0589,
-            "maximum" : 180.0,
-            "minimum" : -180.0
-          }
-        },
-        "required" : [ "notificationRadiusKm" ]
       },
       "ChangeRoleRequest" : {
         "type" : "object",

@@ -7,8 +7,7 @@ import org.example.nabat.identity.domain.UserId;
 /**
  * Changing what another account may do, and switching one off.
  *
- * <p>Separate from {@link UpdateUserPreferencesUseCase}, which is a user acting on itself.
- * Everything here is one account acting on another, so every method takes the actor as well
+ * <p>Everything here is one account acting on another, so every method takes the actor as well
  * as the target: the authorisation rules are about the relationship between the two, not
  * about the caller alone, and that is not something a {@code @PreAuthorize} expression can
  * express.

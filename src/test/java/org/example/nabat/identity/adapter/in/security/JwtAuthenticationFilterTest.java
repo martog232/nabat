@@ -55,10 +55,6 @@ class JwtAuthenticationFilterTest {
             false,
             Instant.now(),
             Instant.now(),
-            5,
-            null,
-            null,
-            null,
             0
         );
     }

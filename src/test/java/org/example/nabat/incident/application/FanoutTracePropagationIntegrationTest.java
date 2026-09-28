@@ -10,7 +10,6 @@ import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.application.port.out.EmailSender;
 import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
-import org.example.nabat.incident.application.port.out.AlertAudiencePort;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertType;
@@ -24,7 +23,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -33,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.when;
 
 /**
@@ -61,7 +58,6 @@ import static org.mockito.Mockito.when;
 @Testcontainers(disabledWithoutDocker = true)
 class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
 
-    private static final UUID RECIPIENT = UUID.randomUUID();
 
     @Autowired
     private CreateAlertUseCase createAlert;
@@ -80,9 +76,6 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
 
     @Autowired
     private AlertJpaRepository alerts;
-
-    @MockitoBean
-    private AlertAudiencePort audiencePort;
 
     /** Prevent real SMTP during integration tests. */
     @MockitoBean
@@ -104,7 +97,6 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
         users.deleteAll();
         notificationPort.observed.clear();
 
-        when(audiencePort.recipientsFor(any(), any(), anyDouble())).thenReturn(List.of(RECIPIENT));
 
         var reporter = Fixtures.user("trace-reporter@example.com");
         users.save(UserJpaEntity.from(reporter));
@@ -199,7 +191,7 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
         }
 
         @Override
-        public void broadcastAlert(Alert alert, List<UUID> userIds) {
+        public void broadcastNewAlert(Alert alert) {
             Span current = tracer.currentSpan();
             observed.add(new Observed(
                 current == null ? null : current.context().traceId(),
