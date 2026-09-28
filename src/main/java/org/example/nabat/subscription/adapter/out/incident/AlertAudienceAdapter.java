@@ -18,7 +18,7 @@ import java.util.UUID;
  * <p>The union of:
  * <ul>
  *   <li>users subscribed to this alert type whose subscription circle covers the
- *       incident, bounded by the severity's broadcast radius;</li>
+ *       report, bounded by the broadcast radius;</li>
  *   <li>users whose own configured notification radius covers the incident.</li>
  * </ul>
  *

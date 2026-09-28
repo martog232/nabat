@@ -5,7 +5,6 @@ import org.example.nabat.PostgresTestSupport;
 import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
@@ -57,7 +56,7 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
         repository.flush();
 
         List<AlertJpaEntity> result =
-            repository.findActiveAlertsWithinRadius(SOFIA_LAT, SOFIA_LON, 5.0, null, null, 100);
+            repository.findActiveAlertsWithinRadius(SOFIA_LAT, SOFIA_LON, 5.0, null, 100);
 
         assertThat(result)
             .extracting(AlertJpaEntity::getTitle)
@@ -78,7 +77,7 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
         repository.flush();
 
         List<AlertJpaEntity> result =
-            repository.findActiveAlertsWithinRadius(SOFIA_LAT, SOFIA_LON, 5.0, null, null, 2);
+            repository.findActiveAlertsWithinRadius(SOFIA_LAT, SOFIA_LON, 5.0, null, 2);
 
         // Newest first, oldest dropped — the right end to lose on a live incident map.
         assertThat(result)
@@ -87,35 +86,30 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
     }
 
     @Test
-    void findActiveAlertsWithinRadiusFiltersByTypeAndSeverity() {
+    void findActiveAlertsWithinRadiusFiltersByType() {
         UserId reporter = seedUser("filtered");
         AlertJpaEntity fire = AlertJpaEntity.from(new Alert(
-            AlertId.generate(), "Fire", "d", AlertType.POTHOLE, AlertSeverity.CRITICAL,
+            AlertId.generate(), "Fire", "d", AlertType.POTHOLE,
             Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T10:00:00Z"),
             AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null));
         AlertJpaEntity hazard = AlertJpaEntity.from(new Alert(
-            AlertId.generate(), "Hazard", "d", AlertType.MANHOLE, AlertSeverity.LOW,
+            AlertId.generate(), "Hazard", "d", AlertType.MANHOLE,
             Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T11:00:00Z"),
             AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null));
         repository.saveAll(List.of(fire, hazard));
         repository.flush();
 
         assertThat(repository.findActiveAlertsWithinRadius(
-                SOFIA_LAT, SOFIA_LON, 5.0, "POTHOLE", null, 100))
+                SOFIA_LAT, SOFIA_LON, 5.0, "POTHOLE", 100))
             .extracting(AlertJpaEntity::getTitle)
             .containsExactly("Fire");
-
-        assertThat(repository.findActiveAlertsWithinRadius(
-                SOFIA_LAT, SOFIA_LON, 5.0, null, "LOW", 100))
-            .extracting(AlertJpaEntity::getTitle)
-            .containsExactly("Hazard");
 
         // Both null means no filter at all. This is the case the `CAST(:type AS text) IS
         // NULL` form exists for: PostgreSQL cannot infer a bare parameter's type in a NULL
         // comparison and fails the statement outright, so the unfiltered path is exactly
         // the one that breaks if the cast is dropped.
         assertThat(repository.findActiveAlertsWithinRadius(
-                SOFIA_LAT, SOFIA_LON, 5.0, null, null, 100))
+                SOFIA_LAT, SOFIA_LON, 5.0, null, 100))
             .hasSize(2);
     }
 
@@ -125,7 +119,7 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
         repository.saveAndFlush(AlertJpaEntity.from(sameSpot));
 
         List<AlertJpaEntity> result =
-            repository.findActiveAlertsWithinRadius(SOFIA_LAT, SOFIA_LON, 0.0, null, null, 100);
+            repository.findActiveAlertsWithinRadius(SOFIA_LAT, SOFIA_LON, 0.0, null, 100);
 
         assertThat(result)
             .extracting(AlertJpaEntity::getTitle)
@@ -160,7 +154,6 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
             title,
             "Integration query test",
             AlertType.POTHOLE,
-            AlertSeverity.MEDIUM,
             Location.of(latitude, longitude),
             createdAt,
             status,

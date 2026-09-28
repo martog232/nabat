@@ -9,11 +9,11 @@ import java.util.Set;
  * {@code CHECK (notification_radius_km IN (...))} constraint added by
  * {@code V6__user_location_and_radius.sql}.
  *
- * <p>Distinct from {@link AlertSeverity}'s broadcast radii, which control how far a
- * <em>new alert</em> is fanned out based on how serious it is. The two were easy to
- * confuse: the severity radii include 2 km, which is not a legal user preference,
- * and {@code CreateAlertService} used the severity radius for subscriber fan-out
- * while ignoring each user's configured preference entirely.
+ * <p>Distinct from the broadcast radius in {@code NewAlertFanout}, which bounds how far a
+ * <em>new report</em> reaches subscribers and is not user-selectable. The two were easy
+ * to confuse: the broadcast radius is 2 km, which is not a legal user preference, and
+ * {@code CreateAlertService} once used it for subscriber fan-out while ignoring each
+ * user's configured preference entirely.
  */
 public final class NotificationRadius {
 

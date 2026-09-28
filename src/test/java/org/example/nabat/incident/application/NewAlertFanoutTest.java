@@ -5,14 +5,11 @@ import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,13 +45,12 @@ class NewAlertFanoutTest {
         return new NewAlertFanout(audiencePort, notificationPort);
     }
 
-    private static Alert alert(AlertSeverity severity, UUID reportedBy) {
+    private static Alert alert(UUID reportedBy) {
         return new Alert(
             AlertId.generate(),
             "Test Alert",
             "Test description",
             AlertType.WASTE,
-            severity,
             Location.of(42.0, 23.0),
             Instant.now(),
             AlertStatus.SUBMITTED,
@@ -67,7 +63,7 @@ class NewAlertFanoutTest {
 
     @Test
     void broadcastsToEveryoneTheAudiencePortResolves() {
-        Alert alert = alert(AlertSeverity.MEDIUM, UUID.randomUUID());
+        Alert alert = alert(UUID.randomUUID());
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
         when(audiencePort.recipientsFor(any(), any(), anyDouble())).thenReturn(List.of(first, second));
@@ -83,7 +79,7 @@ class NewAlertFanoutTest {
     void doesNotBroadcastToTheReporter() {
         UUID reporter = UUID.randomUUID();
         UUID someoneElse = UUID.randomUUID();
-        Alert alert = alert(AlertSeverity.HIGH, reporter);
+        Alert alert = alert(reporter);
         when(audiencePort.recipientsFor(any(), any(), anyDouble()))
             .thenReturn(List.of(reporter, someoneElse));
 
@@ -96,7 +92,7 @@ class NewAlertFanoutTest {
 
     @Test
     void doesNotBroadcastWhenNobodyIsInterested() {
-        Alert alert = alert(AlertSeverity.LOW, UUID.randomUUID());
+        Alert alert = alert(UUID.randomUUID());
         when(audiencePort.recipientsFor(any(), any(), anyDouble())).thenReturn(List.of());
 
         fanout().on(new AlertCreated(alert));
@@ -107,7 +103,7 @@ class NewAlertFanoutTest {
     @Test
     void doesNotBroadcastWhenTheReporterIsTheOnlyRecipient() {
         UUID reporter = UUID.randomUUID();
-        Alert alert = alert(AlertSeverity.LOW, reporter);
+        Alert alert = alert(reporter);
         when(audiencePort.recipientsFor(any(), any(), anyDouble())).thenReturn(List.of(reporter));
 
         fanout().on(new AlertCreated(alert));
@@ -115,21 +111,16 @@ class NewAlertFanoutTest {
         verify(notificationPort, never()).broadcastAlert(any(), any());
     }
 
-    @ParameterizedTest
-    @CsvSource({
-        "CRITICAL,10.0",
-        "HIGH,5.0",
-        "MEDIUM,2.0",
-        "LOW,1.0"
-    })
-    void appliesTheBroadcastRadiusForTheSeverity(AlertSeverity severity, double expectedRadiusKm) {
-        Alert alert = alert(severity, UUID.randomUUID());
+    /** One radius for every report: the severity-driven scale described danger, not proximity. */
+    @Test
+    void appliesTheSameBroadcastRadiusToEveryReport() {
+        Alert alert = alert(UUID.randomUUID());
         when(audiencePort.recipientsFor(any(), any(), anyDouble())).thenReturn(List.of());
 
         fanout().on(new AlertCreated(alert));
 
         ArgumentCaptor<Double> radiusCaptor = ArgumentCaptor.forClass(Double.class);
         verify(audiencePort).recipientsFor(eq(alert.type()), eq(alert.location()), radiusCaptor.capture());
-        assertEquals(expectedRadiusKm, radiusCaptor.getValue());
+        assertEquals(NewAlertFanout.BROADCAST_RADIUS_KM, radiusCaptor.getValue());
     }
 }

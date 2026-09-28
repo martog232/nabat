@@ -5,7 +5,6 @@ import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
@@ -53,7 +52,6 @@ class CreateAlertServiceTest {
             "Test Alert",
             "Test description",
             AlertType.WASTE,
-            AlertSeverity.HIGH,
             Location.of(42.0, 23.0),
             Instant.now(),
             AlertStatus.SUBMITTED,
@@ -66,7 +64,7 @@ class CreateAlertServiceTest {
 
     private static CreateAlertCommand command(UUID reportedBy) {
         return new CreateAlertCommand(
-            "Test Alert", "Description", AlertType.POTHOLE, AlertSeverity.HIGH, 42.0, 23.0, reportedBy, null
+            "Test Alert", "Description", AlertType.POTHOLE, 42.0, 23.0, reportedBy, null
         );
     }
 
@@ -112,7 +110,6 @@ class CreateAlertServiceTest {
 
         assertEquals("Test Alert", proposed.title());
         assertEquals(AlertType.POTHOLE, proposed.type());
-        assertEquals(AlertSeverity.HIGH, proposed.severity());
         assertEquals(Location.of(42.0, 23.0), proposed.location());
         assertEquals(reportedBy, proposed.reportedBy());
     }

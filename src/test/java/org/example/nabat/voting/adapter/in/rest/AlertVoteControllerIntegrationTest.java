@@ -134,7 +134,6 @@ class AlertVoteControllerIntegrationTest extends PostgresTestSupport {
             "Road blocked",
             "Road partially blocked by debris",
             org.example.nabat.incident.domain.AlertType.STREET_LIGHT,
-            org.example.nabat.incident.domain.AlertSeverity.MEDIUM,
             42.6977,
             23.3219,
             null

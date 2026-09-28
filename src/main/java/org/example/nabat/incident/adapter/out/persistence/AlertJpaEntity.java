@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
@@ -47,10 +46,6 @@ public class AlertJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AlertType type;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AlertSeverity severity;
 
     @Column(nullable = false)
     private double latitude;
@@ -96,7 +91,6 @@ public class AlertJpaEntity {
         entity.title = alert.title();
         entity.description = alert.description();
         entity.type = alert.type();
-        entity.severity = alert.severity();
         entity.latitude = alert.location().latitude();
         entity.longitude = alert.location().longitude();
         entity.createdAt = alert.createdAt();
@@ -118,7 +112,6 @@ public class AlertJpaEntity {
                 title,
                 description,
                 type,
-                severity,
                 Location.of(latitude, longitude),
                 createdAt,
                 status,

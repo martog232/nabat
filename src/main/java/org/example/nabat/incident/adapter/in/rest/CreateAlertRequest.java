@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertType;
 
 import java.util.UUID;
@@ -28,10 +27,6 @@ public record CreateAlertRequest(
     @NotNull(message = "Alert type is required")
     AlertType type,
 
-    @Schema(description = "Severity level", example = "HIGH")
-    @NotNull(message = "Severity is required")
-    AlertSeverity severity,
-
     @Schema(description = "WGS-84 latitude of the problem", example = "42.6977", minimum = "-90", maximum = "90")
     @NotNull(message = "Latitude is required")
     @DecimalMin(value = "-90.0") @DecimalMax(value = "90.0")
@@ -47,7 +42,7 @@ public record CreateAlertRequest(
 ) {
     public CreateAlertUseCase.CreateAlertCommand toCommand(UUID reportedBy) {
         return new CreateAlertUseCase.CreateAlertCommand(
-            title, description, type, severity, latitude, longitude, reportedBy, photoUrl
+            title, description, type, latitude, longitude, reportedBy, photoUrl
         );
     }
 }

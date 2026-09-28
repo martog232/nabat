@@ -5,7 +5,6 @@ import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.platform.AsyncConfig;
@@ -108,7 +107,6 @@ class NewAlertFanoutWiringTest {
             "Wiring check",
             "desc",
             AlertType.MANHOLE,
-            AlertSeverity.HIGH,
             Location.of(42.0, 23.0),
             Instant.now(),
             AlertStatus.SUBMITTED,

@@ -9,7 +9,6 @@ import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
@@ -79,7 +78,6 @@ class AlertControllerTest {
                 "Test Alert",
                 "Test description",
                 AlertType.POTHOLE,
-                AlertSeverity.HIGH,
                 Location.of(42.0, 23.0),
                 Instant.parse("2024-01-01T00:00:00Z"),
                 AlertStatus.SUBMITTED,
@@ -121,7 +119,6 @@ class AlertControllerTest {
                 "Test Alert",
                 "Test description",
                 AlertType.POTHOLE,
-                AlertSeverity.HIGH,
                 42.0,
                 23.0,
                 null
@@ -143,7 +140,6 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.id").value("00000000-0000-0000-0000-000000000001"))
                 .andExpect(jsonPath("$.title").value("Test Alert"))
                 .andExpect(jsonPath("$.type").value("POTHOLE"))
-                .andExpect(jsonPath("$.severity").value("HIGH"))
                 .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
 
@@ -185,7 +181,6 @@ class AlertControllerTest {
                         .param("latitude", "42.0")
                         .param("longitude", "23.0")
                         .param("type", "POTHOLE")
-                        .param("severity", "CRITICAL")
                         .param("limit", "25"))
                 .andExpect(status().isOk());
 
@@ -194,7 +189,6 @@ class AlertControllerTest {
         verify(getNearbyAlertsUseCase).getNearbyAlerts(captor.capture());
 
         assertEquals(AlertType.POTHOLE, captor.getValue().type());
-        assertEquals(AlertSeverity.CRITICAL, captor.getValue().severity());
         assertEquals(25, captor.getValue().limit());
     }
 
@@ -237,7 +231,6 @@ class AlertControllerTest {
                     "title": "",
                     "description": "desc",
                     "type": "POTHOLE",
-                    "severity": "HIGH",
                     "latitude": 42.0,
                     "longitude": 23.0
                 }

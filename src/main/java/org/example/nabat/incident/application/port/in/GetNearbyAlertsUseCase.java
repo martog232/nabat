@@ -1,7 +1,6 @@
 package org.example.nabat.incident.application.port.in;
 
 import org.example.nabat.incident.domain.Alert;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 
@@ -22,7 +21,7 @@ public interface GetNearbyAlertsUseCase {
     List<Alert> getAlertsSince(NearbyAlertsQuery query, Instant since);
 
     /**
-     * @param type     optional filter; null means every type. Likewise {@code severity}.
+     * @param type     optional filter; null means every type.
      * @param limit    maximum alerts to return. There is always one — an unbounded result
      *                 is a denial of service that a legitimate client can trigger by
      *                 asking for a 100 km radius over a dense city.
@@ -32,7 +31,6 @@ public interface GetNearbyAlertsUseCase {
         double longitude,
         double radiusKm,
         AlertType type,
-        AlertSeverity severity,
         int limit
     ) {
         /** Cache keys are built from coordinates rounded to this many decimal places. */
@@ -57,7 +55,7 @@ public interface GetNearbyAlertsUseCase {
 
         /** An unfiltered query at the default limit — the common case. */
         public static NearbyAlertsQuery of(double latitude, double longitude, double radiusKm) {
-            return new NearbyAlertsQuery(latitude, longitude, radiusKm, null, null, DEFAULT_LIMIT);
+            return new NearbyAlertsQuery(latitude, longitude, radiusKm, null, DEFAULT_LIMIT);
         }
 
         public Location center() {
@@ -82,7 +80,6 @@ public interface GetNearbyAlertsUseCase {
         public String cacheKey() {
             return quantize(latitude) + "_" + quantize(longitude) + "_" + radiusKm
                 + "_" + (type == null ? "*" : type.name())
-                + "_" + (severity == null ? "*" : severity.name())
                 + "_" + limit;
         }
 

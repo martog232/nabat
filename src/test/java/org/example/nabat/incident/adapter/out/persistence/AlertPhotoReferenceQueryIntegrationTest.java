@@ -6,7 +6,6 @@ import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
@@ -98,7 +97,6 @@ class AlertPhotoReferenceQueryIntegrationTest extends PostgresTestSupport {
             "Alert " + UUID.randomUUID(),
             "description",
             AlertType.MANHOLE,
-            AlertSeverity.LOW,
             Location.of(42.695, 23.329),
             Instant.now(),
             AlertStatus.SUBMITTED,

@@ -14,7 +14,6 @@ import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.identity.domain.User;
@@ -96,12 +95,11 @@ public class AlertController {
         @DecimalMin(value = "0.0", inclusive = false) @DecimalMax("100.0") Double radiusKm,
         @RequestParam(required = false) Instant since,
         @RequestParam(required = false) AlertType type,
-        @RequestParam(required = false) AlertSeverity severity,
         @RequestParam(defaultValue = "100")
         @Min(1) @Max(GetNearbyAlertsUseCase.NearbyAlertsQuery.MAX_LIMIT) Integer limit
     ) {
         var query = new GetNearbyAlertsUseCase.NearbyAlertsQuery(
-            latitude, longitude, radiusKm, type, severity, limit);
+            latitude, longitude, radiusKm, type, limit);
 
         List<Alert> alerts = since == null
             ? getNearbyAlertsUseCase.getNearbyAlerts(query)

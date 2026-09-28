@@ -7,7 +7,6 @@ import tools.jackson.databind.ObjectMapper;
 import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.application.port.out.EmailSender;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,7 +83,6 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 "Integration Test Alert",
                 "A test alert from integration test",
                 AlertType.POTHOLE,
-                AlertSeverity.HIGH,
                 42.695,
                 23.329,
                 null
@@ -117,7 +115,6 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 "Nearby Alert",
                 "A nearby alert",
                 AlertType.WASTE,
-                AlertSeverity.MEDIUM,
                 42.695,
                 23.329,
                 null
@@ -146,7 +143,6 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 "Unauthorized Alert",
                 "Should fail",
                 AlertType.POTHOLE,
-                AlertSeverity.LOW,
                 42.0,
                 23.0,
                 null
@@ -192,7 +188,6 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 "Security Test Alert",
                 "Verifying reporter is from token, not request body",
                 AlertType.OTHER,
-                AlertSeverity.LOW,
                 40.0,
                 20.0,
                 null

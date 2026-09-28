@@ -10,7 +10,7 @@ import java.util.UUID;
  * Who should be told about a new alert.
  *
  * <p>This module decides <em>that</em> an audience must be reached and how wide the
- * broadcast radius is for a given severity; it does not know how the audience is
+ * broadcast radius is; it does not know how the audience is
  * assembled. {@code CreateAlertService} previously queried the subscription and
  * identity repositories itself, which made incident depend on subscription while
  * subscription depends on incident's {@link AlertType} — the cycle Spring Modulith
@@ -26,7 +26,7 @@ public interface AlertAudiencePort {
     /**
      * @param type              the alert's category, which subscribers opt into
      * @param location          where the alert was reported
-     * @param broadcastRadiusKm how far to fan out, derived from the alert's severity
+     * @param broadcastRadiusKm the widest circle a subscription may match within
      * @return distinct user ids to notify, in no particular order. Never null.
      */
     List<UUID> recipientsFor(AlertType type, Location location, double broadcastRadiusKm);

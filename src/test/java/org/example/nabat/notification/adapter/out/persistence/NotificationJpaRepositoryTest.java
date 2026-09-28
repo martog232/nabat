@@ -7,7 +7,6 @@ import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
@@ -95,7 +94,6 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
                 "Related alert",
                 "desc",
                 AlertType.MANHOLE,
-                AlertSeverity.HIGH,
                 Location.of(42.6977, 23.3219),
                 Instant.now(),
                 AlertStatus.SUBMITTED,

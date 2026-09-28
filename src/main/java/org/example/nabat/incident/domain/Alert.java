@@ -25,7 +25,6 @@ public record Alert(
         String title,
         String description,
         AlertType type,
-        AlertSeverity severity,
         Location location,
         Instant createdAt,
         AlertStatus status,
@@ -41,7 +40,6 @@ public record Alert(
             String title,
             String description,
             AlertType type,
-            AlertSeverity severity,
             Location location,
             UUID reportedBy,
             String photoUrl
@@ -51,7 +49,6 @@ public record Alert(
                 title,
                 description,
                 type,
-                severity,
                 location,
                 Instant.now(),
                 AlertStatus.SUBMITTED,
@@ -103,7 +100,7 @@ public record Alert(
             throw new IllegalStateException("Alert cannot move from " + status + " to " + target);
         }
         return new Alert(
-                id, title, description, type, severity, location,
+                id, title, description, type, location,
                 createdAt, target, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount, credibilityScore,
                 resolvedAt, photoUrl
@@ -118,7 +115,7 @@ public record Alert(
      */
     public Alert withVoteCounts(int upvotes, int downvotes, int confirmations, int credibilityScore) {
         return new Alert(
-                id, title, description, type, severity, location,
+                id, title, description, type, location,
                 createdAt, status, reportedBy,
                 upvotes, downvotes, confirmations, credibilityScore,
                 resolvedAt, photoUrl

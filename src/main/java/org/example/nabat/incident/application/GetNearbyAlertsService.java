@@ -39,7 +39,6 @@ public class GetNearbyAlertsService implements GetNearbyAlertsUseCase {
             query.center(),
             query.radiusKm(),
             query.type(),
-            query.severity(),
             query.limit()
         );
     }

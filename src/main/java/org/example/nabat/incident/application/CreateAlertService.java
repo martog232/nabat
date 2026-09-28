@@ -51,7 +51,6 @@ public class CreateAlertService implements CreateAlertUseCase {
             command.title(),
             command.description(),
             command.type(),
-            command.severity(),
             location,
             command.reportedBy(),
             command.photoUrl()

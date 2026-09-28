@@ -17,8 +17,8 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     List<AlertJpaEntity> findByStatus(AlertStatus status);
 
     /*
-     * The four spatial queries below share a shape: circle predicate, optional type and
-     * severity filters, newest first, LIMIT.
+     * The four spatial queries below share a shape: circle predicate, optional type
+     * filter, newest first, LIMIT.
      *
      * "Open" is spelled out as `NOT IN ('RESOLVED', 'REJECTED')`, the SQL twin of
      * AlertStatus.isOpen(). Naming the closed states rather than the open ones is
@@ -42,8 +42,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
-        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
@@ -56,8 +55,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("type") String type,
-        @Param("severity") String severity,
+        @Param("type") String type,
         @Param("limit") int limit
     );
 
@@ -70,8 +68,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND a.created_at >= :since
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
-        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
@@ -85,8 +82,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
         @Param("since") Instant since,
-        @Param("type") String type,
-        @Param("severity") String severity,
+        @Param("type") String type,
         @Param("limit") int limit
     );
 
@@ -95,8 +91,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND a.created_at >= :since
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
-        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
@@ -110,8 +105,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
         @Param("since") Instant since,
-        @Param("type") String type,
-        @Param("severity") String severity,
+        @Param("type") String type,
         @Param("limit") int limit
     );
 
@@ -119,8 +113,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
-        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
+        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
@@ -133,8 +126,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("type") String type,
-        @Param("severity") String severity,
+        @Param("type") String type,
         @Param("limit") int limit
     );
 

@@ -4,7 +4,6 @@ import org.example.nabat.incident.application.port.out.AlertAudiencePort;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -57,6 +56,21 @@ public class NewAlertFanout {
 
     private static final Logger log = LoggerFactory.getLogger(NewAlertFanout.class);
 
+    /**
+     * How far a new report reaches <em>subscribers</em>: the widest subscription circle it
+     * can match within.
+     *
+     * <p>One value, where there used to be four chosen by severity — 10 km for a critical
+     * alert down to 1 km for a minor one. That scale was about danger, and a pothole is
+     * not dangerous to someone two districts away; what a report is worth to a neighbour
+     * is roughly walking distance, whatever its category.
+     *
+     * <p>Distinct from a user's own {@code notificationRadiusKm} preference, which the
+     * audience port applies separately. See {@code NotificationRadius} — this value is not
+     * drawn from that allow-list and is not user-selectable.
+     */
+    static final double BROADCAST_RADIUS_KM = 2.0;
+
     private final AlertAudiencePort audiencePort;
     private final AlertNotificationPort notificationPort;
 
@@ -72,7 +86,7 @@ public class NewAlertFanout {
         List<UUID> recipients = new ArrayList<>(audiencePort.recipientsFor(
             alert.type(),
             alert.location(),
-            broadcastRadiusKm(alert.severity())
+            BROADCAST_RADIUS_KM
         ));
         // The reporter does not need to be told about their own report.
         recipients.remove(alert.reportedBy());
@@ -81,23 +95,7 @@ public class NewAlertFanout {
             return;
         }
 
-        log.debug("Pushing new {} alert to {} recipient(s)", alert.severity(), recipients.size());
+        log.debug("Pushing new {} report to {} recipient(s)", alert.type(), recipients.size());
         notificationPort.broadcastAlert(alert, recipients);
-    }
-
-    /**
-     * How far a new alert is fanned out to <em>subscribers</em>, by severity.
-     *
-     * <p>Distinct from a user's own {@code notificationRadiusKm} preference, which the
-     * audience port applies separately. See {@code NotificationRadius} — these values are
-     * not drawn from that allow-list and are not user-selectable.
-     */
-    private double broadcastRadiusKm(AlertSeverity severity) {
-        return switch (severity) {
-            case CRITICAL -> 10.0;
-            case HIGH -> 5.0;
-            case MEDIUM -> 2.0;
-            case LOW -> 1.0;
-        };
     }
 }

@@ -816,14 +816,6 @@
             "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ]
           }
         }, {
-          "name" : "severity",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "enum" : [ "LOW", "MEDIUM", "HIGH", "CRITICAL" ]
-          }
-        }, {
           "name" : "limit",
           "in" : "query",
           "required" : false,
@@ -1241,12 +1233,6 @@
             "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ],
             "example" : "POTHOLE"
           },
-          "severity" : {
-            "type" : "string",
-            "description" : "Severity level",
-            "enum" : [ "LOW", "MEDIUM", "HIGH", "CRITICAL" ],
-            "example" : "HIGH"
-          },
           "latitude" : {
             "type" : "number",
             "format" : "double",
@@ -1269,7 +1255,7 @@
             "example" : "/api/v1/uploads/uuid.jpg"
           }
         },
-        "required" : [ "description", "latitude", "longitude", "severity", "title", "type" ]
+        "required" : [ "description", "latitude", "longitude", "title", "type" ]
       },
       "AlertResponse" : {
         "type" : "object",
@@ -1292,11 +1278,6 @@
             "type" : "string",
             "description" : "Alert category",
             "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ]
-          },
-          "severity" : {
-            "type" : "string",
-            "description" : "Severity level",
-            "enum" : [ "LOW", "MEDIUM", "HIGH", "CRITICAL" ]
           },
           "latitude" : {
             "type" : "number",
@@ -1519,7 +1500,7 @@
           },
           "truncated" : {
             "type" : "boolean",
-            "description" : "True when the cap was reached and older matches were dropped. Narrow the radius or filter by type/severity to see them.",
+            "description" : "True when the cap was reached and older matches were dropped. Narrow the radius or filter by type to see them.",
             "example" : false
           }
         }

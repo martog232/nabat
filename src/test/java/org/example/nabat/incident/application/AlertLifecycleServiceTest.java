@@ -5,7 +5,6 @@ import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
@@ -46,7 +45,7 @@ class AlertLifecycleServiceTest {
     }
 
     private Alert active() {
-        return new Alert(alertId, "T", "D", AlertType.POTHOLE, AlertSeverity.HIGH,
+        return new Alert(alertId, "T", "D", AlertType.POTHOLE,
                 Location.of(0, 0), Instant.now(), AlertStatus.SUBMITTED,
                 ownerId, 0, 0, 0,
         0, null, null);
@@ -94,7 +93,7 @@ class AlertLifecycleServiceTest {
 
     @Test
     void resolve_alreadyResolved_throwsIllegalState() {
-        Alert resolved = new Alert(alertId, "T", "D", AlertType.POTHOLE, AlertSeverity.HIGH,
+        Alert resolved = new Alert(alertId, "T", "D", AlertType.POTHOLE,
                 Location.of(0, 0), Instant.now(), AlertStatus.RESOLVED,
                 ownerId, 0, 0, 0,
         0, Instant.now(), null);

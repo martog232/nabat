@@ -21,7 +21,6 @@ class AlertTest {
                 "Test Alert",
                 "Some description",
                 AlertType.POTHOLE,
-                AlertSeverity.HIGH,
                 Location.of(42.0, 23.0),
                 reportedBy,
                 null
@@ -43,7 +42,6 @@ class AlertTest {
                 "Pothole on Shipka",
                 "Deep pothole outside number 12",
                 AlertType.POTHOLE,
-                AlertSeverity.CRITICAL,
                 location,
                 reportedBy,
                 null
@@ -52,7 +50,6 @@ class AlertTest {
         assertEquals("Pothole on Shipka", alert.title());
         assertEquals("Deep pothole outside number 12", alert.description());
         assertEquals(AlertType.POTHOLE, alert.type());
-        assertEquals(AlertSeverity.CRITICAL, alert.severity());
         assertEquals(location, alert.location());
         assertEquals(reportedBy, alert.reportedBy());
     }
@@ -63,7 +60,6 @@ class AlertTest {
                 "Test Alert",
                 "Description",
                 AlertType.WASTE,
-                AlertSeverity.LOW,
                 Location.of(42.0, 23.0),
                 UUID.randomUUID(),
                 null
@@ -76,8 +72,8 @@ class AlertTest {
 
     @Test
     void shouldGenerateUniqueIds() {
-        Alert alert1 = Alert.create("A1", "D1", AlertType.POTHOLE, AlertSeverity.HIGH, Location.of(42.0, 23.0), UUID.randomUUID(), null);
-        Alert alert2 = Alert.create("A2", "D2", AlertType.WASTE, AlertSeverity.LOW, Location.of(42.0, 23.0), UUID.randomUUID(), null);
+        Alert alert1 = Alert.create("A1", "D1", AlertType.POTHOLE, Location.of(42.0, 23.0), UUID.randomUUID(), null);
+        Alert alert2 = Alert.create("A2", "D2", AlertType.WASTE, Location.of(42.0, 23.0), UUID.randomUUID(), null);
 
         assertNotEquals(alert1.id(), alert2.id());
     }
@@ -86,7 +82,7 @@ class AlertTest {
     class Lifecycle {
 
         private final Alert submitted = Alert.create(
-                "T", "D", AlertType.POTHOLE, AlertSeverity.LOW,
+                "T", "D", AlertType.POTHOLE,
                 Location.of(42.69, 23.32), UUID.randomUUID(), null);
 
         @Test

@@ -13,7 +13,6 @@ import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.out.AlertAudiencePort;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.testsupport.Fixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -180,7 +179,6 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
             "Trace check",
             "raised by " + FanoutTracePropagationIntegrationTest.class.getSimpleName(),
             AlertType.MANHOLE,
-            AlertSeverity.HIGH,
             42.6977,
             23.3219,
             reporterId,
