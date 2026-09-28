@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.nabat.shared.UseCase;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
+import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
@@ -20,7 +21,8 @@ import java.util.List;
 
 @UseCase
 @RequiredArgsConstructor
-public class AlertLifecycleService implements GetAlertByIdUseCase, ResolveAlertUseCase, ListAlertsUseCase {
+public class AlertLifecycleService
+        implements GetAlertByIdUseCase, ResolveAlertUseCase, ListAlertsUseCase, RecordDeliveryUseCase {
 
     private final AlertRepository alertRepository;
     private final AlertNotificationPort alertNotificationPort;
@@ -65,5 +67,20 @@ public class AlertLifecycleService implements GetAlertByIdUseCase, ResolveAlertU
         alertNotificationPort.broadcastAlertUpdate(resolved);
         return resolved;
     }
-}
 
+    /** Evicts for the same reason {@link #resolve} does: the status is on every cached map. */
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
+    public void recordDelivered(AlertId id) {
+        Alert alert = alertRepository.findById(id)
+                .orElseThrow(() -> new AlertNotFoundException(id));
+
+        if (alert.status() != AlertStatus.SUBMITTED) {
+            return;
+        }
+
+        Alert sent = alertRepository.save(alert.markSent());
+        alertNotificationPort.broadcastAlertUpdate(sent);
+    }
+}

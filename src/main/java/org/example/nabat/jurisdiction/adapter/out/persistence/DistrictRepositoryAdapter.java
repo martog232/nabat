@@ -25,6 +25,11 @@ public class DistrictRepositoryAdapter implements DistrictRepository {
     }
 
     @Override
+    public Optional<District> findByCode(String code) {
+        return jpaRepository.findById(code).map(DistrictJpaEntity::toDomain);
+    }
+
+    @Override
     public Optional<District> findCovering(Location location) {
         return jpaRepository.findCovering(location.latitude(), location.longitude())
             .map(DistrictJpaEntity::toDomain);

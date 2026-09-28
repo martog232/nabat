@@ -10,6 +10,8 @@ public interface DistrictRepository {
 
     List<District> findAllOrderedByName();
 
+    Optional<District> findByCode(String code);
+
     /**
      * The district whose boundary covers {@code location}, boundary included.
      *

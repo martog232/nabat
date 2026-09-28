@@ -103,6 +103,15 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - The boundaries are OSM data (ODbL), relation ids kept in `osm_relation_id` for refreshing. `DistrictBoundariesIntegrationTest` holds the invariants checked on import — all valid, no overlaps, one piece, ~1342 km² — so a refresh cannot quietly break routing.
 - `GET /api/v1/districts` lists code and name, for clients turning a `districtCode` into something to show.
 
+### Delivering a report to its district (`jurisdiction`)
+- **`SignalDispatcher` listens to `AlertCreated`** with `@ApplicationModuleListener`, so the Event Publication Registry is its outbox: a row in the report's own transaction, completed only when the listener returns. It mails the district (`districts.signal_email`), writes a `signal_dispatches` row, and calls `incident`'s `RecordDeliveryUseCase` to move the report `SUBMITTED → SENT` — all in the listener's one transaction.
+- **`SignalMailer` must throw on failure.** `identity`'s `SmtpEmailSender` logs and carries on, which suits account mail; here a swallowed exception is a report the district never got, marked delivered. Do not "harmonise" the two.
+- **At least once, not twice.** A replay that finds a `signal_dispatches` row skips the mail and only catches the status up. The row is always an INSERT (`SignalDispatchJpaEntity.isNew()`), so a second dispatch fails on the primary key instead of merging over the first. The window no outbox closes remains: mail sent, then the commit fails — the next attempt sends again. Accepted: a duplicate report is a smaller failure than a lost one.
+- **`recordDelivered` is idempotent and never drags a report back.** Anything past `SUBMITTED` is left alone — a reporter may resolve before the mail is recorded.
+- **The district addresses are placeholders on `.test` (V19)**, deliberately: real addresses are published by each administration and were not verified, and this project must not mail real officials. Replace them in a new migration once checked. Every environment delivers to MailHog.
+- The mail is Bulgarian plain text: category label, title, description, coordinates with an OSM link, time in Europe/Sofia, and the reporter's name and email with **Reply-To set to the reporter** — an administration only considers a report whose author is identifiable, and its answer should reach the citizen. `X-Nabat-Signal-Id` carries the report id, stable across retries. **No photo link**: uploads need a nabat session, so it would 401 for the district; it arrives with presigned URLs (phase 4).
+- `AlertCreated` now has two listeners, each with its own registry rows. Tests counting `event_publication` rows must filter by `listener_id`.
+
 ### New-report push (`incident`)
 - `CreateAlertService` saves the alert and publishes `AlertCreated`. It pushes nothing itself.
 - `NewAlertFanout` handles that event with **`@ApplicationModuleListener`** — after commit, async, in a new transaction — and broadcasts a `NEW_ALERT` frame to **every connected client**, the same way an update goes out. It is how a new report appears on open maps.
@@ -198,6 +207,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V16 | Drop `alerts.severity` |
 | V17 | Drop `user_subscriptions` and the notification radius and location columns on `users` — the proximity push is gone |
 | V18 | `districts` — the 24 Sofia district boundaries from OSM (PostGIS now required), and `alerts.district_code`, backfilled |
+| V19 | `districts.signal_email` (placeholders on `.test`) and `signal_dispatches` — one row per report delivered |
 
 ---
 

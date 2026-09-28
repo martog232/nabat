@@ -32,10 +32,13 @@ public class DistrictJpaEntity {
     @Column(name = "osm_relation_id", nullable = false)
     private long osmRelationId;
 
+    @Column(name = "signal_email", nullable = false, length = 254)
+    private String signalEmail;
+
     protected DistrictJpaEntity() {
     }
 
     public District toDomain() {
-        return new District(code, name);
+        return new District(code, name, signalEmail);
     }
 }

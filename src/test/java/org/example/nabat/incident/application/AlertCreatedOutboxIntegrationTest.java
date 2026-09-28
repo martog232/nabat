@@ -10,6 +10,7 @@ import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.AlertType;
+import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
 import org.example.nabat.testsupport.Fixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,13 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
     /** How long an assertion waits on the async listener before failing. */
     private static final Duration DELIVERY_TIMEOUT = Duration.ofSeconds(10);
 
+    /**
+     * The publications this class is about. {@code AlertCreated} has a second listener —
+     * {@code SignalDispatcher}, which mails the district — with rows of its own, covered by
+     * {@code SignalDispatchIntegrationTest}.
+     */
+    private static final String FANOUT = "listener_id LIKE '%NewAlertFanout%'";
+
 
     @Autowired
     private CreateAlertUseCase createAlert;
@@ -79,6 +87,10 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
      */
     @MockitoBean
     private AlertNotificationPort notificationPort;
+
+    /** Mocked so the other listener on the same event has nothing to fail on. */
+    @MockitoBean
+    private SignalMailer signalMailer;
 
     /** Prevent real SMTP during integration tests. */
     @MockitoBean
@@ -127,7 +139,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
         await(() -> outstandingPublications() == 1);
 
         String serialized = jdbc.queryForObject(
-            "SELECT serialized_event FROM event_publication WHERE completion_date IS NULL",
+            "SELECT serialized_event FROM event_publication WHERE completion_date IS NULL AND " + FANOUT,
             String.class
         );
         assertNotNull(serialized);
@@ -195,12 +207,12 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
 
     private int outstandingPublications() {
         Integer count = jdbc.queryForObject(
-            "SELECT count(*) FROM event_publication WHERE completion_date IS NULL", Integer.class);
+            "SELECT count(*) FROM event_publication WHERE completion_date IS NULL AND " + FANOUT, Integer.class);
         return count == null ? 0 : count;
     }
 
     private int totalPublications() {
-        Integer count = jdbc.queryForObject("SELECT count(*) FROM event_publication", Integer.class);
+        Integer count = jdbc.queryForObject("SELECT count(*) FROM event_publication WHERE " + FANOUT, Integer.class);
         return count == null ? 0 : count;
     }
 
