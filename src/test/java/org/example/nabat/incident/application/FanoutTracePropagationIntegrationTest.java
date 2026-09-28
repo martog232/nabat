@@ -93,7 +93,7 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM event_publication");
-        alerts.deleteAll();
+        alerts.deleteAllInBatch();
         users.deleteAll();
         notificationPort.observed.clear();
 

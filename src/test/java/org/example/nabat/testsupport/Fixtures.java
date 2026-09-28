@@ -66,7 +66,7 @@ public final class Fixtures {
             reportedBy,
             0, 0, 0, 0,
             null,
-            null, "LOZENETS"
+            null, "LOZENETS", null
         );
     }
 
@@ -82,7 +82,7 @@ public final class Fixtures {
             UUID.randomUUID(),
             0, 0, 0, 0,
             null,
-            null, "LOZENETS"
+            null, "LOZENETS", null
         );
     }
 

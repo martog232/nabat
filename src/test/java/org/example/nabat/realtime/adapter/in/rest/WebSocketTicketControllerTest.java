@@ -52,7 +52,7 @@ class WebSocketTicketControllerTest {
             true,
             now,
             now,
-            0);
+            0, null);
 
         mockMvc.perform(post("/api/v1/ws/tickets")
                 .with(request -> {

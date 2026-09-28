@@ -91,11 +91,11 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
         AlertJpaEntity fire = AlertJpaEntity.from(new Alert(
             AlertId.generate(), "Fire", "d", AlertType.POTHOLE,
             Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T10:00:00Z"),
-            AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null, "LOZENETS"));
+            AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null, "LOZENETS", null));
         AlertJpaEntity hazard = AlertJpaEntity.from(new Alert(
             AlertId.generate(), "Hazard", "d", AlertType.MANHOLE,
             Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T11:00:00Z"),
-            AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null, "LOZENETS"));
+            AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null, "LOZENETS", null));
         repository.saveAll(List.of(fire, hazard));
         repository.flush();
 
@@ -137,7 +137,7 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
             true,
             Instant.now(),
             Instant.now(),
-            0);
+            0, null);
         userRepository.saveAndFlush(UserJpaEntity.from(user));
         return user.id();
     }
@@ -158,7 +158,7 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
 
             0,
             status == AlertStatus.RESOLVED ? createdAt.plusSeconds(60) : null,
-            null, "LOZENETS"
+            null, "LOZENETS", null
         );
     }
 }

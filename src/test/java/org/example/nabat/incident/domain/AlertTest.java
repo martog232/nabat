@@ -96,7 +96,7 @@ class AlertTest {
             alert = alert.startWork();
             assertEquals(AlertStatus.IN_PROGRESS, alert.status());
 
-            alert = alert.resolve();
+            alert = alert.resolve(ClosedBy.REPORTER);
             assertEquals(AlertStatus.RESOLVED, alert.status());
             assertNotNull(alert.resolvedAt());
         }
@@ -126,8 +126,8 @@ class AlertTest {
         void canBeClosedFromAnyOpenState(AlertStatus open) {
             Alert alert = inStatus(open);
 
-            assertEquals(AlertStatus.RESOLVED, alert.resolve().status());
-            assertEquals(AlertStatus.REJECTED, alert.reject().status());
+            assertEquals(AlertStatus.RESOLVED, alert.resolve(ClosedBy.REPORTER).status());
+            assertEquals(AlertStatus.REJECTED, alert.reject(ClosedBy.MODERATOR).status());
         }
 
         @ParameterizedTest
@@ -136,14 +136,29 @@ class AlertTest {
             Alert alert = inStatus(closed);
 
             assertFalse(closed.isOpen());
-            assertThrows(IllegalStateException.class, alert::resolve);
-            assertThrows(IllegalStateException.class, alert::reject);
+            assertThrows(IllegalStateException.class, () -> alert.resolve(ClosedBy.REPORTER));
+            assertThrows(IllegalStateException.class, () -> alert.reject(ClosedBy.MODERATOR));
             assertThrows(IllegalStateException.class, alert::startWork);
         }
 
         @Test
         void aRejectionRecordsNoResolutionTime() {
-            assertNull(submitted.reject().resolvedAt());
+            assertNull(submitted.reject(ClosedBy.MODERATOR).resolvedAt());
+        }
+
+        /** "The district says it is fixed" and "the reporter says so" must stay distinguishable. */
+        @Test
+        void recordsWhoClosedItAndNothingBeforeThat() {
+            assertNull(submitted.closedBy());
+            assertNull(submitted.startWork().closedBy());
+            assertEquals(ClosedBy.DISTRICT, submitted.resolve(ClosedBy.DISTRICT).closedBy());
+            assertEquals(ClosedBy.MODERATOR, submitted.reject(ClosedBy.MODERATOR).closedBy());
+        }
+
+        @Test
+        void refusesToCloseWithoutSayingWho() {
+            assertThrows(IllegalArgumentException.class, () -> submitted.resolve(null));
+            assertThrows(IllegalArgumentException.class, () -> submitted.reject(null));
         }
 
         private Alert inStatus(AlertStatus status) {
@@ -152,8 +167,8 @@ class AlertTest {
                 case SENT -> submitted.markSent();
                 case ACKNOWLEDGED -> submitted.acknowledge();
                 case IN_PROGRESS -> submitted.startWork();
-                case RESOLVED -> submitted.resolve();
-                case REJECTED -> submitted.reject();
+                case RESOLVED -> submitted.resolve(ClosedBy.REPORTER);
+                case REJECTED -> submitted.reject(ClosedBy.MODERATOR);
             };
         }
     }

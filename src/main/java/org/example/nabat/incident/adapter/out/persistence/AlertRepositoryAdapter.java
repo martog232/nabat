@@ -6,11 +6,13 @@ import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.shared.domain.Location;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 @Component
@@ -27,8 +29,15 @@ public class AlertRepositoryAdapter implements AlertRepository {
 
     @Override
     public Alert save(Alert alert) {
-        AlertJpaEntity entity = AlertJpaEntity.from(alert);
-        AlertJpaEntity saved = jpaRepository.save(entity);
+        // Existing alerts are written onto the managed entity, which carries the version the
+        // transaction loaded; see AlertJpaEntity.copyStateFrom for what went wrong without it.
+        AlertJpaEntity entity = jpaRepository.findById(alert.id().value())
+            .map(existing -> {
+                existing.copyStateFrom(alert);
+                return existing;
+            })
+            .orElseGet(() -> AlertJpaEntity.from(alert));
+        AlertJpaEntity saved = jpaRepository.saveAndFlush(entity);
         return saved.toDomain();
     }
 
@@ -67,6 +76,12 @@ public class AlertRepositoryAdapter implements AlertRepository {
     @Override
     public List<Alert> findByStatus(AlertStatus status) {
         return toDomain(jpaRepository.findByStatus(status));
+    }
+
+    @Override
+    public List<Alert> findInDistrict(String districtCode, Set<AlertStatus> statuses, int limit) {
+        return toDomain(jpaRepository.findByDistrictCodeAndStatusInOrderByCreatedAtDesc(
+            districtCode, statuses, Limit.of(limit)));
     }
 
     /**

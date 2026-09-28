@@ -80,7 +80,7 @@ public class AdminUserController {
         @Valid @RequestBody ChangeRoleRequest request,
         @AuthenticationPrincipal User actor
     ) {
-        User updated = administerUsersUseCase.changeRole(actor.id(), UserId.of(id), request.role());
+        User updated = administerUsersUseCase.changeRole(actor.id(), UserId.of(id), request.role(), request.districtCode());
         return ResponseEntity.ok(UserResponse.from(updated));
     }
 
@@ -98,7 +98,9 @@ public class AdminUserController {
     public record ChangeRoleRequest(
         @Schema(description = "The role to assign", example = "MODERATOR")
         @NotNull(message = "Role is required")
-        Role role
+        Role role,
+        @Schema(description = "Required for DISTRICT_OFFICIAL, and only for it: the district the account acts for", example = "LOZENETS")
+        String districtCode
     ) {
     }
 

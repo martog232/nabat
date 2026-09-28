@@ -1,12 +1,14 @@
 package org.example.nabat.incident.adapter.out.persistence;
 
 import org.example.nabat.incident.domain.AlertStatus;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -15,6 +17,9 @@ import java.util.UUID;
 public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> {
 
     List<AlertJpaEntity> findByStatus(AlertStatus status);
+
+    List<AlertJpaEntity> findByDistrictCodeAndStatusInOrderByCreatedAtDesc(
+        String districtCode, Collection<AlertStatus> statuses, Limit limit);
 
     /*
      * The four spatial queries below share a shape: circle predicate, optional type

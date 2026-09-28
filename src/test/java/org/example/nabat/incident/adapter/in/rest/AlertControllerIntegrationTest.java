@@ -50,7 +50,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
 
     @BeforeEach
     void setUp() {
-        alertRepository.deleteAll();
+        alertRepository.deleteAllInBatch();
         userRepository.deleteAll();
     }
 

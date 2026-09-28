@@ -40,7 +40,9 @@ public record Alert(
          * once at creation and never changed: the report does not move. Null only on reports
          * that predate districts and lie outside the city (V18).
          */
-        String districtCode
+        String districtCode,
+        /** Who closed the report; null while it is open, and on reports closed before V20. */
+        ClosedBy closedBy
 ) {
     public static Alert create(
             String title,
@@ -63,47 +65,55 @@ public record Alert(
                 0, 0, 0, 0,
                 null,
                 photoUrl,
-                districtCode
+                districtCode,
+                null
         );
     }
 
     /**
-     * Returns a copy of this alert marked as RESOLVED.
+     * Returns a copy of this alert marked as RESOLVED, by {@code by}.
      *
      * @throws IllegalStateException if the alert is already closed — this is the only
      *                               supported way to make the transition, so that a
      *                               double-resolve surfaces as a 409 rather than silently
      *                               overwriting {@code resolvedAt}
      */
-    public Alert resolve() {
-        return moveTo(AlertStatus.RESOLVED, Instant.now());
+    public Alert resolve(ClosedBy by) {
+        return moveTo(AlertStatus.RESOLVED, Instant.now(), requireCloser(by));
     }
 
     /** Closed without a fix. {@code resolvedAt} stays empty: nothing was resolved. */
-    public Alert reject() {
-        return moveTo(AlertStatus.REJECTED, null);
+    public Alert reject(ClosedBy by) {
+        return moveTo(AlertStatus.REJECTED, null, requireCloser(by));
     }
 
     /** The signal has been delivered to the institution responsible for it. */
     public Alert markSent() {
-        return moveTo(AlertStatus.SENT, null);
+        return moveTo(AlertStatus.SENT, null, null);
     }
 
     /** The institution has confirmed it received the signal. */
     public Alert acknowledge() {
-        return moveTo(AlertStatus.ACKNOWLEDGED, null);
+        return moveTo(AlertStatus.ACKNOWLEDGED, null, null);
     }
 
     /** The institution reports that work has started. */
     public Alert startWork() {
-        return moveTo(AlertStatus.IN_PROGRESS, null);
+        return moveTo(AlertStatus.IN_PROGRESS, null, null);
+    }
+
+    private static ClosedBy requireCloser(ClosedBy by) {
+        if (by == null) {
+            throw new IllegalArgumentException("A closed report records who closed it");
+        }
+        return by;
     }
 
     /**
      * The one place a status changes. Every transition goes through
      * {@link AlertStatus#canMoveTo}, so the rules cannot differ between two callers.
      */
-    private Alert moveTo(AlertStatus target, Instant resolvedAt) {
+    private Alert moveTo(AlertStatus target, Instant resolvedAt, ClosedBy by) {
         if (!status.canMoveTo(target)) {
             throw new IllegalStateException("Alert cannot move from " + status + " to " + target);
         }
@@ -111,7 +121,7 @@ public record Alert(
                 id, title, description, type, location,
                 createdAt, target, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount, credibilityScore,
-                resolvedAt, photoUrl, districtCode
+                resolvedAt, photoUrl, districtCode, by
         );
     }
 
@@ -126,7 +136,7 @@ public record Alert(
                 id, title, description, type, location,
                 createdAt, status, reportedBy,
                 upvotes, downvotes, confirmations, credibilityScore,
-                resolvedAt, photoUrl, districtCode
+                resolvedAt, photoUrl, districtCode, closedBy
         );
     }
 }

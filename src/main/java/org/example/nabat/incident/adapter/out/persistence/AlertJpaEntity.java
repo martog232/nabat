@@ -6,6 +6,7 @@ import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
+import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.shared.domain.Location;
 
 import java.time.Instant;
@@ -84,30 +85,56 @@ public class AlertJpaEntity {
     @Column(name = "district_code", length = 32)
     private String districtCode;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "closed_by", length = 20)
+    private ClosedBy closedBy;
+
     // JPA requires default constructor
     protected AlertJpaEntity() {
     }
 
+    /**
+     * A new row. Only for an alert that has never been saved: the version starts at zero,
+     * which is right for an insert and wrong for anything else — see {@link #copyStateFrom}.
+     */
     public static AlertJpaEntity from(Alert alert) {
         AlertJpaEntity entity = new AlertJpaEntity();
         entity.id = alert.id().value();
-        entity.title = alert.title();
-        entity.description = alert.description();
-        entity.type = alert.type();
-        entity.latitude = alert.location().latitude();
-        entity.longitude = alert.location().longitude();
-        entity.createdAt = alert.createdAt();
-        entity.status = alert.status();
-        entity.reportedBy = alert.reportedBy();
-        entity.upvoteCount = alert.upvoteCount();
-        entity.downvoteCount = alert.downvoteCount();
-        entity.confirmationCount = alert.confirmationCount();
-        // Carried through, never recomputed — the voting service owns this value.
-        entity.credibilityScore = alert.credibilityScore();
-        entity.resolvedAt = alert.resolvedAt();
-        entity.photoUrl = alert.photoUrl();
-        entity.districtCode = alert.districtCode();
+        entity.copyStateFrom(alert);
         return entity;
+    }
+
+    /**
+     * Writes the domain record's state onto this entity, leaving {@code id} and
+     * {@code version} as they are.
+     *
+     * <p>This is how an existing alert is saved: onto the managed entity loaded in the same
+     * transaction, never onto a fresh one. The domain record carries no version, so a fresh
+     * entity always claimed version 0 — and the first save of any alert that had already
+     * been updated once failed as a concurrent modification. It went unnoticed while an
+     * alert was saved at most twice, created and resolved; a report that is also SENT,
+     * ACKNOWLEDGED and IN_PROGRESS hit it on the first step. Copying onto the managed entity
+     * keeps the version check meaningful: it now covers exactly the window from the load to
+     * the commit, which is the one that matters.
+     */
+    void copyStateFrom(Alert alert) {
+        this.title = alert.title();
+        this.description = alert.description();
+        this.type = alert.type();
+        this.latitude = alert.location().latitude();
+        this.longitude = alert.location().longitude();
+        this.createdAt = alert.createdAt();
+        this.status = alert.status();
+        this.reportedBy = alert.reportedBy();
+        this.upvoteCount = alert.upvoteCount();
+        this.downvoteCount = alert.downvoteCount();
+        this.confirmationCount = alert.confirmationCount();
+        // Carried through, never recomputed — the voting service owns this value.
+        this.credibilityScore = alert.credibilityScore();
+        this.resolvedAt = alert.resolvedAt();
+        this.photoUrl = alert.photoUrl();
+        this.districtCode = alert.districtCode();
+        this.closedBy = alert.closedBy();
     }
 
     public Alert toDomain() {
@@ -126,7 +153,8 @@ public class AlertJpaEntity {
                 credibilityScore,
                 resolvedAt,
                 photoUrl,
-                districtCode
+                districtCode,
+                closedBy
         );
     }
 }

@@ -77,7 +77,7 @@ class CreateAlertServiceTest {
             reportedBy,
             0, 0, 0, 0,
             null,
-            null, "LOZENETS"
+            null, "LOZENETS", null
         );
     }
 

@@ -41,7 +41,7 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
     @BeforeEach
     void setUp() {
         notificationRepository.deleteAll();
-        alertRepository.deleteAll();
+        alertRepository.deleteAllInBatch();
         userRepository.deleteAll();
     }
 
@@ -100,7 +100,7 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
                 reportedBy,
                 0, 0, 0, 0,
                 null,
-                null, "LOZENETS"
+                null, "LOZENETS", null
         );
         return alertRepository.saveAndFlush(AlertJpaEntity.from(alert)).getId();
     }

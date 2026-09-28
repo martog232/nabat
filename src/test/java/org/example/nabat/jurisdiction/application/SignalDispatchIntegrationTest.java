@@ -71,7 +71,7 @@ class SignalDispatchIntegrationTest extends PostgresTestSupport {
     void setUp() {
         jdbc.update("DELETE FROM event_publication");
         jdbc.update("DELETE FROM signal_dispatches");
-        alerts.deleteAll();
+        alerts.deleteAllInBatch();
         users.deleteAll();
         Mockito.reset(mailer);
 

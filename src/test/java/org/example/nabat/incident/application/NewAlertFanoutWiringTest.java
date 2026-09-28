@@ -110,7 +110,7 @@ class NewAlertFanoutWiringTest {
             UUID.randomUUID(),
             0, 0, 0, 0,
             null,
-            null, "LOZENETS"
+            null, "LOZENETS", null
         );
     }
 

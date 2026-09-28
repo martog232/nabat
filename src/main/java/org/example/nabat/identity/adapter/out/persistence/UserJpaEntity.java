@@ -53,6 +53,10 @@ public class UserJpaEntity {
     @Column(name = "token_version", nullable = false)
     private int tokenVersion;
 
+    /** See {@link User#districtCode()}; set exactly for district officials (V20). */
+    @Column(name = "district_code", length = 32)
+    private String districtCode;
+
     protected UserJpaEntity() {
     }
 
@@ -68,6 +72,7 @@ public class UserJpaEntity {
         entity.createdAt = user.createdAt();
         entity.updatedAt = user.updatedAt();
         entity.tokenVersion = user.tokenVersion();
+        entity.districtCode = user.districtCode();
         return entity;
     }
 
@@ -82,7 +87,8 @@ public class UserJpaEntity {
             emailVerified,
             createdAt,
             updatedAt,
-            tokenVersion
+            tokenVersion,
+            districtCode
         );
     }
 }

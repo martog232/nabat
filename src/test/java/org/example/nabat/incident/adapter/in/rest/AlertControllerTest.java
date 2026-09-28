@@ -7,6 +7,8 @@ import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
+import org.example.nabat.incident.application.port.in.ListDistrictReportsUseCase;
+import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
@@ -70,6 +72,12 @@ class AlertControllerTest {
     private ListAlertsUseCase listAlertsUseCase;
 
     @MockitoBean
+    private ProgressReportUseCase progressReportUseCase;
+
+    @MockitoBean
+    private ListDistrictReportsUseCase listDistrictReportsUseCase;
+
+    @MockitoBean
     private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     private Alert buildAlert() {
@@ -86,7 +94,7 @@ class AlertControllerTest {
 
                 0,
                 null,
-                null, "LOZENETS"
+                null, "LOZENETS", null
         );
     }
 
@@ -107,7 +115,7 @@ class AlertControllerTest {
                 false,
                 now,
                 now,
-                0);
+                0, null);
 
         CreateAlertRequest request = new CreateAlertRequest(
                 "Test Alert",
@@ -265,7 +273,7 @@ class AlertControllerTest {
         User mockUser = new User(
                 UserId.of(UUID.randomUUID()),
                 "test@example.com", "p", "n",
-                Role.USER, true, false, now, now, 0);
+                Role.USER, true, false, now, now, 0, null);
         var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                 mockUser, null, java.util.List.of());
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);

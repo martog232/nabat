@@ -40,7 +40,7 @@ class EmailVerificationServiceTest {
 
     private User user(boolean verified) {
         return new User(userId, email, "hash", "Alice", Role.USER, true, verified,
-                Instant.now(), Instant.now(), 0);
+                Instant.now(), Instant.now(), 0, null);
     }
 
     @BeforeEach

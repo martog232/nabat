@@ -49,7 +49,7 @@ class NotificationControllerTest {
     @BeforeEach
     void setUp() {
         user = new User(UserId.generate(), "u@x.y", "p", "n",
-                Role.USER, true, false, Instant.now(), Instant.now(), 0);
+                Role.USER, true, false, Instant.now(), Instant.now(), 0, null);
         var auth = new UsernamePasswordAuthenticationToken(user, null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
         SecurityContextHolder.getContext().setAuthentication(auth);

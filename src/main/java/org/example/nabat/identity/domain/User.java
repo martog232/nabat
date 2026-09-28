@@ -38,8 +38,22 @@ public record User(
      * sessions — before, a reset left every already-issued token valid for its
      * full lifetime.
      */
-    int tokenVersion
+    int tokenVersion,
+    /**
+     * The district this account acts for. Set exactly when the role is
+     * {@link Role#DISTRICT_OFFICIAL}, and null otherwise — enforced here and by a CHECK
+     * constraint (V20), because an official with no district acts nowhere and a district on
+     * any other role is a grant waiting to be misread.
+     */
+    String districtCode
 ) {
+    public User {
+        if ((role == Role.DISTRICT_OFFICIAL) != (districtCode != null)) {
+            throw new IllegalArgumentException(
+                "A district is set exactly for DISTRICT_OFFICIAL, not for " + role);
+        }
+    }
+
     public static User create(
         String email,
         String password,
@@ -56,7 +70,8 @@ public record User(
             false,   // emailVerified = false until they click the link
             now,
             now,
-            0
+            0,
+            null
         );
     }
 
@@ -73,8 +88,29 @@ public record User(
             .build();
     }
 
+    /**
+     * Any role but {@link Role#DISTRICT_OFFICIAL}, which needs a district — see
+     * {@link #appointToDistrict}. Clears the district, so moving an official to another role
+     * takes their territory away with the role.
+     */
     public User withRole(Role newRole) {
-        return toBuilder().role(newRole).touch().build();
+        if (newRole == Role.DISTRICT_OFFICIAL) {
+            throw new IllegalArgumentException("A district official needs a district: use appointToDistrict");
+        }
+        return toBuilder().role(newRole).districtCode(null).touch().build();
+    }
+
+    /** Makes this account the voice of one district. */
+    public User appointToDistrict(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("District code is required");
+        }
+        return toBuilder().role(Role.DISTRICT_OFFICIAL).districtCode(code).touch().build();
+    }
+
+    /** Whether this account may act on a report in {@code code}: the right role, and that district. */
+    public boolean actsForDistrict(String code) {
+        return role.canActForDistrict() && code != null && code.equals(districtCode);
     }
 
     /** Disables the account and invalidates all existing sessions. */
@@ -106,6 +142,7 @@ public record User(
         private Instant createdAt;
         private Instant updatedAt;
         private int tokenVersion;
+        private String districtCode;
 
         private Builder(User source) {
             this.id = source.id;
@@ -118,6 +155,7 @@ public record User(
             this.createdAt = source.createdAt;
             this.updatedAt = source.updatedAt;
             this.tokenVersion = source.tokenVersion;
+            this.districtCode = source.districtCode;
         }
 
         public Builder id(UserId value) { this.id = value; return this; }
@@ -130,6 +168,7 @@ public record User(
         public Builder createdAt(Instant value) { this.createdAt = value; return this; }
         public Builder updatedAt(Instant value) { this.updatedAt = value; return this; }
         public Builder tokenVersion(int value) { this.tokenVersion = value; return this; }
+        public Builder districtCode(String value) { this.districtCode = value; return this; }
 
         /** Sets {@code updatedAt} to now. */
         public Builder touch() { this.updatedAt = Instant.now(); return this; }
@@ -137,7 +176,7 @@ public record User(
         public User build() {
             return new User(
                 id, email, password, displayName, role, enabled, emailVerified,
-                createdAt, updatedAt, tokenVersion
+                createdAt, updatedAt, tokenVersion, districtCode
             );
         }
     }

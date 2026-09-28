@@ -11,6 +11,8 @@ import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
+import org.example.nabat.incident.application.port.in.ListDistrictReportsUseCase;
+import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -45,6 +48,8 @@ public class AlertController {
     private final GetAlertByIdUseCase getAlertByIdUseCase;
     private final ResolveAlertUseCase resolveAlertUseCase;
     private final ListAlertsUseCase listAlertsUseCase;
+    private final ProgressReportUseCase progressReportUseCase;
+    private final ListDistrictReportsUseCase listDistrictReportsUseCase;
 
     public AlertController(
         CreateAlertUseCase createAlertUseCase,
@@ -53,13 +58,17 @@ public class AlertController {
         ResolveAlertUseCase resolveAlertUseCase,
         // An in-port, not the AlertRepository out-port this controller used to inject
         // directly — which let the REST layer reach past the application layer entirely.
-        ListAlertsUseCase listAlertsUseCase
+        ListAlertsUseCase listAlertsUseCase,
+        ProgressReportUseCase progressReportUseCase,
+        ListDistrictReportsUseCase listDistrictReportsUseCase
     ) {
         this.createAlertUseCase = createAlertUseCase;
         this.getNearbyAlertsUseCase = getNearbyAlertsUseCase;
         this.getAlertByIdUseCase = getAlertByIdUseCase;
         this.resolveAlertUseCase = resolveAlertUseCase;
         this.listAlertsUseCase = listAlertsUseCase;
+        this.progressReportUseCase = progressReportUseCase;
+        this.listDistrictReportsUseCase = listDistrictReportsUseCase;
     }
 
     @PostMapping
@@ -131,6 +140,54 @@ public class AlertController {
     ) {
         Alert resolved = resolveAlertUseCase.resolve(AlertId.of(id), currentUser);
         return ResponseEntity.ok(AlertResponse.from(resolved));
+    }
+
+    /** The district has received the report. Its own officials only. */
+    @PatchMapping("/{id}/acknowledge")
+    @Operation(summary = "The report's district confirms it has received it")
+    public ResponseEntity<AlertResponse> acknowledge(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.acknowledge(AlertId.of(id), currentUser)));
+    }
+
+    /** The district has started work on it. Its own officials only. */
+    @PatchMapping("/{id}/start-work")
+    @Operation(summary = "The report's district says work has started")
+    public ResponseEntity<AlertResponse> startWork(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.startWork(AlertId.of(id), currentUser)));
+    }
+
+    /** Closed without a fix. The report's district or a moderator — not the reporter. */
+    @PatchMapping("/{id}/reject")
+    @Operation(summary = "Close a report without a fix: a duplicate, not a real problem, not anyone's to fix")
+    public ResponseEntity<AlertResponse> reject(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.reject(AlertId.of(id), currentUser)));
+    }
+
+    /**
+     * The working list of a district official: the reports in their own district, open ones
+     * unless {@code status} says otherwise. Which district comes from the account — there is
+     * no parameter for it, so there is nothing to tamper with.
+     */
+    @GetMapping("/district")
+    @PreAuthorize("hasRole('DISTRICT_OFFICIAL')")
+    @Operation(summary = "Reports in the district the caller acts for, newest first")
+    public ResponseEntity<List<AlertResponse>> listForOwnDistrict(
+            @RequestParam(required = false) Set<AlertStatus> status,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        List<AlertResponse> response = listDistrictReportsUseCase.listForOwnDistrict(currentUser, status).stream()
+                .map(AlertResponse::from)
+                .toList();
+        return ResponseEntity.ok(response);
     }
 
     /**

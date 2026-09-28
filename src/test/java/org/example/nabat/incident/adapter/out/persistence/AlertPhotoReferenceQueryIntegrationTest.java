@@ -44,7 +44,7 @@ class AlertPhotoReferenceQueryIntegrationTest extends PostgresTestSupport {
 
     @BeforeEach
     void setUp() {
-        alerts.deleteAll();
+        alerts.deleteAllInBatch();
         users.deleteAll();
 
         User reporter = User.create("photo-ref@example.com", "hash", "Photo Ref");
@@ -103,7 +103,7 @@ class AlertPhotoReferenceQueryIntegrationTest extends PostgresTestSupport {
             reporterId,
             0, 0, 0, 0,
             null,
-            photoUrl, "LOZENETS"
+            photoUrl, "LOZENETS", null
         );
         alerts.saveAndFlush(AlertJpaEntity.from(alert));
     }

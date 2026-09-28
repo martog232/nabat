@@ -51,7 +51,7 @@ class GetNearbyAlertsServiceTest {
 
                 0,
                 null,
-                null, "LOZENETS"
+                null, "LOZENETS", null
         );
     }
 

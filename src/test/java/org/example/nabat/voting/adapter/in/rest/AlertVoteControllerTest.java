@@ -62,7 +62,7 @@ class AlertVoteControllerTest {
                 false,
                 Instant.now(),
                 Instant.now(),
-                0
+                0, null
         );
     }
 

@@ -13,6 +13,7 @@ import org.example.nabat.voting.domain.VoteConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -107,6 +108,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("IllegalArgument: {}", ex.getMessage());
         return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", MSG_INVALID_REQUEST);
+    }
+
+    /**
+     * Someone else changed the same row between this request reading it and writing it —
+     * a district acknowledging a report while the dispatcher marks it sent, say. The request
+     * did nothing wrong and a retry will very likely succeed, which is a 409, not the 500 it
+     * used to fall through to.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleConcurrentUpdate(OptimisticLockingFailureException ex) {
+        log.info("Concurrent update: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "CONCURRENT_UPDATE", MSG_CONFLICT);
     }
 
     @ExceptionHandler(IllegalStateException.class)

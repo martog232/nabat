@@ -8,6 +8,7 @@ import org.example.nabat.shared.domain.Location;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 public interface AlertRepository {
@@ -49,6 +50,9 @@ public interface AlertRepository {
     }
 
     List<Alert> findByStatus(AlertStatus status);
+
+    /** A district's reports in any of {@code statuses}, newest first, at most {@code limit}. */
+    List<Alert> findInDistrict(String districtCode, Set<AlertStatus> statuses, int limit);
 
     /**
      * Writes the denormalised vote counts and returns the refreshed alert, in one

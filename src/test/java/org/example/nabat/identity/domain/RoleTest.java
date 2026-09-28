@@ -32,15 +32,25 @@ class RoleTest {
         assertTrue(Role.ADMIN.canAdministerUsers());
     }
 
+    /** Trusted with a territory, not with content or accounts. */
+    @Test
+    void aDistrictOfficialActsForADistrictAndNothingElse() {
+        assertTrue(Role.DISTRICT_OFFICIAL.canActForDistrict());
+        assertFalse(Role.DISTRICT_OFFICIAL.canModerateContent());
+        assertFalse(Role.DISTRICT_OFFICIAL.canAdministerUsers());
+        assertFalse(Role.ADMIN.canActForDistrict());
+        assertFalse(Role.MODERATOR.canActForDistrict());
+    }
+
     /**
-     * Guards the CHECK constraint in V12, which lists these names as strings. A constant
-     * added to the enum and not to the migration fails on the first attempt to assign it —
-     * in production, at a point far from this change.
+     * Guards the CHECK constraint in V12 (widened in V20), which lists these names as
+     * strings. A constant added to the enum and not to the migration fails on the first
+     * attempt to assign it — in production, at a point far from this change.
      */
     @Test
     void theRoleSetIsExactlyWhatTheDatabaseConstraintAllows() {
         assertArrayEquals(
-            new Role[] {Role.USER, Role.MODERATOR, Role.ADMIN},
+            new Role[] {Role.USER, Role.MODERATOR, Role.ADMIN, Role.DISTRICT_OFFICIAL},
             Role.values(),
             "Adding or reordering roles means updating the CHECK constraint on users.role"
         );

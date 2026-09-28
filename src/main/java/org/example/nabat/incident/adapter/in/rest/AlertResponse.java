@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
+import org.example.nabat.incident.domain.ClosedBy;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -28,7 +29,8 @@ public record AlertResponse(
     @Schema(description = "Credibility score as computed by the voting service") int credibilityScore,
     @Schema(description = "Timestamp when the alert was resolved; null if still active") Instant resolvedAt,
     @Schema(description = "URL of the uploaded photo, if any") String photoUrl,
-    @Schema(description = "Code of the Sofia district the report is in; null only on reports older than districts", example = "LOZENETS") String districtCode
+    @Schema(description = "Code of the Sofia district the report is in; null only on reports older than districts", example = "LOZENETS") String districtCode,
+    @Schema(description = "Who closed the report — the district, the reporter, or a moderator. Null while open, and on reports closed before this was recorded", example = "DISTRICT") ClosedBy closedBy
 ) {
     public static AlertResponse from(Alert alert) {
         return new AlertResponse(
@@ -47,7 +49,8 @@ public record AlertResponse(
             alert.credibilityScore(),
             alert.resolvedAt(),
             alert.photoUrl(),
-            alert.districtCode()
+            alert.districtCode(),
+            alert.closedBy()
         );
     }
 }
