@@ -106,6 +106,13 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - The boundaries are OSM data (ODbL), relation ids kept in `osm_relation_id` for refreshing. `DistrictBoundariesIntegrationTest` holds the invariants checked on import — all valid, no overlaps, one piece, ~1342 km² — so a refresh cannot quietly break routing.
 - `GET /api/v1/districts` lists code and name, for clients turning a `districtCode` into something to show.
 
+### The public list (`incident`)
+- **`GET /api/v1/alerts/ranked` is public** — no session, like `GET /api/v1/districts` beside it. Both are enumerated in `SecurityConfig` and carry an empty `@SecurityRequirements`; `ContractDocumentsAuthenticationTest` holds the two lists equal. It shows nothing the map does not show a signed-in user, and reporters only as an id. Every other report endpoint still needs a token.
+- Three orders (`ReportRanking`): **`HOT`** = `(max(confirmations + upvotes − downvotes, 0) + 1) / (ageDays + 2)^1.5` — support, discounted by age, so old reports cannot hold the top forever; **`LONGEST_WAITING`** — oldest open first, the accountability view, which HOT by design cannot express; **`NEWEST`**. Filters: district, statuses (open by default). Paged, with a total.
+- **The formula lives twice** — documented on `ReportRanking.HOT`, evaluated in `AlertJpaRepository.findRanked`'s SQL. Change both. `RankedReportsQueryIntegrationTest` pins cases where the formula, raw support and raw age each give a different order.
+- **Age is `LOCALTIMESTAMP - created_at`, not a bound `Instant`.** `created_at` is `TIMESTAMP` without zone, written in the JVM zone, and pgjdbc sets the session to the same zone — so both sides are the same local clock. A bound Instant is zoned and would shift every age by the UTC offset.
+- Support is the vote counts, not `credibilityScore`: a reader can check the formula, and that score belongs to nabat-voting. Not cached — HOT moves with the clock.
+
 ### Delivering a report to its district (`jurisdiction`)
 - **`SignalDispatcher` listens to `AlertCreated`** with `@ApplicationModuleListener`, so the Event Publication Registry is its outbox: a row in the report's own transaction, completed only when the listener returns. It mails the district (`districts.signal_email`), writes a `signal_dispatches` row, and calls `incident`'s `RecordDeliveryUseCase` to move the report `SUBMITTED → SENT` — all in the listener's one transaction.
 - **`SignalMailer` must throw on failure.** `identity`'s `SmtpEmailSender` logs and carries on, which suits account mail; here a swallowed exception is a report the district never got, marked delivered. Do not "harmonise" the two.

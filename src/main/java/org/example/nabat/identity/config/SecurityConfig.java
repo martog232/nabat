@@ -60,6 +60,12 @@ public class SecurityConfig {
                     "/api/v1/auth/reset-password",
                     "/api/v1/auth/login",
                     "/api/v1/auth/refresh").permitAll()
+                // The public list of reports and the district names it is shown with. Read-only,
+                // and nothing in either is more than the map shows a signed-in user. Kong's rate
+                // limits apply to them like everything else.
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/alerts/ranked",
+                    "/api/v1/districts").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 // The probe groups are listed individually rather than as /actuator/health/**:
                 // that wildcard would also expose any future health group, and `anyRequest()`

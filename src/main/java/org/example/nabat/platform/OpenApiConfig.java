@@ -22,8 +22,9 @@ import org.springframework.context.annotation.Configuration;
  * ends in {@code denyAll()} so that a route nobody classified is private by default; a
  * documented default of "open, unless a method says otherwise" would describe the opposite
  * policy, and a new endpoint added without annotations would be published as public while
- * actually answering 401. Six {@code POST /api/v1/auth/*} methods clear the requirement with
- * an empty {@code @SecurityRequirements}, and they are the same six the filter chain
+ * actually answering 401. Six {@code POST /api/v1/auth/*} methods and the two public reads —
+ * {@code GET /api/v1/alerts/ranked} and {@code GET /api/v1/districts} — clear the requirement with
+ * an empty {@code @SecurityRequirements}, and they are the same eight the filter chain
  * permits — {@code ContractDocumentsAuthenticationTest} is what keeps the two lists from
  * drifting.
  *

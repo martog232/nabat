@@ -8,6 +8,7 @@ import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ListDistrictReportsUseCase;
+import org.example.nabat.incident.application.port.in.ListRankedReportsUseCase;
 import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
@@ -76,6 +77,9 @@ class AlertControllerTest {
 
     @MockitoBean
     private ListDistrictReportsUseCase listDistrictReportsUseCase;
+
+    @MockitoBean
+    private ListRankedReportsUseCase listRankedReportsUseCase;
 
     @MockitoBean
     private AuthenticateSessionUseCase authenticateSessionUseCase;

@@ -107,6 +107,24 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         org.junit.jupiter.api.Assertions.assertEquals(userId, response.reportedBy());
     }
 
+    /** The public list and the district names it is shown with need no session. */
+    @Test
+    void thePublicListIsReadableWithoutSigningIn() throws Exception {
+        mockMvc.perform(get("/api/v1/alerts/ranked").param("ranking", "LONGEST_WAITING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ranking").value("LONGEST_WAITING"))
+                .andExpect(jsonPath("$.total").value(0));
+        mockMvc.perform(get("/api/v1/districts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(24)));
+    }
+
+    /** Public means readable, not open: nothing else became reachable without a token. */
+    @Test
+    void theRestOfTheReportApiStillNeedsASession() throws Exception {
+        mockMvc.perform(get("/api/v1/alerts/nearby").param("latitude", "42.69").param("longitude", "23.32"))
+                .andExpect(status().isUnauthorized());
+    }
 
     /**
      * Plovdiv: well-formed, and nowhere nabat can send a report. 422 with its own code, so

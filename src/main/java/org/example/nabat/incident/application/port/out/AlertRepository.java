@@ -4,6 +4,7 @@ import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
+import org.example.nabat.incident.domain.ReportRanking;
 import org.example.nabat.shared.domain.Location;
 
 import java.time.Instant;
@@ -53,6 +54,27 @@ public interface AlertRepository {
 
     /** A district's reports in any of {@code statuses}, newest first, at most {@code limit}. */
     List<Alert> findInDistrict(String districtCode, Set<AlertStatus> statuses, int limit);
+
+    /** One page of the public list, in the order {@code search} asks for. */
+    List<Alert> findRanked(RankedSearch search);
+
+    /** How many reports {@code search} matches in all, ignoring its page. */
+    long countRanked(RankedSearch search);
+
+    /**
+     * The public list's filters, order and page. Its own record rather than the in-port's
+     * query, for the same reason as {@link NearbySearch}: an out-port that imports an in-port
+     * points the dependency backwards.
+     *
+     * @param districtCode null for the whole city
+     */
+    record RankedSearch(String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int offset, int limit) {
+
+        /** The status names the native query compares against. */
+        public List<String> statusNames() {
+            return statuses.stream().map(Enum::name).sorted().toList();
+        }
+    }
 
     /**
      * Writes the denormalised vote counts and returns the refreshed alert, in one

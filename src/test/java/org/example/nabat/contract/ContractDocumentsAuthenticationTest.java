@@ -40,14 +40,17 @@ class ContractDocumentsAuthenticationTest {
 
     private static final String SCHEME = "bearerAuth";
 
-    /** The six the filter chain permits, and the only operations allowed to clear the requirement. */
+    /** The eight the filter chain permits, and the only operations allowed to clear the requirement. */
     private static final List<String> PUBLIC_OPERATIONS = List.of(
         "POST /api/v1/auth/register",
         "POST /api/v1/auth/verify",
         "POST /api/v1/auth/forgot-password",
         "POST /api/v1/auth/reset-password",
         "POST /api/v1/auth/login",
-        "POST /api/v1/auth/refresh"
+        "POST /api/v1/auth/refresh",
+        // The public list of reports, and the district names it is shown with.
+        "GET /api/v1/alerts/ranked",
+        "GET /api/v1/districts"
     );
 
     private static JsonNode spec() throws Exception {
@@ -86,7 +89,7 @@ class ContractDocumentsAuthenticationTest {
      * makes the client believe login needs a token it can only get by logging in.
      */
     @Test
-    void onlyTheAuthEndpointsAreExemptFromIt() throws Exception {
+    void onlyTheEndpointsSecurityConfigPermitsAreExemptFromIt() throws Exception {
         var exempt = new TreeSet<String>();
 
         for (Map.Entry<String, JsonNode> path : spec().path("paths").properties()) {

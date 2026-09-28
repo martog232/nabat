@@ -1,6 +1,7 @@
 package org.example.nabat.incident.adapter.in.rest;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -12,12 +13,14 @@ import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ListDistrictReportsUseCase;
+import org.example.nabat.incident.application.port.in.ListRankedReportsUseCase;
 import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.AlertType;
+import org.example.nabat.incident.domain.ReportRanking;
 import org.example.nabat.identity.domain.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +53,7 @@ public class AlertController {
     private final ListAlertsUseCase listAlertsUseCase;
     private final ProgressReportUseCase progressReportUseCase;
     private final ListDistrictReportsUseCase listDistrictReportsUseCase;
+    private final ListRankedReportsUseCase listRankedReportsUseCase;
 
     public AlertController(
         CreateAlertUseCase createAlertUseCase,
@@ -60,7 +64,8 @@ public class AlertController {
         // directly — which let the REST layer reach past the application layer entirely.
         ListAlertsUseCase listAlertsUseCase,
         ProgressReportUseCase progressReportUseCase,
-        ListDistrictReportsUseCase listDistrictReportsUseCase
+        ListDistrictReportsUseCase listDistrictReportsUseCase,
+        ListRankedReportsUseCase listRankedReportsUseCase
     ) {
         this.createAlertUseCase = createAlertUseCase;
         this.getNearbyAlertsUseCase = getNearbyAlertsUseCase;
@@ -69,6 +74,7 @@ public class AlertController {
         this.listAlertsUseCase = listAlertsUseCase;
         this.progressReportUseCase = progressReportUseCase;
         this.listDistrictReportsUseCase = listDistrictReportsUseCase;
+        this.listRankedReportsUseCase = listRankedReportsUseCase;
     }
 
     @PostMapping
@@ -170,6 +176,35 @@ public class AlertController {
             @AuthenticationPrincipal User currentUser
     ) {
         return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.reject(AlertId.of(id), currentUser)));
+    }
+
+    /**
+     * The public list of reports — anyone may read it, signed in or not.
+     *
+     * <p>Public because that is what it is for: what a district has been told, and what it has
+     * done about it, visible to the people who told it and to anyone else who wants to look.
+     * It carries nothing the map does not already show a signed-in user; reporters appear as
+     * an id, never a name or an address.
+     */
+    @GetMapping("/ranked")
+    @SecurityRequirements
+    @Operation(summary = "All reports, or one district's, in HOT, LONGEST_WAITING or NEWEST order")
+    public ResponseEntity<RankedReportsResponse> listRanked(
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) Set<AlertStatus> status,
+            @RequestParam(defaultValue = "HOT") ReportRanking ranking,
+            @RequestParam(defaultValue = "0") @Min(0) Integer page,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(ListRankedReportsUseCase.RankedQuery.MAX_SIZE) Integer size
+    ) {
+        var query = new ListRankedReportsUseCase.RankedQuery(district, status, ranking, page, size);
+        var result = listRankedReportsUseCase.listRanked(query);
+        return ResponseEntity.ok(new RankedReportsResponse(
+            result.alerts().stream().map(AlertResponse::from).toList(),
+            query.ranking(),
+            page,
+            size,
+            result.total()
+        ));
     }
 
     /**

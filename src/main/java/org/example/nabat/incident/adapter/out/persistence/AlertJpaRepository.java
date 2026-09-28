@@ -18,6 +18,47 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
 
     List<AlertJpaEntity> findByStatus(AlertStatus status);
 
+    /*
+     * The public list. One query for all three orders: ORDER BY cannot take a bind
+     * parameter, and three copies of the same filters would drift. Each CASE is null for the
+     * orders it does not apply to, so only one of them decides; the id breaks ties so that
+     * paging is stable.
+     *
+     * The HOT score is ReportRanking.HOT's formula, and the two must be changed together.
+     * Age is LOCALTIMESTAMP - created_at: created_at is a TIMESTAMP without zone, written in
+     * the JVM's zone, and pgjdbc sets the session to that same zone, so both sides are the
+     * same local clock. Comparing against a bound Instant instead would mix a zoned value
+     * with an unzoned one and shift every age by the UTC offset.
+     */
+    @Query(value = """
+        SELECT * FROM alerts a
+        WHERE a.status IN (:statuses)
+        AND (CAST(:district AS text) IS NULL OR a.district_code = CAST(:district AS text))
+        ORDER BY
+          CASE WHEN :ranking = 'HOT' THEN
+            (GREATEST(a.confirmation_count + a.upvote_count - a.downvote_count, 0) + 1)
+            / power(GREATEST(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - a.created_at)) / 86400.0, 0) + 2, 1.5)
+          END DESC,
+          CASE WHEN :ranking = 'LONGEST_WAITING' THEN a.created_at END ASC,
+          CASE WHEN :ranking = 'NEWEST' THEN a.created_at END DESC,
+          a.id
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<AlertJpaEntity> findRanked(
+        @Param("statuses") Collection<String> statuses,
+        @Param("district") String districtCode,
+        @Param("ranking") String ranking,
+        @Param("offset") int offset,
+        @Param("limit") int limit
+    );
+
+    @Query(value = """
+        SELECT count(*) FROM alerts a
+        WHERE a.status IN (:statuses)
+        AND (CAST(:district AS text) IS NULL OR a.district_code = CAST(:district AS text))
+        """, nativeQuery = true)
+    long countRanked(@Param("statuses") Collection<String> statuses, @Param("district") String districtCode);
+
     List<AlertJpaEntity> findByDistrictCodeAndStatusInOrderByCreatedAtDesc(
         String districtCode, Collection<AlertStatus> statuses, Limit limit);
 

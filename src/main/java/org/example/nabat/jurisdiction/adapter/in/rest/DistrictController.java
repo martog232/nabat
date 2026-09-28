@@ -2,6 +2,7 @@ package org.example.nabat.jurisdiction.adapter.in.rest;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import org.example.nabat.jurisdiction.application.port.in.ListDistrictsUseCase;
 import org.example.nabat.jurisdiction.domain.District;
 import org.springframework.http.CacheControl;
@@ -26,9 +27,10 @@ public class DistrictController {
     /**
      * The districts reports are routed to, so a client can turn a report's
      * {@code districtCode} into a name. Cacheable for a day: the list changes with a
-     * migration, not with use.
+     * migration, not with use. Public, like the ranked list it names the districts for.
      */
     @GetMapping
+    @SecurityRequirements
     @Operation(summary = "The districts of Sofia that reports are routed to")
     public ResponseEntity<List<DistrictResponse>> list() {
         List<DistrictResponse> body = listDistricts.listDistricts().stream()
