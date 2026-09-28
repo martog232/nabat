@@ -12,19 +12,19 @@ import org.example.nabat.incident.domain.AlertType;
 
 import java.util.UUID;
 
-@Schema(description = "Request body for creating a new safety alert")
+@Schema(description = "Request body for reporting a problem in the city")
 public record CreateAlertRequest(
-    @Schema(description = "Short title of the alert", example = "Gas leak on Main St", maxLength = 200)
+    @Schema(description = "Short title of the alert", example = "Дупка на ул. Шипка", maxLength = 200)
     @NotBlank(message = "Title is required")
     @Size(max = 200, message = "Title must be less than 200 characters")
     String title,
 
-    @Schema(description = "Detailed description of the alert", example = "Strong smell of gas near intersection", maxLength = 2000)
+    @Schema(description = "Detailed description of the alert", example = "Дълбока дупка в дясното платно, пред номер 12", maxLength = 2000)
     @NotBlank(message = "Description is required")
     @Size(max = 2000, message = "Description must be less than 2000 characters")
     String description,
 
-    @Schema(description = "Category of the alert", example = "GAS_LEAK")
+    @Schema(description = "Category of the problem", example = "POTHOLE")
     @NotNull(message = "Alert type is required")
     AlertType type,
 
@@ -32,12 +32,12 @@ public record CreateAlertRequest(
     @NotNull(message = "Severity is required")
     AlertSeverity severity,
 
-    @Schema(description = "WGS-84 latitude of the incident", example = "40.7128", minimum = "-90", maximum = "90")
+    @Schema(description = "WGS-84 latitude of the problem", example = "42.6977", minimum = "-90", maximum = "90")
     @NotNull(message = "Latitude is required")
     @DecimalMin(value = "-90.0") @DecimalMax(value = "90.0")
     Double latitude,
 
-    @Schema(description = "WGS-84 longitude of the incident", example = "-74.0060", minimum = "-180", maximum = "180")
+    @Schema(description = "WGS-84 longitude of the problem", example = "23.3219", minimum = "-180", maximum = "180")
     @NotNull(message = "Longitude is required")
     @DecimalMin(value = "-180.0") @DecimalMax(value = "180.0")
     Double longitude,

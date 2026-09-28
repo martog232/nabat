@@ -53,14 +53,14 @@ class UserSubscriptionJpaRepositoryPostgisIntegrationTest extends PostgresTestSu
         seedUser(farAwayUser, "far-away");
 
         repository.saveAll(List.of(
-            entity(matchingUser, AlertType.FIRE, SOFIA_LAT, SOFIA_LON, 0.5, true),
-            entity(inactiveUser, AlertType.FIRE, SOFIA_LAT, SOFIA_LON, 5.0, false),
-            entity(wrongTypeUser, AlertType.CRIME, SOFIA_LAT, SOFIA_LON, 5.0, true),
-            entity(farAwayUser, AlertType.FIRE, 42.1354, 24.7453, 100.0, true)
+            entity(matchingUser, AlertType.POTHOLE, SOFIA_LAT, SOFIA_LON, 0.5, true),
+            entity(inactiveUser, AlertType.POTHOLE, SOFIA_LAT, SOFIA_LON, 5.0, false),
+            entity(wrongTypeUser, AlertType.WASTE, SOFIA_LAT, SOFIA_LON, 5.0, true),
+            entity(farAwayUser, AlertType.POTHOLE, 42.1354, 24.7453, 100.0, true)
         ));
         repository.flush();
 
-        List<UUID> result = repository.findUserIdsMatching(AlertType.FIRE, SOFIA_LAT, SOFIA_LON, 1.0);
+        List<UUID> result = repository.findUserIdsMatching(AlertType.POTHOLE, SOFIA_LAT, SOFIA_LON, 1.0);
 
         assertThat(result).containsExactly(matchingUser);
     }
@@ -71,15 +71,15 @@ class UserSubscriptionJpaRepositoryPostgisIntegrationTest extends PostgresTestSu
         seedUser(subscriberNearAlertEdge, "near-edge");
         repository.saveAndFlush(entity(
             subscriberNearAlertEdge,
-            AlertType.HAZARD,
+            AlertType.MANHOLE,
             42.730,
             SOFIA_LON,
             1.0,
             true
         ));
 
-        List<UUID> tooSmallRadius = repository.findUserIdsMatching(AlertType.HAZARD, SOFIA_LAT, SOFIA_LON, 1.0);
-        List<UUID> combinedRadiusCoversSubscriber = repository.findUserIdsMatching(AlertType.HAZARD, SOFIA_LAT, SOFIA_LON, 4.0);
+        List<UUID> tooSmallRadius = repository.findUserIdsMatching(AlertType.MANHOLE, SOFIA_LAT, SOFIA_LON, 1.0);
+        List<UUID> combinedRadiusCoversSubscriber = repository.findUserIdsMatching(AlertType.MANHOLE, SOFIA_LAT, SOFIA_LON, 4.0);
 
         assertThat(tooSmallRadius).isEmpty();
         assertThat(combinedRadiusCoversSubscriber).containsExactly(subscriberNearAlertEdge);

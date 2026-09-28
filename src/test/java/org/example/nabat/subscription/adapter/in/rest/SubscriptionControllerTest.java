@@ -57,7 +57,7 @@ class SubscriptionControllerTest {
     }
 
     private UserSubscription sample(UUID id) {
-        return new UserSubscription(id, user.id(), AlertType.FIRE,
+        return new UserSubscription(id, user.id(), AlertType.POTHOLE,
                 Location.of(42.0, 23.0), 5.0, true, Instant.now());
     }
 
@@ -66,7 +66,7 @@ class SubscriptionControllerTest {
         when(useCase.listMine(user.id())).thenReturn(List.of(sample(UUID.randomUUID())));
         mockMvc.perform(get("/api/v1/subscriptions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].alertType").value("FIRE"));
+                .andExpect(jsonPath("$[0].alertType").value("POTHOLE"));
     }
 
     @Test
@@ -75,7 +75,7 @@ class SubscriptionControllerTest {
         when(useCase.subscribe(any())).thenReturn(sample(id));
 
         var req = new SubscriptionController.SubscriptionRequest(
-                AlertType.FIRE, 42.0, 23.0, 5.0);
+                AlertType.POTHOLE, 42.0, 23.0, 5.0);
 
         mockMvc.perform(post("/api/v1/subscriptions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +86,7 @@ class SubscriptionControllerTest {
 
     @Test
     void create_invalid_returns400() throws Exception {
-        String invalid = "{\"alertType\":\"FIRE\",\"latitude\":1,\"longitude\":2}"; // missing radiusKm
+        String invalid = "{\"alertType\":\"POTHOLE\",\"latitude\":1,\"longitude\":2}"; // missing radiusKm
         mockMvc.perform(post("/api/v1/subscriptions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalid))

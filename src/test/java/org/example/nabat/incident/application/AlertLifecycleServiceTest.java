@@ -46,8 +46,8 @@ class AlertLifecycleServiceTest {
     }
 
     private Alert active() {
-        return new Alert(alertId, "T", "D", AlertType.FIRE, AlertSeverity.HIGH,
-                Location.of(0, 0), Instant.now(), AlertStatus.ACTIVE,
+        return new Alert(alertId, "T", "D", AlertType.POTHOLE, AlertSeverity.HIGH,
+                Location.of(0, 0), Instant.now(), AlertStatus.SUBMITTED,
                 ownerId, 0, 0, 0,
         0, null, null);
     }
@@ -94,7 +94,7 @@ class AlertLifecycleServiceTest {
 
     @Test
     void resolve_alreadyResolved_throwsIllegalState() {
-        Alert resolved = new Alert(alertId, "T", "D", AlertType.FIRE, AlertSeverity.HIGH,
+        Alert resolved = new Alert(alertId, "T", "D", AlertType.POTHOLE, AlertSeverity.HIGH,
                 Location.of(0, 0), Instant.now(), AlertStatus.RESOLVED,
                 ownerId, 0, 0, 0,
         0, Instant.now(), null);

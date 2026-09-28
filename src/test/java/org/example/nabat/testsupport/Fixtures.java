@@ -46,7 +46,7 @@ public final class Fixtures {
         return user().toBuilder().role(Role.ADMIN).build();
     }
 
-    /** An ACTIVE alert with no votes. */
+    /** A SUBMITTED alert with no votes. */
     public static Alert alert() {
         return alert(AlertId.generate(), UUID.randomUUID());
     }
@@ -64,7 +64,7 @@ public final class Fixtures {
             AlertSeverity.MEDIUM,
             Location.of(42.695, 23.329),
             Instant.now(),
-            AlertStatus.ACTIVE,
+            AlertStatus.SUBMITTED,
             reportedBy,
             0, 0, 0, 0,
             null,
@@ -77,11 +77,11 @@ public final class Fixtures {
             AlertId.generate(),
             "Nearby Alert",
             "Some description",
-            AlertType.FIRE,
+            AlertType.POTHOLE,
             AlertSeverity.HIGH,
             Location.of(latitude, longitude),
             Instant.now(),
-            AlertStatus.ACTIVE,
+            AlertStatus.SUBMITTED,
             UUID.randomUUID(),
             0, 0, 0, 0,
             null,

@@ -20,6 +20,11 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      * The four spatial queries below share a shape: circle predicate, optional type and
      * severity filters, newest first, LIMIT.
      *
+     * "Open" is spelled out as `NOT IN ('RESOLVED', 'REJECTED')`, the SQL twin of
+     * AlertStatus.isOpen(). Naming the closed states rather than the open ones is
+     * deliberate: a new open state then appears on the map without touching this file,
+     * whereas a list of open states would hide it until someone remembered.
+     *
      * On the filters — `CAST(:type AS text) IS NULL OR ...` rather than the obvious
      * `:type IS NULL OR ...`. PostgreSQL infers parameter types from context, and in a
      * bare `NULL` comparison there is no context, so it fails the statement with
@@ -36,7 +41,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     /** PostGIS path — used when the location_geog generated column exists. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status = 'ACTIVE'
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
         AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND ST_DWithin(
@@ -63,7 +68,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status = 'ACTIVE'
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND a.created_at >= :since
         AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
         AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
@@ -88,7 +93,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     /** Haversine equivalent of {@link #findActiveAlertsWithinRadiusSince}. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status = 'ACTIVE'
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND a.created_at >= :since
         AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
         AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
@@ -113,7 +118,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     /** Haversine fallback — used when PostGIS is not installed on the server. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status = 'ACTIVE'
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
         AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
         AND (6371 * acos(

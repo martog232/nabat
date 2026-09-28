@@ -179,7 +179,7 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
         return new CreateAlertUseCase.CreateAlertCommand(
             "Trace check",
             "raised by " + FanoutTracePropagationIntegrationTest.class.getSimpleName(),
-            AlertType.HAZARD,
+            AlertType.MANHOLE,
             AlertSeverity.HIGH,
             42.6977,
             23.3219,

@@ -44,9 +44,9 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
 
     @Test
     void findActiveAlertsWithinRadiusReturnsOnlyActiveNearbyAlertsNewestFirst() {
-        Alert oldNearby = alert("Old nearby", AlertStatus.ACTIVE, SOFIA_LAT, SOFIA_LON, Instant.parse("2026-05-06T08:00:00Z"), seedUser("old-nearby"));
-        Alert newNearby = alert("New nearby", AlertStatus.ACTIVE, 42.697, 23.331, Instant.parse("2026-05-06T09:00:00Z"), seedUser("new-nearby"));
-        Alert farAway = alert("Far away", AlertStatus.ACTIVE, 42.1354, 24.7453, Instant.parse("2026-05-06T10:00:00Z"), seedUser("far-away"));
+        Alert oldNearby = alert("Old nearby", AlertStatus.SUBMITTED, SOFIA_LAT, SOFIA_LON, Instant.parse("2026-05-06T08:00:00Z"), seedUser("old-nearby"));
+        Alert newNearby = alert("New nearby", AlertStatus.SUBMITTED, 42.697, 23.331, Instant.parse("2026-05-06T09:00:00Z"), seedUser("new-nearby"));
+        Alert farAway = alert("Far away", AlertStatus.SUBMITTED, 42.1354, 24.7453, Instant.parse("2026-05-06T10:00:00Z"), seedUser("far-away"));
         Alert resolvedNearby = alert("Resolved nearby", AlertStatus.RESOLVED, SOFIA_LAT, SOFIA_LON, Instant.parse("2026-05-06T11:00:00Z"), seedUser("resolved-nearby"));
         repository.saveAll(List.of(
             AlertJpaEntity.from(oldNearby),
@@ -68,11 +68,11 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
     void findActiveAlertsWithinRadiusAppliesTheLimitInSqlKeepingTheNewest() {
         UserId reporter = seedUser("limited");
         repository.saveAll(List.of(
-            AlertJpaEntity.from(alert("Oldest", AlertStatus.ACTIVE, SOFIA_LAT, SOFIA_LON,
+            AlertJpaEntity.from(alert("Oldest", AlertStatus.SUBMITTED, SOFIA_LAT, SOFIA_LON,
                 Instant.parse("2026-05-06T08:00:00Z"), reporter)),
-            AlertJpaEntity.from(alert("Middle", AlertStatus.ACTIVE, SOFIA_LAT, SOFIA_LON,
+            AlertJpaEntity.from(alert("Middle", AlertStatus.SUBMITTED, SOFIA_LAT, SOFIA_LON,
                 Instant.parse("2026-05-06T09:00:00Z"), reporter)),
-            AlertJpaEntity.from(alert("Newest", AlertStatus.ACTIVE, SOFIA_LAT, SOFIA_LON,
+            AlertJpaEntity.from(alert("Newest", AlertStatus.SUBMITTED, SOFIA_LAT, SOFIA_LON,
                 Instant.parse("2026-05-06T10:00:00Z"), reporter))
         ));
         repository.flush();
@@ -90,18 +90,18 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
     void findActiveAlertsWithinRadiusFiltersByTypeAndSeverity() {
         UserId reporter = seedUser("filtered");
         AlertJpaEntity fire = AlertJpaEntity.from(new Alert(
-            AlertId.generate(), "Fire", "d", AlertType.FIRE, AlertSeverity.CRITICAL,
+            AlertId.generate(), "Fire", "d", AlertType.POTHOLE, AlertSeverity.CRITICAL,
             Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T10:00:00Z"),
-            AlertStatus.ACTIVE, reporter.value(), 0, 0, 0, 0, null, null));
+            AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null));
         AlertJpaEntity hazard = AlertJpaEntity.from(new Alert(
-            AlertId.generate(), "Hazard", "d", AlertType.HAZARD, AlertSeverity.LOW,
+            AlertId.generate(), "Hazard", "d", AlertType.MANHOLE, AlertSeverity.LOW,
             Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T11:00:00Z"),
-            AlertStatus.ACTIVE, reporter.value(), 0, 0, 0, 0, null, null));
+            AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null));
         repository.saveAll(List.of(fire, hazard));
         repository.flush();
 
         assertThat(repository.findActiveAlertsWithinRadius(
-                SOFIA_LAT, SOFIA_LON, 5.0, "FIRE", null, 100))
+                SOFIA_LAT, SOFIA_LON, 5.0, "POTHOLE", null, 100))
             .extracting(AlertJpaEntity::getTitle)
             .containsExactly("Fire");
 
@@ -121,7 +121,7 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
 
     @Test
     void findActiveAlertsWithinRadiusIncludesAlertAtSameCoordinatesWithZeroRadius() {
-        Alert sameSpot = alert("Same spot", AlertStatus.ACTIVE, SOFIA_LAT, SOFIA_LON, Instant.parse("2026-05-06T08:00:00Z"), seedUser("same-spot"));
+        Alert sameSpot = alert("Same spot", AlertStatus.SUBMITTED, SOFIA_LAT, SOFIA_LON, Instant.parse("2026-05-06T08:00:00Z"), seedUser("same-spot"));
         repository.saveAndFlush(AlertJpaEntity.from(sameSpot));
 
         List<AlertJpaEntity> result =
@@ -159,7 +159,7 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
             AlertId.generate(),
             title,
             "Integration query test",
-            AlertType.FIRE,
+            AlertType.POTHOLE,
             AlertSeverity.MEDIUM,
             Location.of(latitude, longitude),
             createdAt,

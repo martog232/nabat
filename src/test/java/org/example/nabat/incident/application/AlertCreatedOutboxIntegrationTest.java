@@ -195,7 +195,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
         return new CreateAlertUseCase.CreateAlertCommand(
             title,
             "raised by " + AlertCreatedOutboxIntegrationTest.class.getSimpleName(),
-            AlertType.HAZARD,
+            AlertType.MANHOLE,
             AlertSeverity.HIGH,
             42.6977,
             23.3219,

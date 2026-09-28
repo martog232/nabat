@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A safety alert.
+ * A signal about a problem in the city: a pothole, a missing manhole cover, a dump.
  *
  * <p>{@code upvoteCount}, {@code downvoteCount}, {@code confirmationCount} and
  * {@code credibilityScore} are a <em>denormalised projection</em> of state owned by
@@ -54,7 +54,7 @@ public record Alert(
                 severity,
                 location,
                 Instant.now(),
-                AlertStatus.ACTIVE,
+                AlertStatus.SUBMITTED,
                 reportedBy,
                 0, 0, 0, 0,
                 null,
@@ -65,20 +65,48 @@ public record Alert(
     /**
      * Returns a copy of this alert marked as RESOLVED.
      *
-     * @throws IllegalStateException if the alert is already resolved — this is the
-     *                               only supported way to make the transition, so
-     *                               that a double-resolve surfaces as a 409 rather
-     *                               than silently overwriting {@code resolvedAt}
+     * @throws IllegalStateException if the alert is already closed — this is the only
+     *                               supported way to make the transition, so that a
+     *                               double-resolve surfaces as a 409 rather than silently
+     *                               overwriting {@code resolvedAt}
      */
     public Alert resolve() {
-        if (status == AlertStatus.RESOLVED) {
-            throw new IllegalStateException("Alert is already resolved");
+        return moveTo(AlertStatus.RESOLVED, Instant.now());
+    }
+
+    /** Closed without a fix. {@code resolvedAt} stays empty: nothing was resolved. */
+    public Alert reject() {
+        return moveTo(AlertStatus.REJECTED, null);
+    }
+
+    /** The signal has been delivered to the institution responsible for it. */
+    public Alert markSent() {
+        return moveTo(AlertStatus.SENT, null);
+    }
+
+    /** The institution has confirmed it received the signal. */
+    public Alert acknowledge() {
+        return moveTo(AlertStatus.ACKNOWLEDGED, null);
+    }
+
+    /** The institution reports that work has started. */
+    public Alert startWork() {
+        return moveTo(AlertStatus.IN_PROGRESS, null);
+    }
+
+    /**
+     * The one place a status changes. Every transition goes through
+     * {@link AlertStatus#canMoveTo}, so the rules cannot differ between two callers.
+     */
+    private Alert moveTo(AlertStatus target, Instant resolvedAt) {
+        if (!status.canMoveTo(target)) {
+            throw new IllegalStateException("Alert cannot move from " + status + " to " + target);
         }
         return new Alert(
                 id, title, description, type, severity, location,
-                createdAt, AlertStatus.RESOLVED, reportedBy,
+                createdAt, target, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount, credibilityScore,
-                Instant.now(), photoUrl
+                resolvedAt, photoUrl
         );
     }
 

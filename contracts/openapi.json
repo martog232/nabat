@@ -335,8 +335,8 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "default" : "ACTIVE",
-            "enum" : [ "ACTIVE", "RESOLVED" ]
+            "default" : "SUBMITTED",
+            "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED" ]
           }
         } ],
         "responses" : {
@@ -813,7 +813,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ]
           }
         }, {
           "name" : "severity",
@@ -928,7 +928,7 @@
           "alertType" : {
             "type" : "string",
             "description" : "Alert type to subscribe to",
-            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ],
+            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ],
             "example" : "GAS_LEAK"
           },
           "latitude" : {
@@ -969,7 +969,7 @@
           "alertType" : {
             "type" : "string",
             "description" : "Subscribed alert type",
-            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ]
           },
           "latitude" : {
             "type" : "number",
@@ -1219,27 +1219,27 @@
       },
       "CreateAlertRequest" : {
         "type" : "object",
-        "description" : "Request body for creating a new safety alert",
+        "description" : "Request body for reporting a problem in the city",
         "properties" : {
           "title" : {
             "type" : "string",
             "description" : "Short title of the alert",
-            "example" : "Gas leak on Main St",
+            "example" : "Дупка на ул. Шипка",
             "maxLength" : 200,
             "minLength" : 0
           },
           "description" : {
             "type" : "string",
             "description" : "Detailed description of the alert",
-            "example" : "Strong smell of gas near intersection",
+            "example" : "Дълбока дупка в дясното платно, пред номер 12",
             "maxLength" : 2000,
             "minLength" : 0
           },
           "type" : {
             "type" : "string",
-            "description" : "Category of the alert",
-            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ],
-            "example" : "GAS_LEAK"
+            "description" : "Category of the problem",
+            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ],
+            "example" : "POTHOLE"
           },
           "severity" : {
             "type" : "string",
@@ -1250,16 +1250,16 @@
           "latitude" : {
             "type" : "number",
             "format" : "double",
-            "description" : "WGS-84 latitude of the incident",
-            "example" : 40.7128,
+            "description" : "WGS-84 latitude of the problem",
+            "example" : 42.6977,
             "maximum" : 90.0,
             "minimum" : -90.0
           },
           "longitude" : {
             "type" : "number",
             "format" : "double",
-            "description" : "WGS-84 longitude of the incident",
-            "example" : -74.006,
+            "description" : "WGS-84 longitude of the problem",
+            "example" : 23.3219,
             "maximum" : 180.0,
             "minimum" : -180.0
           },
@@ -1291,7 +1291,7 @@
           "type" : {
             "type" : "string",
             "description" : "Alert category",
-            "enum" : [ "CRIME", "FIRE", "ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "SUSPICIOUS_ACTIVITY", "TRAFFIC", "HAZARD", "MISSING_PERSON", "OTHER" ]
+            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ]
           },
           "severity" : {
             "type" : "string",
@@ -1318,7 +1318,7 @@
           "status" : {
             "type" : "string",
             "description" : "Current lifecycle status",
-            "enum" : [ "ACTIVE", "RESOLVED" ]
+            "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED" ]
           },
           "reportedBy" : {
             "type" : "string",

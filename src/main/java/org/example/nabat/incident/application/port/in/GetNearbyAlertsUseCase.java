@@ -75,7 +75,7 @@ public interface GetNearbyAlertsUseCase {
          *
          * <p><strong>Every field that changes the result set must appear here.</strong>
          * The filters and the limit narrow the rows returned, so leaving them out would
-         * let a request for {@code type=FIRE&limit=10} be served the cached response of an
+         * let a request for {@code type=POTHOLE&limit=10} be served the cached response of an
          * unfiltered one from the same grid square — wrong alerts on a safety map, and
          * invisible except under concurrent traffic with mixed filters.
          */

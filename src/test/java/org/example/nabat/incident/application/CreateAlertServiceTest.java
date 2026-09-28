@@ -52,11 +52,11 @@ class CreateAlertServiceTest {
             AlertId.generate(),
             "Test Alert",
             "Test description",
-            AlertType.CRIME,
+            AlertType.WASTE,
             AlertSeverity.HIGH,
             Location.of(42.0, 23.0),
             Instant.now(),
-            AlertStatus.ACTIVE,
+            AlertStatus.SUBMITTED,
             reportedBy,
             0, 0, 0, 0,
             null,
@@ -66,7 +66,7 @@ class CreateAlertServiceTest {
 
     private static CreateAlertCommand command(UUID reportedBy) {
         return new CreateAlertCommand(
-            "Test Alert", "Description", AlertType.FIRE, AlertSeverity.HIGH, 42.0, 23.0, reportedBy, null
+            "Test Alert", "Description", AlertType.POTHOLE, AlertSeverity.HIGH, 42.0, 23.0, reportedBy, null
         );
     }
 
@@ -111,7 +111,7 @@ class CreateAlertServiceTest {
         Alert proposed = captor.getValue();
 
         assertEquals("Test Alert", proposed.title());
-        assertEquals(AlertType.FIRE, proposed.type());
+        assertEquals(AlertType.POTHOLE, proposed.type());
         assertEquals(AlertSeverity.HIGH, proposed.severity());
         assertEquals(Location.of(42.0, 23.0), proposed.location());
         assertEquals(reportedBy, proposed.reportedBy());

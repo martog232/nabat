@@ -48,7 +48,7 @@ class AlertAudienceAdapterTest {
         when(userRepository.findUsersNearLocation(any()))
             .thenReturn(List.of(inBoth, nearbyOnly));
 
-        List<UUID> recipients = adapter().recipientsFor(AlertType.FIRE, SOFIA, 5.0);
+        List<UUID> recipients = adapter().recipientsFor(AlertType.POTHOLE, SOFIA, 5.0);
 
         assertThat(recipients).containsExactlyInAnyOrder(inBoth, subscribedOnly, nearbyOnly);
     }
@@ -59,16 +59,16 @@ class AlertAudienceAdapterTest {
             .thenReturn(List.of());
         when(userRepository.findUsersNearLocation(any())).thenReturn(List.of());
 
-        assertThat(adapter().recipientsFor(AlertType.CRIME, SOFIA, 1.0)).isEmpty();
+        assertThat(adapter().recipientsFor(AlertType.WASTE, SOFIA, 1.0)).isEmpty();
     }
 
     @Test
     void passesTheBroadcastRadiusThroughToTheSubscriptionQuery() {
-        when(subscriptionRepository.findUsersSubscribedToAlertType(AlertType.ACCIDENT, SOFIA, 10.0))
+        when(subscriptionRepository.findUsersSubscribedToAlertType(AlertType.STREET_LIGHT, SOFIA, 10.0))
             .thenReturn(List.of());
         when(userRepository.findUsersNearLocation(SOFIA)).thenReturn(List.of());
 
         // Strict stubbing fails this test if the adapter passes anything else.
-        assertThat(adapter().recipientsFor(AlertType.ACCIDENT, SOFIA, 10.0)).isEmpty();
+        assertThat(adapter().recipientsFor(AlertType.STREET_LIGHT, SOFIA, 10.0)).isEmpty();
     }
 }

@@ -43,11 +43,11 @@ class GetNearbyAlertsServiceTest {
                 AlertId.generate(),
                 "Nearby Alert",
                 "Some description",
-                AlertType.FIRE,
+                AlertType.POTHOLE,
                 AlertSeverity.HIGH,
                 Location.of(lat, lon),
                 Instant.now(),
-                AlertStatus.ACTIVE,
+                AlertStatus.SUBMITTED,
                 UUID.randomUUID(),
                 0, 0, 0,
 
@@ -103,7 +103,7 @@ class GetNearbyAlertsServiceTest {
         when(alertRepository.findActiveAlertsWithinRadius(any(NearbySearch.class)))
                 .thenReturn(Collections.emptyList());
 
-        var query = new NearbyAlertsQuery(42.0, 23.0, 5.0, AlertType.FIRE, AlertSeverity.CRITICAL, 25);
+        var query = new NearbyAlertsQuery(42.0, 23.0, 5.0, AlertType.POTHOLE, AlertSeverity.CRITICAL, 25);
         getNearbyAlertsService.getNearbyAlerts(query);
 
         ArgumentCaptor<NearbySearch> searchCaptor = ArgumentCaptor.forClass(NearbySearch.class);
@@ -112,7 +112,7 @@ class GetNearbyAlertsServiceTest {
         NearbySearch search = searchCaptor.getValue();
         // Dropping any of these on the way down would silently widen the query — the
         // caller asked for 25 critical fires and would get every alert in the circle.
-        assertEquals(AlertType.FIRE, search.type());
+        assertEquals(AlertType.POTHOLE, search.type());
         assertEquals(AlertSeverity.CRITICAL, search.severity());
         assertEquals(25, search.limit());
     }
@@ -126,7 +126,7 @@ class GetNearbyAlertsServiceTest {
     @Test
     void cacheKeyDistinguishesQueriesThatReturnDifferentResults() {
         var unfiltered = NearbyAlertsQuery.of(42.0, 23.0, 5.0);
-        var byType = new NearbyAlertsQuery(42.0, 23.0, 5.0, AlertType.FIRE, null, 100);
+        var byType = new NearbyAlertsQuery(42.0, 23.0, 5.0, AlertType.POTHOLE, null, 100);
         var bySeverity = new NearbyAlertsQuery(42.0, 23.0, 5.0, null, AlertSeverity.CRITICAL, 100);
         var smallerLimit = new NearbyAlertsQuery(42.0, 23.0, 5.0, null, null, 10);
 

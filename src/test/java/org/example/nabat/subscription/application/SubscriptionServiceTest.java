@@ -40,10 +40,10 @@ class SubscriptionServiceTest {
         when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         UserSubscription s = service.subscribe(new SubscribeCommand(
-                u, AlertType.FIRE, 42.0, 23.0, 5.0));
+                u, AlertType.POTHOLE, 42.0, 23.0, 5.0));
 
         assertEquals(u, s.userId());
-        assertEquals(AlertType.FIRE, s.alertType());
+        assertEquals(AlertType.POTHOLE, s.alertType());
         assertTrue(s.active());
     }
 
@@ -51,14 +51,14 @@ class SubscriptionServiceTest {
     void subscribe_rejectsNonPositiveRadius() {
         UserId u = UserId.generate();
         assertThrows(IllegalArgumentException.class, () -> service.subscribe(
-                new SubscribeCommand(u, AlertType.FIRE, 42.0, 23.0, 0.0)));
+                new SubscribeCommand(u, AlertType.POTHOLE, 42.0, 23.0, 0.0)));
     }
 
     @Test
     void unsubscribe_byOwner_deletes() {
         UserId u = UserId.generate();
         UUID id = UUID.randomUUID();
-        UserSubscription s = new UserSubscription(id, u, AlertType.FIRE,
+        UserSubscription s = new UserSubscription(id, u, AlertType.POTHOLE,
                 Location.of(0, 0), 1.0, true, Instant.now());
         when(repository.findById(id)).thenReturn(Optional.of(s));
 
@@ -70,7 +70,7 @@ class SubscriptionServiceTest {
     @Test
     void unsubscribe_byOther_throwsAccessDenied() {
         UUID id = UUID.randomUUID();
-        UserSubscription s = new UserSubscription(id, UserId.generate(), AlertType.FIRE,
+        UserSubscription s = new UserSubscription(id, UserId.generate(), AlertType.POTHOLE,
                 Location.of(0, 0), 1.0, true, Instant.now());
         when(repository.findById(id)).thenReturn(Optional.of(s));
 

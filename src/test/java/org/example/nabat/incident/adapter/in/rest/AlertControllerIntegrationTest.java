@@ -83,7 +83,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Integration Test Alert",
                 "A test alert from integration test",
-                AlertType.FIRE,
+                AlertType.POTHOLE,
                 AlertSeverity.HIGH,
                 42.695,
                 23.329,
@@ -97,7 +97,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(notNullValue()))
                 .andExpect(jsonPath("$.title").value("Integration Test Alert"))
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.status").value("SUBMITTED"))
                 .andReturn();
 
         // Verify the alert was created with the authenticated user's ID
@@ -116,7 +116,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Nearby Alert",
                 "A nearby alert",
-                AlertType.CRIME,
+                AlertType.WASTE,
                 AlertSeverity.MEDIUM,
                 42.695,
                 23.329,
@@ -145,7 +145,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Unauthorized Alert",
                 "Should fail",
-                AlertType.FIRE,
+                AlertType.POTHOLE,
                 AlertSeverity.LOW,
                 42.0,
                 23.0,
