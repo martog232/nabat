@@ -43,12 +43,22 @@ scrape_configs:
             traceId: traceId
             service: service.name
             ts: '"@timestamp"'
-      # A label, not just a field: this is what makes "show me every line from this trace"
-      # a label selector. Deliberately only traceId — labels are indexed and high
-      # cardinality is what makes Loki slow, so message and logger stay as content.
+      # A label, not just a field: `level` has a handful of values, so indexing it makes
+      # "show me the errors" a stream selector and costs almost nothing.
+      #
+      # traceId is deliberately NOT a label. Loki indexes label values into separate
+      # streams, and a trace id is unique per request — promoting it meant one stream per
+      # request, and an ordinary hour-long query over this stack already answered
+      # "maximum number of series (500) reached for a single query" instead of logs. The
+      # search it was added for still works, through the field the json stage extracts:
+      #
+      #     {service="nabat-app"} | json | traceId = "<id>"
+      #
+      # That reads the line rather than the index, which is the intended shape for a
+      # high-cardinality value — Loki 3 calls the indexed-but-not-a-stream version of
+      # this structured metadata, if it is ever worth the upgrade.
       - labels:
           level:
-          traceId:
       # Use the application's own timestamp rather than ingestion time, so ordering
       # survives a shipping delay.
       # `source` names a field extracted by the json stage above, not a JMESPath

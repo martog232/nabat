@@ -56,12 +56,16 @@ data:
             traceId: traceId
             service: service.name
             ts: '"@timestamp"'
-      # Labels, not just fields: this is what turns "every line from this trace" into a
-      # label selector. Deliberately only level and traceId — labels are indexed, and high
-      # cardinality is what makes Loki slow, so message and logger stay as content.
+      # A label, not just a field: `level` has few enough values that indexing it is what
+      # makes "show me the errors" a stream selector.
+      #
+      # traceId is deliberately NOT a label — see promtail-config.yml for the full reason.
+      # Loki gives each label value its own stream, and a trace id is unique per request,
+      # so promoting it produces one stream per request and queries fail with "maximum
+      # number of series reached". Search it as a field instead:
+      # `{service="nabat-app"} | json | traceId = "<id>"`.
       - labels:
           level:
-          traceId:
       # The application's own timestamp, so ordering survives a shipping delay. `source`
       # names a field extracted above, not a JMESPath expression — hence `ts`.
       - timestamp:

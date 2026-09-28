@@ -41,6 +41,33 @@ datasources:
     access: proxy
     url: http://loki:3100
     editable: true
+    jsonData:
+      # Turns the trace id inside a log line into a link straight to that trace in Zipkin,
+      # which is the whole reason the id is logged. It replaces copying the id out of a log
+      # line and pasting it into the Zipkin search box — the step everyone skips, which is
+      # how a trace backend ends up unused while it works perfectly.
+      #
+      # Two fields because the two services log differently, and a derived field matches the
+      # raw line rather than any parsed structure:
+      #  - nabat-app emits ECS JSON, so the id is a quoted "traceId" value.
+      #  - nabat-voting emits the plain console pattern, where it is the middle element of
+      #    [name,traceId,spanId] — empty outside a request, hence the 32-hex requirement,
+      #    which also keeps the empty `[nabat-voting,,]` lines from producing a dead link.
+      #
+      # Neither uses matcherType `label`: traceId is deliberately not a Loki label (see
+      # promtail-config.yml), and a label matcher would silently find nothing.
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '"traceId"\s*:\s*"([0-9a-f]+)"'
+          # By uid, not by name: a datasource renamed in the UI would break a name link.
+          datasourceUid: zipkin
+          url: '${__value.raw}'
+          urlDisplayLabel: 'View trace'
+        - name: TraceID
+          matcherRegex: '\[[\w.-]+,([0-9a-f]{32}),'
+          datasourceUid: zipkin
+          url: '${__value.raw}'
+          urlDisplayLabel: 'View trace'
 
   - name: Zipkin
     type: zipkin

@@ -75,6 +75,20 @@ data:
       uid: loki
       access: proxy
       url: http://{{ include "nabat.fullname" . }}-loki:3100
+      # Trace id in a log line becomes a link into Zipkin — see grafana-datasources.yml for
+      # why there are two matchers and why neither uses matcherType `label`.
+      jsonData:
+        derivedFields:
+          - name: TraceID
+            matcherRegex: '"traceId"\s*:\s*"([0-9a-f]+)"'
+            datasourceUid: zipkin
+            url: '${__value.raw}'
+            urlDisplayLabel: 'View trace'
+          - name: TraceID
+            matcherRegex: '\[[\w.-]+,([0-9a-f]{32}),'
+            datasourceUid: zipkin
+            url: '${__value.raw}'
+            urlDisplayLabel: 'View trace'
     - name: Zipkin
       type: zipkin
       uid: zipkin
