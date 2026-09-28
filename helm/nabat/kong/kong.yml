@@ -98,6 +98,14 @@ plugins:
         - Authorization
       credentials: true
       preflight_continue: false
+      # How long a browser may reuse one preflight answer, in seconds. Without it every
+      # single call is preceded by its own OPTIONS: a HAR of one minute of ordinary use
+      # showed 20 preflights against 21 real requests, each a full round trip to the
+      # gateway before the request it guards may leave. An hour is the ceiling Chrome
+      # honours (Firefox caps at 24h), and the answer only changes when the block above
+      # does — a deploy that alters it is a config change, not something a browser needs
+      # to re-ask about mid-session.
+      max_age: 3600
 
   # Baseline limit for ordinary API traffic. `policy: local` counts per Kong node, which is
   # correct for a single instance; running more than one Kong requires `policy: redis` and a
