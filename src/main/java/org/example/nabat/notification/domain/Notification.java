@@ -56,6 +56,25 @@ public record Notification(
         );
     }
 
+    public static Notification createResolvedNotification(
+            UserId recipientId,
+            AlertId alertId,
+            String title,
+            String message
+    ) {
+        return new Notification(
+                NotificationId.generate(),
+                recipientId,
+                NotificationType.ALERT_RESOLVED,
+                title,
+                message,
+                alertId,
+                null,
+                false,
+                Instant.now()
+        );
+    }
+
     /** Returns a copy of this notification with isRead = true. Notification is immutable. */
     public Notification markAsRead() {
         return new Notification(

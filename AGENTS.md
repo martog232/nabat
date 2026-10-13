@@ -94,6 +94,16 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - **Saving an existing alert writes onto the managed entity** (`AlertRepositoryAdapter.save` → `AlertJpaEntity.copyStateFrom`). The domain record has no version, so building a fresh entity claimed version 0 and the first save of any alert already updated once failed as a concurrent modification — latent since V10 because alerts were saved at most twice. Do not go back to `AlertJpaEntity.from` for updates. `OptimisticLockingFailureException` is a **409 `CONCURRENT_UPDATE`**, not a 500.
 - **Tests that clear `alerts` use `deleteAllInBatch()`.** `deleteAll()` deletes row by row with a version check, and the async dispatch listener of a previous test can have moved the row on in between.
 
+### "Is it really fixed?" (`incident`)
+- **Why it exists.** A district marking a report resolved is its own word about its own work, and Call Sofia's data has the same gap — its "closed" ends the paperwork, and nobody asks the reporter. Our Sofia (oursofia.bg), which already maps Call Sofia, says so in its own analytics. This is the part neither does.
+- **One answer per person per RESOLVED report** — `FIXED`, `PARTLY`, `NOT_FIXED` (`fix_checks`, V24). `PUT`/`DELETE /api/v1/alerts/{id}/fix-check` sets or takes it back, `GET` shows the tally and the caller's own. Not on open reports (409) — confirmation votes are for those — and not on rejected ones, which nobody claimed were fixed.
+- **The report's own district may not answer** (403): the check is of its work. Officials of other districts are citizens here.
+- **`FixCheckTally.outcome()` is the rule**: no answers → `UNCHECKED`; the reporter says not fixed, or more say not than say fixed → `DISPUTED`; all fixed → `CONFIRMED`; else `MIXED`. The reporter's "no" counts alone, their "yes" does not outvote others' "no" — the sceptical answer is the one that must not be outvoted. `FixCheckTallyTest` pins each case.
+- **The tally lives on `alerts`** (`fix_*_count`, `reporter_fix_verdict`) so every list carries it without a join, as `AlertResponse.fixCheck`. **Only `JdbcFixCheckStore` writes it**, recounting from `fix_checks` after taking the report row `FOR UPDATE` — without the lock two answers at once each recount without the other's uncommitted row. The JPA entity maps the columns `insertable = false, updatable = false`, so saving a report loaded before an answer cannot write its stale counts back (`JdbcFixCheckStoreIntegrationTest` pins it).
+- **The reporter is asked.** `resolve` publishes `AlertResolved`; `notification`'s `AskReporterIfFixed` sends an `ALERT_RESOLVED` notification unless the reporter closed it themselves. Through the Event Publication Registry, at least once — a question asked twice costs less than one never asked. Do not rename the listener or its `on` method with publications outstanding.
+- `Alert` grew `fixCheck` as its last component; a constructor without it remains (= `FixCheckTally.NONE`) so the many positional constructions in tests did not all change, and the compact constructor turns a null into `NONE` because `AlertCreated` rows stored before V24 replay without it.
+- **Not done yet**: Call Sofia's own closed reports (the archive and the map's departures) cannot be checked — they are not `alerts`. Photos as evidence, and a district view of how many of its "resolved" are disputed, are the obvious next steps.
+
 ### Notification system (`notification`)
 - `NotificationService` — creates and persists `Notification` records; delivers them in real time via `NotificationSender` if the user is reachable, and relies on the persisted row otherwise.
 - `NotificationMilestones` (in `notification/domain`) — the confirmation thresholds that trigger milestone notifications.
@@ -253,6 +263,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V21 | `call_sofia_categories`, `call_sofia_signals`, `call_sofia_status_changes` — the Call Sofia archive, owned by `callsofia` |
 | V22 | `call_sofia_open_signals` — reports on Call Sofia's live map, and when and why each left it |
 | V23 | `report_categories` — Call Sofia's category tree with its codes; `alerts.category_code` replaces `alerts.type`, existing reports mapped |
+| V24 | `fix_checks` — "is it really fixed?" answers on resolved reports; the tally on `alerts` |
 
 ---
 

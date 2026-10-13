@@ -6,6 +6,8 @@ import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.ClosedBy;
+import org.example.nabat.incident.domain.FixCheckTally;
+import org.example.nabat.incident.domain.FixVerdict;
 import org.example.nabat.shared.domain.Location;
 
 import java.time.Instant;
@@ -87,6 +89,24 @@ public class AlertJpaEntity {
     @Column(name = "closed_by", length = 20)
     private ClosedBy closedBy;
 
+    /*
+     * The fix-check tally (V24). Read-only here: JdbcFixCheckStore recounts these from
+     * fix_checks under a lock on this row, and a save of a report loaded before a check
+     * must not write the counts it loaded back over the new ones.
+     */
+    @Column(name = "fix_fixed_count", insertable = false, updatable = false)
+    private int fixFixedCount;
+
+    @Column(name = "fix_partly_count", insertable = false, updatable = false)
+    private int fixPartlyCount;
+
+    @Column(name = "fix_not_fixed_count", insertable = false, updatable = false)
+    private int fixNotFixedCount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "reporter_fix_verdict", insertable = false, updatable = false)
+    private FixVerdict reporterFixVerdict;
+
     // JPA requires default constructor
     protected AlertJpaEntity() {
     }
@@ -152,7 +172,8 @@ public class AlertJpaEntity {
                 resolvedAt,
                 photoUrl,
                 districtCode,
-                closedBy
+                closedBy,
+                new FixCheckTally(fixFixedCount, fixPartlyCount, fixNotFixedCount, reporterFixVerdict)
         );
     }
 }

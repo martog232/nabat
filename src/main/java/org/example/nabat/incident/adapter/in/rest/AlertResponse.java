@@ -29,7 +29,8 @@ public record AlertResponse(
     @Schema(description = "Timestamp when the alert was resolved; null if still active") Instant resolvedAt,
     @Schema(description = "URL of the uploaded photo, if any") String photoUrl,
     @Schema(description = "Code of the Sofia district the report is in; null only on reports older than districts", example = "LOZENETS") String districtCode,
-    @Schema(description = "Who closed the report — the district, the reporter, or a moderator. Null while open, and on reports closed before this was recorded", example = "DISTRICT") ClosedBy closedBy
+    @Schema(description = "Who closed the report — the district, the reporter, or a moderator. Null while open, and on reports closed before this was recorded", example = "DISTRICT") ClosedBy closedBy,
+    @Schema(description = "Whether people say a resolved report is really fixed. All zero and UNCHECKED on reports nobody has checked") FixCheckSummary fixCheck
 ) {
     public static AlertResponse from(Alert alert) {
         return new AlertResponse(
@@ -49,7 +50,8 @@ public record AlertResponse(
             alert.resolvedAt(),
             alert.photoUrl(),
             alert.districtCode(),
-            alert.closedBy()
+            alert.closedBy(),
+            FixCheckSummary.from(alert.fixCheck())
         );
     }
 }

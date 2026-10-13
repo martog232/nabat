@@ -5,6 +5,7 @@ import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
+import org.example.nabat.incident.domain.AlertResolved;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.shared.domain.Location;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.example.nabat.shared.domain.NotAuthorizedException;
 
 import java.time.Instant;
@@ -35,6 +37,8 @@ class AlertLifecycleServiceTest {
     private AlertRepository alertRepository;
     @Mock
     private AlertNotificationPort alertNotificationPort;
+    @Mock
+    private ApplicationEventPublisher events;
 
     private AlertLifecycleService service;
 
@@ -43,7 +47,7 @@ class AlertLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AlertLifecycleService(alertRepository, alertNotificationPort);
+        service = new AlertLifecycleService(alertRepository, alertNotificationPort, events);
     }
 
     private Alert active() {
@@ -80,6 +84,26 @@ class AlertLifecycleServiceTest {
 
         assertEquals(AlertStatus.RESOLVED, result.status());
         assertNotNull(result.resolvedAt());
+    }
+
+    /** What lets the reporter be asked whether it really is fixed. */
+    @Test
+    void resolvingAnnouncesTheResolvedReport() {
+        when(alertRepository.findById(alertId)).thenReturn(Optional.of(active()));
+        when(alertRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        Alert result = service.resolve(alertId, user(UUID.randomUUID(), Role.ADMIN));
+
+        verify(events).publishEvent(new AlertResolved(result));
+    }
+
+    @Test
+    void aFailedResolveAnnouncesNothing() {
+        when(alertRepository.findById(alertId)).thenReturn(Optional.of(active()));
+
+        assertThrows(NotAuthorizedException.class,
+                () -> service.resolve(alertId, user(UUID.randomUUID(), Role.USER)));
+        verifyNoInteractions(events);
     }
 
     @Test

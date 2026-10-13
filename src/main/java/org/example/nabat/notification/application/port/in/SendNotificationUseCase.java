@@ -27,6 +27,16 @@ public interface SendNotificationUseCase {
     ) {
     }
 
+    /**
+     * Tells a reporter their report was closed as resolved by someone else, and asks whether
+     * it really is fixed.
+     */
+    Notification sendResolvedNotification(ResolvedNotificationCommand command);
+
+    /** @param byDistrict true if the report's district closed it, false if a moderator did */
+    record ResolvedNotificationCommand(UserId reporterId, AlertId alertId, String alertTitle, boolean byDistrict) {
+    }
+
     record MilestoneNotificationCommand(
             UserId alertOwnerId,           // owner of the alert
             AlertId alertId,               // alert that reached the milestone

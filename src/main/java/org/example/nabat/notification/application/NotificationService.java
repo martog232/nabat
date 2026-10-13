@@ -122,6 +122,31 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
         return saved;
     }
 
+    @Override
+    @Transactional
+    public Notification sendResolvedNotification(ResolvedNotificationCommand command) {
+        String title = messageSource.getMessage(
+                "notification.resolved.title",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                command.byDistrict() ? "notification.resolved.message.district" : "notification.resolved.message.moderator",
+                new Object[]{command.alertTitle()},
+                LocaleContextHolder.getLocale()
+        );
+
+        Notification n = Notification.createResolvedNotification(
+                command.reporterId(),
+                command.alertId(),
+                title,
+                message
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.reporterId(), saved);
+        return saved;
+    }
+
     private String voteTitleKey(NotificationType type) {
         return switch (type) {
             case ALERT_UPVOTED -> "notification.vote.title.alert_upvoted";

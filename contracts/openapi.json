@@ -13,6 +13,96 @@
     "bearerAuth" : [ ]
   } ],
   "paths" : {
+    "/api/v1/alerts/{id}/fix-check" : {
+      "get" : {
+        "tags" : [ "fix-check-controller" ],
+        "summary" : "What people say about whether a resolved report is really fixed, and what you said",
+        "operationId" : "view",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FixCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "fix-check-controller" ],
+        "summary" : "Say whether a resolved report is really fixed",
+        "operationId" : "check",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FixCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FixCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "fix-check-controller" ],
+        "summary" : "Take back your answer",
+        "operationId" : "withdraw",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FixCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ws/tickets" : {
       "post" : {
         "tags" : [ "web-socket-ticket-controller" ],
@@ -1043,6 +1133,66 @@
   },
   "components" : {
     "schemas" : {
+      "FixCheckRequest" : {
+        "type" : "object",
+        "description" : "An answer to: is it really fixed?",
+        "properties" : {
+          "verdict" : {
+            "type" : "string",
+            "description" : "FIXED, PARTLY or NOT_FIXED",
+            "enum" : [ "FIXED", "PARTLY", "NOT_FIXED" ],
+            "example" : "NOT_FIXED"
+          }
+        },
+        "required" : [ "verdict" ]
+      },
+      "FixCheckResponse" : {
+        "type" : "object",
+        "description" : "The answers on a report, with the caller's own",
+        "properties" : {
+          "summary" : {
+            "$ref" : "#/components/schemas/FixCheckSummary",
+            "description" : "The tally and what it adds up to"
+          },
+          "mine" : {
+            "type" : "string",
+            "description" : "The caller's own answer; null if they have not given one",
+            "enum" : [ "FIXED", "PARTLY", "NOT_FIXED" ]
+          }
+        }
+      },
+      "FixCheckSummary" : {
+        "type" : "object",
+        "description" : "What people say about whether a resolved report is really fixed",
+        "properties" : {
+          "fixed" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Answers saying it is fixed"
+          },
+          "partly" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Answers saying it is partly fixed"
+          },
+          "notFixed" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Answers saying it is not fixed"
+          },
+          "reporterVerdict" : {
+            "type" : "string",
+            "description" : "The reporter's own answer; null if they have not given one",
+            "enum" : [ "FIXED", "PARTLY", "NOT_FIXED" ]
+          },
+          "outcome" : {
+            "type" : "string",
+            "description" : "What the answers add up to. DISPUTED if the reporter says not fixed, or more say not than say fixed",
+            "enum" : [ "UNCHECKED", "CONFIRMED", "DISPUTED", "MIXED" ],
+            "example" : "CONFIRMED"
+          }
+        }
+      },
       "WebSocketTicketResponse" : {
         "type" : "object",
         "properties" : {
@@ -1411,6 +1561,10 @@
             "description" : "Who closed the report — the district, the reporter, or a moderator. Null while open, and on reports closed before this was recorded",
             "enum" : [ "DISTRICT", "REPORTER", "MODERATOR" ],
             "example" : "DISTRICT"
+          },
+          "fixCheck" : {
+            "$ref" : "#/components/schemas/FixCheckSummary",
+            "description" : "Whether people say a resolved report is really fixed. All zero and UNCHECKED on reports nobody has checked"
           }
         }
       },

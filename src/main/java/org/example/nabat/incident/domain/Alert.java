@@ -42,8 +42,36 @@ public record Alert(
          */
         String districtCode,
         /** Who closed the report; null while it is open, and on reports closed before V20. */
-        ClosedBy closedBy
+        ClosedBy closedBy,
+        /**
+         * What people say about whether a resolved report is really fixed. Never null:
+         * {@link FixCheckTally#NONE} until someone answers. Written by the fix-check store,
+         * never by saving the report.
+         */
+        FixCheckTally fixCheck
 ) {
+    /**
+     * Null becomes {@link FixCheckTally#NONE}: events stored before V24 replay from JSON that
+     * has no {@code fixCheck}, and a report must not lose its outbox row over that.
+     */
+    public Alert {
+        if (fixCheck == null) {
+            fixCheck = FixCheckTally.NONE;
+        }
+    }
+
+    /** A report nobody has checked yet — what everything before V24 constructed. */
+    public Alert(
+            AlertId id, String title, String description, int categoryCode, Location location,
+            Instant createdAt, AlertStatus status, UUID reportedBy,
+            int upvoteCount, int downvoteCount, int confirmationCount, int credibilityScore,
+            Instant resolvedAt, String photoUrl, String districtCode, ClosedBy closedBy
+    ) {
+        this(id, title, description, categoryCode, location, createdAt, status, reportedBy,
+                upvoteCount, downvoteCount, confirmationCount, credibilityScore,
+                resolvedAt, photoUrl, districtCode, closedBy, FixCheckTally.NONE);
+    }
+
     public static Alert create(
             String title,
             String description,
@@ -121,7 +149,7 @@ public record Alert(
                 id, title, description, categoryCode, location,
                 createdAt, target, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount, credibilityScore,
-                resolvedAt, photoUrl, districtCode, by
+                resolvedAt, photoUrl, districtCode, by, fixCheck
         );
     }
 
@@ -136,7 +164,17 @@ public record Alert(
                 id, title, description, categoryCode, location,
                 createdAt, status, reportedBy,
                 upvotes, downvotes, confirmations, credibilityScore,
-                resolvedAt, photoUrl, districtCode, closedBy
+                resolvedAt, photoUrl, districtCode, closedBy, fixCheck
+        );
+    }
+
+    /** Returns a copy carrying a fresh fix-check tally, as the store has just counted it. */
+    public Alert withFixCheck(FixCheckTally tally) {
+        return new Alert(
+                id, title, description, categoryCode, location,
+                createdAt, status, reportedBy,
+                upvoteCount, downvoteCount, confirmationCount, credibilityScore,
+                resolvedAt, photoUrl, districtCode, closedBy, tally
         );
     }
 }

@@ -11,6 +11,7 @@ import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.domain.AlertNotFoundException;
+import org.example.nabat.incident.domain.AlertResolved;
 import org.example.nabat.shared.domain.NotAuthorizedException;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
@@ -18,6 +19,7 @@ import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.identity.domain.User;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -32,6 +34,7 @@ public class AlertLifecycleService
 
     private final AlertRepository alertRepository;
     private final AlertNotificationPort alertNotificationPort;
+    private final ApplicationEventPublisher events;
 
     @Override
     @Transactional(readOnly = true)
@@ -56,7 +59,11 @@ public class AlertLifecycleService
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert resolve(AlertId id, User actor) {
-        return transition(id, alert -> alert.resolve(closerOf(alert, actor, true)));
+        Alert resolved = transition(id, alert -> alert.resolve(closerOf(alert, actor, true)));
+        // Through the Event Publication Registry, like AlertCreated: the reporter is asked
+        // whether it is really fixed after this commits, and asked again if that fails.
+        events.publishEvent(new AlertResolved(resolved));
+        return resolved;
     }
 
     @Override
