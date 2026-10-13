@@ -19,7 +19,7 @@ Each direct sub-package of `org.example.nabat` is a Spring Modulith module. `Mod
 | `realtime` | WebSocket transport: sessions, tickets, cross-instance relay |
 | `media` | photo upload and retrieval |
 | `jurisdiction` | the 24 districts of Sofia and their boundaries; answers `incident`'s `DistrictLookupPort` |
-| `callsofia` | a copy of Call Sofia's own reports and their status history, imported from Boyan Yurukov's archive; depends only on `shared` |
+| `callsofia` | Call Sofia's own reports: the past, imported from Boyan Yurukov's archive, and what is open now, read from its public map; declares `DistrictLocatorPort`, which `jurisdiction` implements |
 | `shared` | value types every module needs (`Location`, `NotAuthorizedException`, `@UseCase`) plus infrastructure beans. **Depends on nothing.** |
 | `events` | the Avro event contract shared with nabat-voting, **generated** from `src/main/avro` into `org.example.nabat.events.*`. An **open** module (`@ApplicationModule(type = OPEN)`): every type is public, because the package holds nothing but generated classes whose shape another repository also owns. |
 | `platform` | app-wide composition: `GlobalExceptionHandler`, request logging, use-case metrics, async enablement. **Depended on by nothing.** |
@@ -136,6 +136,13 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - **Running it:** `NABAT_CALLSOFIA_IMPORT_ENABLED=true` for one start. `CallSofiaArchiveImportRunner` runs it `@Async` after `ApplicationReadyEvent`, so readiness is not held for the ~2.5 minutes it takes; a second run is ~1.5 minutes and changes nothing. `NABAT_CALLSOFIA_ARCHIVE_URL` takes any Spring resource location — download the files once and point it at `file:/dir/` rather than reading ~200 MB from his server on every attempt. One replica only: two at once are safe but do the work twice.
 - **Nothing reads these tables yet.** The district comparison is the next step.
 
+### Open reports from Call Sofia's map (`callsofia`)
+- **The archive is for statistics; this is what is open now.** `CallSofiaMapClient` reads the public map at `call.sofia.bg/signals` the way its own page does — **there is no API**: `GET /signals` for the Rails session cookie and the `csrf-token` meta tag, then `POST /signals/map` with `client_signals_grid[period]=30`, which returns every marker in one gzipped response (~10 000 reports, ~5.5 MB unzipped). Two requests per reading, hourly (`CallSofiaMapPoller`), off by default (`NABAT_CALLSOFIA_LIVE_ENABLED`), with a `User-Agent` that says who is asking. Do not shorten the interval for freshness: the site sits behind an F5 WAF and never agreed to serve us.
+- **What the map is**: reports *in processing* (`public_signal_status_id` 2, „В обработка“) *filed in the last 30 days*. No district, no history, and categories from the new site (codes 1000+, 40 of them) that do not match the archive's — hence a table of its own (V22), not `call_sofia_signals`. The district is computed by nabat from the point, through `DistrictLocatorPort` (declared here, implemented by `jurisdiction`), once, when a report is first seen.
+- **A report leaves the map for one of two reasons, and they are told apart when it goes** (`MapDeparture`): filed more than 30 days ago → `AGED_OUT`, status unknown; otherwise → `NO_LONGER_PROCESSING` — answered, closed or rejected, the map does not say which. The age line has 15 minutes of slack *towards* aged-out, so clock skew cannot credit the municipality with an answer it did not give. `left_map_at` is when nabat noticed, up to an interval late.
+- **A reading is all or nothing**, because a report missing from it is recorded as gone. A marker that does not parse fails the whole reading (`MapFormatChangedException`) rather than being skipped; an empty map is refused by the service; the write is one transaction after the HTTP exchange, never around it.
+- **Gap**: neither source has reports filed between the archive's end (2026-08-01) and the map's window when polling began (2026-09-13).
+
 ### New-report push (`incident`)
 - `CreateAlertService` saves the alert and publishes `AlertCreated`. It pushes nothing itself.
 - `NewAlertFanout` handles that event with **`@ApplicationModuleListener`** — after commit, async, in a new transaction — and broadcasts a `NEW_ALERT` frame to **every connected client**, the same way an update goes out. It is how a new report appears on open maps.
@@ -235,6 +242,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V19 | `districts.signal_email` (placeholders on `.test`) and `signal_dispatches` — one row per report delivered |
 | V20 | `DISTRICT_OFFICIAL` role with `users.district_code` (set exactly for it), and `alerts.closed_by` |
 | V21 | `call_sofia_categories`, `call_sofia_signals`, `call_sofia_status_changes` — the Call Sofia archive, owned by `callsofia` |
+| V22 | `call_sofia_open_signals` — reports on Call Sofia's live map, and when and why each left it |
 
 ---
 
