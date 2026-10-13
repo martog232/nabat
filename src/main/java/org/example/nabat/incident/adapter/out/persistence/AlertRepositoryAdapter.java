@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.Optional;
@@ -71,6 +72,15 @@ public class AlertRepositoryAdapter implements AlertRepository {
                     center.latitude(), center.longitude(), search.radiusKm(), since,
                     search.category(), search.limit());
         return toDomain(results);
+    }
+
+    @Override
+    public List<Alert> findOpenNear(Location center, double radiusMeters, Collection<Integer> categoryCodes, int limit) {
+        if (categoryCodes.isEmpty()) {
+            return List.of();
+        }
+        return toDomain(jpaRepository.findOpenNear(
+            center.latitude(), center.longitude(), radiusMeters, categoryCodes, limit));
     }
 
     @Override

@@ -104,6 +104,13 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `Alert` grew `fixCheck` as its last component; a constructor without it remains (= `FixCheckTally.NONE`) so the many positional constructions in tests did not all change, and the compact constructor turns a null into `NONE` because `AlertCreated` rows stored before V24 replay without it.
 - **Not done yet**: Call Sofia's own closed reports (the archive and the map's departures) cannot be checked — they are not `alerts`. Photos as evidence, and a district view of how many of its "resolved" are disputed, are the obvious next steps.
 
+### "Is this already reported?" (`incident` + `callsofia`)
+- **`GET /api/v1/alerts/similar?latitude&longitude&category`** — asked by the report form once it has a place and a subcategory. Returns open reports within **100 m** in the **same category group**, nearest first, at most 5 — from nabat and from Call Sofia. Advice only: nothing refuses a report because a similar one exists, and the form keeps its submit button live throughout.
+- **By group, not subcategory**: the same pothole is „Улично платно“ to one person and „Тротоар“ to the next. A group or unknown `category` is a 400 `UNKNOWN_CATEGORY`, like creating with one.
+- **A nabat match can be confirmed instead of re-reported** — the form casts the existing `CONFIRM` vote on it, so the second person's report becomes weight on the first rather than a second mail to the district.
+- **Call Sofia matches come from its map** (`call_sofia_open_signals`, still on the map only — one that has left it is answered, closed or too old to say). `incident` declares `CallSofiaReportsPort`; `callsofia` implements it (`CallSofiaReportsAdapter`), so `callsofia → incident`, the same direction as `jurisdiction`'s adapters. The category codes are compared directly — nabat's are Call Sofia's. Empty when the map is not being read. `OpenCallSofiaReport` sits in `incident/domain` because the REST layer returns it and `ArchitectureTest` keeps controllers off out-port types.
+- **Not done**: a near-duplicate that is filed anyway still mails its district. Suppressing that automatically would drop real reports on a 100 m guess; the confirm path is how duplicates are meant to go away.
+
 ### Notification system (`notification`)
 - `NotificationService` — creates and persists `Notification` records; delivers them in real time via `NotificationSender` if the user is reachable, and relies on the persisted row otherwise.
 - `NotificationMilestones` (in `notification/domain`) — the confirmation thresholds that trigger milestone notifications.

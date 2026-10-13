@@ -85,12 +85,36 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      * the right end to lose for a live incident map.
      */
 
+    /**
+     * Open reports close to a point, nearest first — the duplicate check before reporting.
+     * PostGIS only: V18 made it a requirement, and this was written after.
+     */
+    @Query(value = """
+        SELECT * FROM alerts a
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
+        AND a.category_code IN (:categories)
+        AND ST_DWithin(
+            a.location_geog,
+            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+            :meters
+        )
+        ORDER BY ST_Distance(a.location_geog, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography)
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<AlertJpaEntity> findOpenNear(
+        @Param("lat") double latitude,
+        @Param("lon") double longitude,
+        @Param("meters") double meters,
+        @Param("categories") Collection<Integer> categories,
+        @Param("limit") int limit
+    );
+
     /** PostGIS path — used when the location_geog generated column exists. */
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
-             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
@@ -103,7 +127,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("category") Integer category,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
@@ -117,7 +141,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND a.created_at >= :since
         AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
-             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
@@ -131,7 +155,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
         @Param("since") Instant since,
-        @Param("category") Integer category,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
@@ -141,7 +165,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND a.created_at >= :since
         AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
-             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
@@ -155,7 +179,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
         @Param("since") Instant since,
-        @Param("category") Integer category,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
@@ -164,7 +188,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
-             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
@@ -177,7 +201,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("category") Integer category,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 

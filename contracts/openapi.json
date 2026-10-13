@@ -908,6 +908,54 @@
         }
       }
     },
+    "/api/v1/alerts/similar" : {
+      "get" : {
+        "tags" : [ "similar-reports-controller" ],
+        "summary" : "Open reports near a point in the same category group, in nabat and in Call Sofia",
+        "operationId" : "similar",
+        "parameters" : [ {
+          "name" : "latitude",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 90.0,
+            "minimum" : -90.0
+          }
+        }, {
+          "name" : "longitude",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 180.0,
+            "minimum" : -180.0
+          }
+        }, {
+          "name" : "category",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SimilarReportsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/ranked" : {
       "get" : {
         "tags" : [ "alert-controller" ],
@@ -1746,6 +1794,91 @@
             "type" : "string",
             "description" : "The vote type, or null if hasVoted is false",
             "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ]
+          }
+        }
+      },
+      "SimilarCallSofiaReport" : {
+        "type" : "object",
+        "description" : "A report open in Call Sofia near the point",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Call Sofia's id",
+            "example" : 788076
+          },
+          "registryNumber" : {
+            "type" : "string",
+            "description" : "The municipality's registry number",
+            "example" : "СОА26-КЦ01-103731/13.09.2026"
+          },
+          "title" : {
+            "type" : "string",
+            "description" : "Title as filed"
+          },
+          "categoryCode" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Category code — the same codes as nabat's",
+            "example" : 1007
+          },
+          "submittedAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "When it was filed"
+          },
+          "meters" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Metres from the point asked about",
+            "example" : 60
+          },
+          "url" : {
+            "type" : "string",
+            "description" : "Its page on call.sofia.bg",
+            "example" : "https://call.sofia.bg/signals/788076"
+          }
+        }
+      },
+      "SimilarReport" : {
+        "type" : "object",
+        "description" : "An open nabat report near the point",
+        "properties" : {
+          "report" : {
+            "$ref" : "#/components/schemas/AlertResponse",
+            "description" : "The report"
+          },
+          "meters" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Metres from the point asked about",
+            "example" : 35
+          }
+        }
+      },
+      "SimilarReportsResponse" : {
+        "type" : "object",
+        "description" : "What might be the same problem, already reported",
+        "properties" : {
+          "radiusMeters" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "How far around the point was searched",
+            "example" : 100
+          },
+          "reports" : {
+            "type" : "array",
+            "description" : "Open nabat reports, nearest first",
+            "items" : {
+              "$ref" : "#/components/schemas/SimilarReport"
+            }
+          },
+          "callSofia" : {
+            "type" : "array",
+            "description" : "Reports open in Call Sofia, nearest first; empty when Call Sofia's map is not being read",
+            "items" : {
+              "$ref" : "#/components/schemas/SimilarCallSofiaReport"
+            }
           }
         }
       },

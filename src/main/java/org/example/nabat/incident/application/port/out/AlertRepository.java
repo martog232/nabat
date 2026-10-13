@@ -7,6 +7,7 @@ import org.example.nabat.incident.domain.ReportRanking;
 import org.example.nabat.shared.domain.Location;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.Optional;
@@ -43,6 +44,12 @@ public interface AlertRepository {
             }
         }
     }
+
+    /**
+     * Open reports within {@code radiusMeters} of {@code center} filed under any of
+     * {@code categoryCodes}, nearest first, at most {@code limit}.
+     */
+    List<Alert> findOpenNear(Location center, double radiusMeters, Collection<Integer> categoryCodes, int limit);
 
     List<Alert> findByStatus(AlertStatus status);
 
