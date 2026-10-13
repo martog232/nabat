@@ -19,6 +19,7 @@ Each direct sub-package of `org.example.nabat` is a Spring Modulith module. `Mod
 | `realtime` | WebSocket transport: sessions, tickets, cross-instance relay |
 | `media` | photo upload and retrieval |
 | `jurisdiction` | the 24 districts of Sofia and their boundaries; answers `incident`'s `DistrictLookupPort` |
+| `callsofia` | a copy of Call Sofia's own reports and their status history, imported from Boyan Yurukov's archive; depends only on `shared` |
 | `shared` | value types every module needs (`Location`, `NotAuthorizedException`, `@UseCase`) plus infrastructure beans. **Depends on nothing.** |
 | `events` | the Avro event contract shared with nabat-voting, **generated** from `src/main/avro` into `org.example.nabat.events.*`. An **open** module (`@ApplicationModule(type = OPEN)`): every type is public, because the package holds nothing but generated classes whose shape another repository also owns. |
 | `platform` | app-wide composition: `GlobalExceptionHandler`, request logging, use-case metrics, async enablement. **Depended on by nothing.** |
@@ -122,6 +123,19 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - The mail is Bulgarian plain text: category label, title, description, coordinates with an OSM link, time in Europe/Sofia, and the reporter's name and email with **Reply-To set to the reporter** — an administration only considers a report whose author is identifiable, and its answer should reach the citizen. `X-Nabat-Signal-Id` carries the report id, stable across retries. **No photo link**: uploads need a nabat session, so it would 401 for the district; it arrives with presigned URLs (phase 4).
 - `AlertCreated` now has two listeners, each with its own registry rows. Tests counting `event_publication` rows must filter by `listener_id`.
 
+### The Call Sofia archive (`callsofia`)
+- **Call Sofia is the municipality's own channel, and nabat does not compete with it as one.** What nabat can add is public accountability over its reports — longest waiting across all time, districts compared by time to answer, "answered" told apart from "fixed". That needs Call Sofia's data, which it does not publish: no API, no open dataset (checked 2026-10-06).
+- **The source is Boyan Yurukov's unofficial dump**, `https://opendata.yurukov.net/callsofia/data/`, **CC BY-SA 2.5 BG** — anything published from it credits him and carries the same licence. It stopped updating on **2026-08-01**, most likely when Call Sofia's site was rebuilt in July. What it holds: 762 464 reports from 2021-12-14 on, and 2.93 M status changes going back to 2014 (12 148 of them for reports not in the file, left out).
+- **Separate tables, not `alerts`** (V21). These reports have no author here and were never sent by nabat; in `alerts` the dispatch listener would mail them to the districts and the public list would rank them as ours.
+- **`YurukovCsvArchive` is the anti-corruption layer** — the only class that knows the file names, the line layout, the district numbers and the status codes. **It is not CSV, so do not reach for a CSV parser**: the title is the last field and is raw, with its own commas and quotes, and the coordinates are one quoted `"lng,lat"` field under a header naming two columns. Each line is matched whole by a regex and the title is the rest. A header that differs throws `ArchiveFormatChangedException`; a single line that does not parse is skipped, counted and logged. The real archive has none.
+- **Districts are mapped by number (`YurukovRegions`), never by name** — the archive spells two of them wrong („Панчерево“, „Върбица“). 0 is "unknown" and stays NULL. `CallSofiaArchiveImportIntegrationTest` holds the 24 codes equal to `districts`.
+- **`CallSofiaStatus` is not `AlertStatus`, deliberately.** Call Sofia's commonest end state is `ANSWERED` („Получил уведомление“ — the citizen got a reply), 470 878 of 762 464; mapping it to `RESOLVED` would put a claim in the data that the source never made. Only 136 448 end `CLOSED`.
+- **History order is `position`, not `changed_at`.** "Answered" and "closed" are routinely stamped in the same second; the line order is all that says which was last. **Who made each change is in the file — names of municipal staff — and is not imported.**
+- Times are Sofia wall clock in the file and `TIMESTAMPTZ` here.
+- **Idempotent, batch by batch.** `CallSofiaArchiveImportService` is not `@Transactional`: each batch of 1 000 commits on its own, reports are upserted on Call Sofia's id and steps inserted `ON CONFLICT DO NOTHING`, so a run that dies halfway is finished by running it again. Writes are `JdbcTemplate`, not JPA — see `JdbcCallSofiaArchiveStore` for why.
+- **Running it:** `NABAT_CALLSOFIA_IMPORT_ENABLED=true` for one start. `CallSofiaArchiveImportRunner` runs it `@Async` after `ApplicationReadyEvent`, so readiness is not held for the ~2.5 minutes it takes; a second run is ~1.5 minutes and changes nothing. `NABAT_CALLSOFIA_ARCHIVE_URL` takes any Spring resource location — download the files once and point it at `file:/dir/` rather than reading ~200 MB from his server on every attempt. One replica only: two at once are safe but do the work twice.
+- **Nothing reads these tables yet.** The district comparison is the next step.
+
 ### New-report push (`incident`)
 - `CreateAlertService` saves the alert and publishes `AlertCreated`. It pushes nothing itself.
 - `NewAlertFanout` handles that event with **`@ApplicationModuleListener`** — after commit, async, in a new transaction — and broadcasts a `NEW_ALERT` frame to **every connected client**, the same way an update goes out. It is how a new report appears on open maps.
@@ -220,6 +234,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V18 | `districts` — the 24 Sofia district boundaries from OSM (PostGIS now required), and `alerts.district_code`, backfilled |
 | V19 | `districts.signal_email` (placeholders on `.test`) and `signal_dispatches` — one row per report delivered |
 | V20 | `DISTRICT_OFFICIAL` role with `users.district_code` (set exactly for it), and `alerts.closed_by` |
+| V21 | `call_sofia_categories`, `call_sofia_signals`, `call_sofia_status_changes` — the Call Sofia archive, owned by `callsofia` |
 
 ---
 
