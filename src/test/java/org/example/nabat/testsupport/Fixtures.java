@@ -3,7 +3,6 @@ package org.example.nabat.testsupport;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.example.nabat.notification.domain.Notification;
 import org.example.nabat.notification.domain.NotificationId;
@@ -59,7 +58,7 @@ public final class Fixtures {
             id,
             "Road closure",
             "Main road is blocked",
-            AlertType.OTHER,
+            1051,
             Location.of(42.695, 23.329),
             Instant.now(),
             AlertStatus.SUBMITTED,
@@ -75,7 +74,7 @@ public final class Fixtures {
             AlertId.generate(),
             "Nearby Alert",
             "Some description",
-            AlertType.POTHOLE,
+            1007,
             Location.of(latitude, longitude),
             Instant.now(),
             AlertStatus.SUBMITTED,

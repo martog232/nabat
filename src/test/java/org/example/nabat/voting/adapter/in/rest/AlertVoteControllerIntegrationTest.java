@@ -133,7 +133,7 @@ class AlertVoteControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
             "Road blocked",
             "Road partially blocked by debris",
-            org.example.nabat.incident.domain.AlertType.STREET_LIGHT,
+            1028,
             42.6977,
             23.3219,
             null

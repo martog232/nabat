@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
-import org.example.nabat.incident.domain.AlertType;
 
 import java.util.UUID;
 
@@ -23,9 +22,9 @@ public record CreateAlertRequest(
     @Size(max = 2000, message = "Description must be less than 2000 characters")
     String description,
 
-    @Schema(description = "Category of the problem", example = "POTHOLE")
-    @NotNull(message = "Alert type is required")
-    AlertType type,
+    @Schema(description = "Subcategory code from GET /api/v1/categories — Call Sofia's codes. A group code is refused.", example = "1007")
+    @NotNull(message = "Category is required")
+    Integer categoryCode,
 
     @Schema(description = "WGS-84 latitude of the problem", example = "42.6977", minimum = "-90", maximum = "90")
     @NotNull(message = "Latitude is required")
@@ -42,7 +41,7 @@ public record CreateAlertRequest(
 ) {
     public CreateAlertUseCase.CreateAlertCommand toCommand(UUID reportedBy) {
         return new CreateAlertUseCase.CreateAlertCommand(
-            title, description, type, latitude, longitude, reportedBy, photoUrl
+            title, description, categoryCode, latitude, longitude, reportedBy, photoUrl
         );
     }
 }

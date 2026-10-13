@@ -4,9 +4,11 @@ import org.example.nabat.shared.UseCase;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.DistrictLookupPort;
+import org.example.nabat.incident.application.port.out.ReportCategoryRepository;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.OutsideServiceAreaException;
+import org.example.nabat.incident.domain.UnknownCategoryException;
 import org.example.nabat.shared.domain.Location;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
@@ -17,15 +19,18 @@ public class CreateAlertService implements CreateAlertUseCase {
 
     private final AlertRepository alertRepository;
     private final DistrictLookupPort districts;
+    private final ReportCategoryRepository categories;
     private final ApplicationEventPublisher events;
 
     public CreateAlertService(
         AlertRepository alertRepository,
         DistrictLookupPort districts,
+        ReportCategoryRepository categories,
         ApplicationEventPublisher events
     ) {
         this.alertRepository = alertRepository;
         this.districts = districts;
+        this.categories = categories;
         this.events = events;
     }
 
@@ -57,6 +62,12 @@ public class CreateAlertService implements CreateAlertUseCase {
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert createAlert(CreateAlertCommand command) {
+        // A group is a heading, not a place to file a report: the foreign key would accept
+        // one, so this is where it is refused.
+        categories.findByCode(command.categoryCode())
+            .filter(category -> !category.isGroup())
+            .orElseThrow(() -> new UnknownCategoryException(command.categoryCode()));
+
         Location location = Location.of(command.latitude(), command.longitude());
 
         DistrictLookupPort.District district = districts.districtAt(location)
@@ -65,7 +76,7 @@ public class CreateAlertService implements CreateAlertUseCase {
         Alert alert = Alert.create(
             command.title(),
             command.description(),
-            command.type(),
+            command.categoryCode(),
             location,
             command.reportedBy(),
             command.photoUrl(),

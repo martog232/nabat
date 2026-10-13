@@ -3,6 +3,7 @@ package org.example.nabat.jurisdiction.application;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.identity.domain.UserId;
+import org.example.nabat.incident.application.port.in.ListReportCategoriesUseCase;
 import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
@@ -48,19 +49,22 @@ public class SignalDispatcher {
     private final SignalMailer mailer;
     private final UserRepository users;
     private final RecordDeliveryUseCase recordDelivery;
+    private final ListReportCategoriesUseCase categories;
 
     public SignalDispatcher(
         DistrictRepository districts,
         SignalDispatchRepository dispatches,
         SignalMailer mailer,
         UserRepository users,
-        RecordDeliveryUseCase recordDelivery
+        RecordDeliveryUseCase recordDelivery,
+        ListReportCategoriesUseCase categories
     ) {
         this.districts = districts;
         this.dispatches = dispatches;
         this.mailer = mailer;
         this.users = users;
         this.recordDelivery = recordDelivery;
+        this.categories = categories;
     }
 
     @ApplicationModuleListener
@@ -93,7 +97,7 @@ public class SignalDispatcher {
             alert.id().value(),
             district.signalEmail(),
             district.name(),
-            alert.type(),
+            categoryLabel(alert.categoryCode()),
             alert.title(),
             alert.description(),
             alert.location().latitude(),
@@ -108,5 +112,16 @@ public class SignalDispatcher {
         recordDelivery.recordDelivered(alert.id());
 
         log.info("Sent report {} to {}", alert.id().value(), district.code());
+    }
+
+    /**
+     * A code that names no subcategory cannot reach here — creation refuses it and the
+     * foreign key holds it — but a report must not stay unsent over a missing label, so
+     * the code itself stands in.
+     */
+    private String categoryLabel(int code) {
+        return categories.findSubcategory(code)
+            .map(ListReportCategoriesUseCase.CategoryGroup.Placed::label)
+            .orElse("Категория " + code);
     }
 }

@@ -6,7 +6,6 @@ import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -86,31 +85,42 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
     }
 
     @Test
-    void findActiveAlertsWithinRadiusFiltersByType() {
+    void findActiveAlertsWithinRadiusFiltersByCategoryOrItsGroup() {
         UserId reporter = seedUser("filtered");
-        AlertJpaEntity fire = AlertJpaEntity.from(new Alert(
-            AlertId.generate(), "Fire", "d", AlertType.POTHOLE,
+        AlertJpaEntity pothole = AlertJpaEntity.from(new Alert(
+            AlertId.generate(), "Pothole", "d", 1007,
             Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T10:00:00Z"),
             AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null, "LOZENETS", null));
-        AlertJpaEntity hazard = AlertJpaEntity.from(new Alert(
-            AlertId.generate(), "Hazard", "d", AlertType.MANHOLE,
+        AlertJpaEntity pavement = AlertJpaEntity.from(new Alert(
+            AlertId.generate(), "Pavement", "d", 1008,
             Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T11:00:00Z"),
             AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null, "LOZENETS", null));
-        repository.saveAll(List.of(fire, hazard));
+        AlertJpaEntity lamp = AlertJpaEntity.from(new Alert(
+            AlertId.generate(), "Lamp", "d", 1028,
+            Location.of(SOFIA_LAT, SOFIA_LON), Instant.parse("2026-05-06T12:00:00Z"),
+            AlertStatus.SUBMITTED, reporter.value(), 0, 0, 0, 0, null, null, "LOZENETS", null));
+        repository.saveAll(List.of(pothole, pavement, lamp));
         repository.flush();
 
+        // A subcategory matches itself only.
         assertThat(repository.findActiveAlertsWithinRadius(
-                SOFIA_LAT, SOFIA_LON, 5.0, "POTHOLE", 100))
+                SOFIA_LAT, SOFIA_LON, 5.0, 1007, 100))
             .extracting(AlertJpaEntity::getTitle)
-            .containsExactly("Fire");
+            .containsExactly("Pothole");
 
-        // Both null means no filter at all. This is the case the `CAST(:type AS text) IS
+        // A group matches every subcategory under it — 1006, roads, holds both.
+        assertThat(repository.findActiveAlertsWithinRadius(
+                SOFIA_LAT, SOFIA_LON, 5.0, 1006, 100))
+            .extracting(AlertJpaEntity::getTitle)
+            .containsExactly("Pavement", "Pothole");
+
+        // Null means no filter at all. This is the case the `CAST(:category AS integer) IS
         // NULL` form exists for: PostgreSQL cannot infer a bare parameter's type in a NULL
         // comparison and fails the statement outright, so the unfiltered path is exactly
         // the one that breaks if the cast is dropped.
         assertThat(repository.findActiveAlertsWithinRadius(
                 SOFIA_LAT, SOFIA_LON, 5.0, null, 100))
-            .hasSize(2);
+            .hasSize(3);
     }
 
     @Test
@@ -147,7 +157,7 @@ class AlertJpaRepositoryPostgisIntegrationTest extends PostgresTestSupport {
             AlertId.generate(),
             title,
             "Integration query test",
-            AlertType.POTHOLE,
+            1007,
             Location.of(latitude, longitude),
             createdAt,
             status,

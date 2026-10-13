@@ -1,7 +1,6 @@
 package org.example.nabat.incident.application.port.in;
 
 import org.example.nabat.incident.domain.Alert;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 
 import java.time.Instant;
@@ -30,7 +29,8 @@ public interface GetNearbyAlertsUseCase {
         double latitude,
         double longitude,
         double radiusKm,
-        AlertType type,
+        /** A group code (all its subcategories) or a subcategory code; null for every category. */
+        Integer category,
         int limit
     ) {
         /** Cache keys are built from coordinates rounded to this many decimal places. */
@@ -79,7 +79,7 @@ public interface GetNearbyAlertsUseCase {
          */
         public String cacheKey() {
             return quantize(latitude) + "_" + quantize(longitude) + "_" + radiusKm
-                + "_" + (type == null ? "*" : type.name())
+                + "_" + (category == null ? "*" : category)
                 + "_" + limit;
         }
 

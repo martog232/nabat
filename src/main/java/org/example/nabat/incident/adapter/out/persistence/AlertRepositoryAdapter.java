@@ -53,10 +53,10 @@ public class AlertRepositoryAdapter implements AlertRepository {
         List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
                 ? jpaRepository.findActiveAlertsWithinRadius(
                     center.latitude(), center.longitude(), search.radiusKm(),
-                    search.typeName(), search.limit())
+                    search.category(), search.limit())
                 : jpaRepository.findActiveAlertsWithinRadiusHaversine(
                     center.latitude(), center.longitude(), search.radiusKm(),
-                    search.typeName(), search.limit());
+                    search.category(), search.limit());
         return toDomain(results);
     }
 
@@ -66,10 +66,10 @@ public class AlertRepositoryAdapter implements AlertRepository {
         List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
                 ? jpaRepository.findActiveAlertsWithinRadiusSince(
                     center.latitude(), center.longitude(), search.radiusKm(), since,
-                    search.typeName(), search.limit())
+                    search.category(), search.limit())
                 : jpaRepository.findActiveAlertsWithinRadiusSinceHaversine(
                     center.latitude(), center.longitude(), search.radiusKm(), since,
-                    search.typeName(), search.limit());
+                    search.category(), search.limit());
         return toDomain(results);
     }
 

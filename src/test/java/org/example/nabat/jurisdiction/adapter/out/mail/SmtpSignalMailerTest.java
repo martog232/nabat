@@ -5,11 +5,8 @@ import jakarta.mail.Message;
 import jakarta.mail.Session;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer.SignalMail;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -35,7 +32,7 @@ class SmtpSignalMailerTest {
 
     private static SignalMail mail() {
         return new SignalMail(
-            ALERT_ID, "lozenets@rayon.nabat.test", "Район Лозенец", AlertType.POTHOLE,
+            ALERT_ID, "lozenets@rayon.nabat.test", "Район Лозенец", "Пътища и шахти — Улично платно",
             "Дупка на Черни връх", "Дълбока дупка в дясното платно",
             42.671234, 23.318765,
             Instant.parse("2026-09-28T16:42:00Z"),
@@ -67,7 +64,7 @@ class SmtpSignalMailerTest {
     void writesTheSubjectAndBodyInBulgarian() throws Exception {
         MimeMessage message = sent();
 
-        assertThat(message.getSubject()).isEqualTo("Сигнал: Дупка на пътя или тротоара — Дупка на Черни връх");
+        assertThat(message.getSubject()).isEqualTo("Сигнал: Пътища и шахти — Улично платно — Дупка на Черни връх");
         assertThat((String) message.getContent())
             .contains("Уважаеми служители на Район Лозенец")
             .contains("Дълбока дупка в дясното платно")
@@ -89,11 +86,6 @@ class SmtpSignalMailerTest {
             .contains("https://www.openstreetmap.org/?mlat=42.671234&mlon=23.318765#map=19/42.671234/23.318765");
     }
 
-    @ParameterizedTest
-    @EnumSource(AlertType.class)
-    void namesEveryCategoryInBulgarian(AlertType type) {
-        assertThat(SmtpSignalMailer.label(type)).isNotBlank().doesNotContain("_");
-    }
 
     /** Swallowing this would turn a report the district never got into one nabat calls sent. */
     @Test

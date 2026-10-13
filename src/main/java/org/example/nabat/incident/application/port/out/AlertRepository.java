@@ -3,7 +3,6 @@ package org.example.nabat.incident.application.port.out;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.incident.domain.ReportRanking;
 import org.example.nabat.shared.domain.Location;
 
@@ -27,7 +26,7 @@ public interface AlertRepository {
      * rather than reusing the in-port's query record — an out-port that imports an in-port
      * would point the dependency backwards.
      *
-     * @param type     null means every type
+     * @param category a group code or a subcategory code; null means every category
      * @param limit    hard cap on rows returned. Applied in SQL, not afterwards in Java:
      *                 trimming a list still makes the database materialise and ship every
      *                 row inside the radius, which is the cost being avoided.
@@ -35,18 +34,13 @@ public interface AlertRepository {
     record NearbySearch(
         Location center,
         double radiusKm,
-        AlertType type,
+        Integer category,
         int limit
     ) {
         public NearbySearch {
             if (limit <= 0) {
                 throw new IllegalArgumentException("Limit must be positive");
             }
-        }
-
-        /** The enum name the native queries compare against, or null for "no filter". */
-        public String typeName() {
-            return type == null ? null : type.name();
         }
     }
 

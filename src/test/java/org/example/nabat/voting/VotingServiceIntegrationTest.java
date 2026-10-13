@@ -558,7 +558,7 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
                         .content("""
                             {"title":"Voting integration",
                              "description":"An alert to vote on",
-                             "type":"MANHOLE",
+                             "categoryCode":1008,
                              "latitude":42.6977,"longitude":23.3219}"""))
                 .andExpect(status().isCreated())
                 .andReturn();

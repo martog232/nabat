@@ -20,7 +20,7 @@ class AlertTest {
         Alert alert = Alert.create(
                 "Test Alert",
                 "Some description",
-                AlertType.POTHOLE,
+                1007,
                 Location.of(42.0, 23.0),
                 reportedBy,
                 null, "LOZENETS"
@@ -41,7 +41,7 @@ class AlertTest {
         Alert alert = Alert.create(
                 "Pothole on Shipka",
                 "Deep pothole outside number 12",
-                AlertType.POTHOLE,
+                1007,
                 location,
                 reportedBy,
                 null, "LOZENETS"
@@ -49,7 +49,7 @@ class AlertTest {
 
         assertEquals("Pothole on Shipka", alert.title());
         assertEquals("Deep pothole outside number 12", alert.description());
-        assertEquals(AlertType.POTHOLE, alert.type());
+        assertEquals(1007, alert.categoryCode());
         assertEquals(location, alert.location());
         assertEquals(reportedBy, alert.reportedBy());
     }
@@ -59,7 +59,7 @@ class AlertTest {
         Alert alert = Alert.create(
                 "Test Alert",
                 "Description",
-                AlertType.WASTE,
+                1001,
                 Location.of(42.0, 23.0),
                 UUID.randomUUID(),
                 null, "LOZENETS"
@@ -72,8 +72,8 @@ class AlertTest {
 
     @Test
     void shouldGenerateUniqueIds() {
-        Alert alert1 = Alert.create("A1", "D1", AlertType.POTHOLE, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS");
-        Alert alert2 = Alert.create("A2", "D2", AlertType.WASTE, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS");
+        Alert alert1 = Alert.create("A1", "D1", 1007, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS");
+        Alert alert2 = Alert.create("A2", "D2", 1001, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS");
 
         assertNotEquals(alert1.id(), alert2.id());
     }
@@ -82,7 +82,7 @@ class AlertTest {
     class Lifecycle {
 
         private final Alert submitted = Alert.create(
-                "T", "D", AlertType.POTHOLE,
+                "T", "D", 1007,
                 Location.of(42.69, 23.32), UUID.randomUUID(), null, "LOZENETS");
 
         @Test

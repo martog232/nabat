@@ -9,7 +9,6 @@ import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
 import org.example.nabat.testsupport.Fixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -197,7 +196,7 @@ class AlertCreatedOutboxIntegrationTest extends PostgresTestSupport {
         return new CreateAlertUseCase.CreateAlertCommand(
             title,
             "raised by " + AlertCreatedOutboxIntegrationTest.class.getSimpleName(),
-            AlertType.MANHOLE,
+            1008,
             42.6977,
             23.3219,
             reporterId,

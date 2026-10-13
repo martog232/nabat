@@ -7,7 +7,6 @@ import tools.jackson.databind.ObjectMapper;
 import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.application.port.out.EmailSender;
-import org.example.nabat.incident.domain.AlertType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,7 +81,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Integration Test Alert",
                 "A test alert from integration test",
-                AlertType.POTHOLE,
+                1007,
                 42.695,
                 23.329,
                 null
@@ -136,7 +135,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         long before = alertRepository.count();
 
         CreateAlertRequest request = new CreateAlertRequest(
-                "Pothole in Plovdiv", "Not ours to route", AlertType.POTHOLE,
+                "Pothole in Plovdiv", "Not ours to route", 1007,
                 42.1354, 24.7453, null
         );
 
@@ -157,7 +156,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Nearby Alert",
                 "A nearby alert",
-                AlertType.WASTE,
+                1001,
                 42.695,
                 23.329,
                 null
@@ -185,7 +184,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Unauthorized Alert",
                 "Should fail",
-                AlertType.POTHOLE,
+                1007,
                 42.0,
                 23.0,
                 null
@@ -230,7 +229,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Security Test Alert",
                 "Verifying reporter is from token, not request body",
-                AlertType.OTHER,
+                1051,
                 42.6515,
                 23.3455,
                 null

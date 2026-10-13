@@ -6,7 +6,6 @@ import org.example.nabat.identity.adapter.in.rest.RegisterRequest;
 import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.application.port.out.EmailSender;
 import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -153,7 +152,7 @@ class DistrictOfficialIntegrationTest extends PostgresTestSupport {
         MvcResult result = perform(post("/api/v1/alerts")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new CreateAlertRequest(
-                    "Счупена шахта", "Пред блок 58", AlertType.MANHOLE, LAT, LON, null))),
+                    "Счупена шахта", "Пред блок 58", 1008, LAT, LON, null))),
             reporter)
             .andExpect(status().isCreated())
             .andReturn();

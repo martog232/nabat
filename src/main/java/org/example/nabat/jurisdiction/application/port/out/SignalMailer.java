@@ -1,7 +1,5 @@
 package org.example.nabat.jurisdiction.application.port.out;
 
-import org.example.nabat.incident.domain.AlertType;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -24,12 +22,14 @@ public interface SignalMailer {
      * @param reporterName  the citizen's display name. A report to an administration is
      *                      considered only when its author is identifiable, so it is sent
      * @param reporterEmail used as Reply-To, so an answer reaches the citizen directly
+     * @param categoryLabel the category in words, group and subcategory:
+     *                      „Пътища и шахти — Улично платно“
      */
     record SignalMail(
         UUID alertId,
         String to,
         String districtName,
-        AlertType type,
+        String categoryLabel,
         String title,
         String description,
         double latitude,

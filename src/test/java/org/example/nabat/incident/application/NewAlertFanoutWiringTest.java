@@ -5,7 +5,6 @@ import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.platform.AsyncConfig;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,7 +102,7 @@ class NewAlertFanoutWiringTest {
             AlertId.generate(),
             "Wiring check",
             "desc",
-            AlertType.MANHOLE,
+            1008,
             Location.of(42.0, 23.0),
             Instant.now(),
             AlertStatus.SUBMITTED,

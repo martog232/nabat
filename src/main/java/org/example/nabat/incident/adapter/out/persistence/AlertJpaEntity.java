@@ -5,7 +5,6 @@ import lombok.Getter;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.shared.domain.Location;
 
@@ -44,9 +43,8 @@ public class AlertJpaEntity {
     @Column(length = 2000)
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AlertType type;
+    @Column(name = "category_code", nullable = false)
+    private int categoryCode;
 
     @Column(nullable = false)
     private double latitude;
@@ -120,7 +118,7 @@ public class AlertJpaEntity {
     void copyStateFrom(Alert alert) {
         this.title = alert.title();
         this.description = alert.description();
-        this.type = alert.type();
+        this.categoryCode = alert.categoryCode();
         this.latitude = alert.location().latitude();
         this.longitude = alert.location().longitude();
         this.createdAt = alert.createdAt();
@@ -142,7 +140,7 @@ public class AlertJpaEntity {
                 AlertId.of(id),
                 title,
                 description,
-                type,
+                categoryCode,
                 Location.of(latitude, longitude),
                 createdAt,
                 status,

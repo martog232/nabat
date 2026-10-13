@@ -1,6 +1,7 @@
 package org.example.nabat.incident.adapter.in.rest;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -19,7 +20,6 @@ import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.incident.domain.ReportRanking;
 import org.example.nabat.identity.domain.User;
 import org.springframework.http.HttpStatus;
@@ -109,12 +109,13 @@ public class AlertController {
         @RequestParam(defaultValue = "5.0")
         @DecimalMin(value = "0.0", inclusive = false) @DecimalMax("100.0") Double radiusKm,
         @RequestParam(required = false) Instant since,
-        @RequestParam(required = false) AlertType type,
+        @Parameter(description = "A group code (every subcategory in it) or a subcategory code, from GET /api/v1/categories", example = "1006")
+        @RequestParam(required = false) Integer category,
         @RequestParam(defaultValue = "100")
         @Min(1) @Max(GetNearbyAlertsUseCase.NearbyAlertsQuery.MAX_LIMIT) Integer limit
     ) {
         var query = new GetNearbyAlertsUseCase.NearbyAlertsQuery(
-            latitude, longitude, radiusKm, type, limit);
+            latitude, longitude, radiusKm, category, limit);
 
         List<Alert> alerts = since == null
             ? getNearbyAlertsUseCase.getNearbyAlerts(query)

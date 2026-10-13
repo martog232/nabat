@@ -3,6 +3,7 @@ package org.example.nabat.platform;
 import org.example.nabat.shared.exception.ExternalServiceUnavailableException;
 import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.OutsideServiceAreaException;
+import org.example.nabat.incident.domain.UnknownCategoryException;
 import org.example.nabat.identity.domain.AuthenticationFailedException;
 import org.example.nabat.identity.domain.EmailAlreadyRegisteredException;
 import org.example.nabat.shared.domain.NotAuthorizedException;
@@ -64,6 +65,7 @@ public class GlobalExceptionHandler {
     static final String MSG_PAYLOAD_TOO_LARGE = "File is too large";
     static final String MSG_UNSUPPORTED_MEDIA = "Unsupported file type";
     static final String MSG_OUTSIDE_AREA    = "nabat only accepts reports inside Sofia";
+    static final String MSG_UNKNOWN_CATEGORY = "Choose a category from the list";
     static final String MSG_UNAVAILABLE     = "A required service is temporarily unavailable. Please try again.";
     static final String MSG_INTERNAL        = "Something went wrong. Please try again.";
 
@@ -104,6 +106,17 @@ public class GlobalExceptionHandler {
         log.info("Rejected report: {}", ex.getMessage());
         return build(HttpStatus.UNPROCESSABLE_CONTENT, "OUTSIDE_SERVICE_AREA", MSG_OUTSIDE_AREA);
     }
+    /**
+     * Its own code rather than INVALID_REQUEST: the client can say which field is wrong,
+     * and a stale category list — the tree changed, the client did not reload — is the
+     * likely cause and worth telling apart.
+     */
+    @ExceptionHandler(UnknownCategoryException.class)
+    public ResponseEntity<ErrorResponse> handleUnknownCategory(UnknownCategoryException ex) {
+        log.info("Rejected report: {}", ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "UNKNOWN_CATEGORY", MSG_UNKNOWN_CATEGORY);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("IllegalArgument: {}", ex.getMessage());

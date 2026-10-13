@@ -69,7 +69,7 @@ public class NewAlertFanout {
     @ApplicationModuleListener
     public void on(AlertCreated event) {
         Alert alert = event.alert();
-        log.debug("Putting new {} report {} on the map", alert.type(), alert.id().value());
+        log.debug("Putting new report {} (category {}) on the map", alert.id().value(), alert.categoryCode());
         notificationPort.broadcastNewAlert(alert);
     }
 }

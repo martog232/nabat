@@ -8,7 +8,6 @@ import org.example.nabat.incident.application.port.out.AlertRepository.RankedSea
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.incident.domain.ReportRanking;
 import org.example.nabat.shared.domain.Location;
@@ -127,7 +126,7 @@ class RankedReportsQueryIntegrationTest extends PostgresTestSupport {
 
     private Alert save(String title, String district, int daysAgo, int confirmations, AlertStatus status) {
         Alert alert = new Alert(
-            AlertId.generate(), title, "d", AlertType.POTHOLE, Location.of(42.67, 23.32),
+            AlertId.generate(), title, "d", 1007, Location.of(42.67, 23.32),
             Instant.now().minus(Duration.ofDays(daysAgo)).minus(Duration.ofMinutes(1)),
             status, reporter,
             0, 0, confirmations, 0,

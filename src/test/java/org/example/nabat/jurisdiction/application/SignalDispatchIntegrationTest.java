@@ -9,7 +9,6 @@ import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer.SignalMail;
 import org.junit.jupiter.api.BeforeEach;
@@ -138,7 +137,7 @@ class SignalDispatchIntegrationTest extends PostgresTestSupport {
 
     private Alert report(String title) {
         return createAlert.createAlert(new CreateAlertUseCase.CreateAlertCommand(
-            title, "raised by " + getClass().getSimpleName(), AlertType.OTHER,
+            title, "raised by " + getClass().getSimpleName(), 1051,
             LAT, LON, reporter.id().value(), null));
     }
 

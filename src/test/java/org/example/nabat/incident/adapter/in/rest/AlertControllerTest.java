@@ -13,7 +13,6 @@ import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -89,7 +88,7 @@ class AlertControllerTest {
                 AlertId.of(UUID.fromString("00000000-0000-0000-0000-000000000001")),
                 "Test Alert",
                 "Test description",
-                AlertType.POTHOLE,
+                1007,
                 Location.of(42.0, 23.0),
                 Instant.parse("2024-01-01T00:00:00Z"),
                 AlertStatus.SUBMITTED,
@@ -124,7 +123,7 @@ class AlertControllerTest {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Test Alert",
                 "Test description",
-                AlertType.POTHOLE,
+                1007,
                 42.0,
                 23.0,
                 null
@@ -145,7 +144,7 @@ class AlertControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("00000000-0000-0000-0000-000000000001"))
                 .andExpect(jsonPath("$.title").value("Test Alert"))
-                .andExpect(jsonPath("$.type").value("POTHOLE"))
+                .andExpect(jsonPath("$.categoryCode").value(1007))
                 .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
 
@@ -186,7 +185,7 @@ class AlertControllerTest {
         mockMvc.perform(get("/api/v1/alerts/nearby")
                         .param("latitude", "42.0")
                         .param("longitude", "23.0")
-                        .param("type", "POTHOLE")
+                        .param("category", "1007")
                         .param("limit", "25"))
                 .andExpect(status().isOk());
 
@@ -194,7 +193,7 @@ class AlertControllerTest {
             ArgumentCaptor.forClass(GetNearbyAlertsUseCase.NearbyAlertsQuery.class);
         verify(getNearbyAlertsUseCase).getNearbyAlerts(captor.capture());
 
-        assertEquals(AlertType.POTHOLE, captor.getValue().type());
+        assertEquals(1007, captor.getValue().category());
         assertEquals(25, captor.getValue().limit());
     }
 
@@ -212,11 +211,11 @@ class AlertControllerTest {
     }
 
     @Test
-    void shouldRejectAnUnknownAlertType() throws Exception {
+    void shouldRejectACategoryThatIsNotACode() throws Exception {
         mockMvc.perform(get("/api/v1/alerts/nearby")
                         .param("latitude", "42.0")
                         .param("longitude", "23.0")
-                        .param("type", "NOT_A_TYPE"))
+                        .param("category", "POTHOLE"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -236,7 +235,7 @@ class AlertControllerTest {
                 {
                     "title": "",
                     "description": "desc",
-                    "type": "POTHOLE",
+                    "categoryCode": 1007,
                     "latitude": 42.0,
                     "longitude": 23.0
                 }

@@ -2,10 +2,10 @@ package org.example.nabat.jurisdiction.application;
 
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.User;
+import org.example.nabat.incident.application.port.in.ListReportCategoriesUseCase;
 import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.jurisdiction.application.port.out.DistrictRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalDispatchRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
@@ -45,6 +45,7 @@ class SignalDispatcherTest {
     @Mock private SignalMailer mailer;
     @Mock private UserRepository users;
     @Mock private RecordDeliveryUseCase recordDelivery;
+    @Mock private ListReportCategoriesUseCase categories;
 
     private SignalDispatcher dispatcher;
     private User reporter;
@@ -52,9 +53,9 @@ class SignalDispatcherTest {
 
     @BeforeEach
     void setUp() {
-        dispatcher = new SignalDispatcher(districts, dispatches, mailer, users, recordDelivery);
+        dispatcher = new SignalDispatcher(districts, dispatches, mailer, users, recordDelivery, categories);
         reporter = User.create("ivan@example.com", "hash", "Иван Петров");
-        alert = Alert.create("Дупка", "Пред номер 12", AlertType.POTHOLE,
+        alert = Alert.create("Дупка", "Пред номер 12", 1007,
             Location.of(42.6750, 23.3200), reporter.id().value(), null, "LOZENETS");
     }
 

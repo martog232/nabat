@@ -2,7 +2,6 @@ package org.example.nabat.jurisdiction.adapter.out.mail;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
@@ -65,7 +64,7 @@ public class SmtpSignalMailer implements SignalMailer {
     }
 
     static String subject(SignalMail mail) {
-        return "Сигнал: " + label(mail.type()) + " — " + mail.title();
+        return "Сигнал: " + mail.categoryLabel() + " — " + mail.title();
     }
 
     static String body(SignalMail mail) {
@@ -93,7 +92,7 @@ public class SmtpSignalMailer implements SignalMailer {
             Номер на сигнала: %s
             """.formatted(
                 mail.districtName(),
-                label(mail.type()),
+                mail.categoryLabel(),
                 mail.title(),
                 mail.description(),
                 coordinates,
@@ -105,16 +104,4 @@ public class SmtpSignalMailer implements SignalMailer {
             );
     }
 
-    /** What the reader of the email calls it. The enum names are for the API. */
-    static String label(AlertType type) {
-        return switch (type) {
-            case POTHOLE -> "Дупка на пътя или тротоара";
-            case MANHOLE -> "Липсваща или счупена шахта";
-            case WASTE -> "Отпадъци";
-            case POLLUTION -> "Замърсяване";
-            case STREET_LIGHT -> "Неработещо улично осветление";
-            case ILLEGAL_PARKING -> "Неправилно паркиране";
-            case OTHER -> "Друго";
-        };
-    }
 }

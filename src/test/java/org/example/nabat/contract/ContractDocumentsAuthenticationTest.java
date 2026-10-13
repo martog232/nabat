@@ -48,9 +48,10 @@ class ContractDocumentsAuthenticationTest {
         "POST /api/v1/auth/reset-password",
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/refresh",
-        // The public list of reports, and the district names it is shown with.
+        // The public list of reports, and the district and category names it is shown with.
         "GET /api/v1/alerts/ranked",
-        "GET /api/v1/districts"
+        "GET /api/v1/districts",
+        "GET /api/v1/categories"
     );
 
     private static JsonNode spec() throws Exception {

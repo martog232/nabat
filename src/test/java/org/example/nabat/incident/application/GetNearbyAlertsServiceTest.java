@@ -6,7 +6,6 @@ import org.example.nabat.incident.application.port.out.AlertRepository.NearbySea
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +41,7 @@ class GetNearbyAlertsServiceTest {
                 AlertId.generate(),
                 "Nearby Alert",
                 "Some description",
-                AlertType.POTHOLE,
+                1007,
                 Location.of(lat, lon),
                 Instant.now(),
                 AlertStatus.SUBMITTED,
@@ -101,7 +100,7 @@ class GetNearbyAlertsServiceTest {
         when(alertRepository.findActiveAlertsWithinRadius(any(NearbySearch.class)))
                 .thenReturn(Collections.emptyList());
 
-        var query = new NearbyAlertsQuery(42.0, 23.0, 5.0, AlertType.POTHOLE, 25);
+        var query = new NearbyAlertsQuery(42.0, 23.0, 5.0, 1007, 25);
         getNearbyAlertsService.getNearbyAlerts(query);
 
         ArgumentCaptor<NearbySearch> searchCaptor = ArgumentCaptor.forClass(NearbySearch.class);
@@ -110,7 +109,7 @@ class GetNearbyAlertsServiceTest {
         NearbySearch search = searchCaptor.getValue();
         // Dropping any of these on the way down would silently widen the query — the
         // caller asked for 25 potholes and would get every signal in the circle.
-        assertEquals(AlertType.POTHOLE, search.type());
+        assertEquals(1007, search.category());
         assertEquals(25, search.limit());
     }
 
@@ -123,7 +122,7 @@ class GetNearbyAlertsServiceTest {
     @Test
     void cacheKeyDistinguishesQueriesThatReturnDifferentResults() {
         var unfiltered = NearbyAlertsQuery.of(42.0, 23.0, 5.0);
-        var byType = new NearbyAlertsQuery(42.0, 23.0, 5.0, AlertType.POTHOLE, 100);
+        var byType = new NearbyAlertsQuery(42.0, 23.0, 5.0, 1007, 100);
         var smallerLimit = new NearbyAlertsQuery(42.0, 23.0, 5.0, null, 10);
 
         assertNotEquals(unfiltered.cacheKey(), byType.cacheKey());

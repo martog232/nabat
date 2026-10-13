@@ -63,7 +63,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         String districtCode, Collection<AlertStatus> statuses, Limit limit);
 
     /*
-     * The four spatial queries below share a shape: circle predicate, optional type
+     * The four spatial queries below share a shape: circle predicate, optional category
      * filter, newest first, LIMIT.
      *
      * "Open" is spelled out as `NOT IN ('RESOLVED', 'REJECTED')`, the SQL twin of
@@ -71,11 +71,12 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      * deliberate: a new open state then appears on the map without touching this file,
      * whereas a list of open states would hide it until someone remembered.
      *
-     * On the filters — `CAST(:type AS text) IS NULL OR ...` rather than the obvious
-     * `:type IS NULL OR ...`. PostgreSQL infers parameter types from context, and in a
+     * On the filters — `CAST(:category AS integer) IS NULL OR ...` rather than the obvious
+     * `:category IS NULL OR ...`. PostgreSQL infers parameter types from context, and in a
      * bare `NULL` comparison there is no context, so it fails the statement with
      * "could not determine data type of parameter". The cast supplies the type.
-     * `a.type` is compared as text because the column is a varchar holding the enum name.
+     * The category may be a group: a report is filed under a subcategory, so a group code
+     * matches through report_categories.group_code rather than directly.
      *
      * On the LIMIT — it belongs here rather than in Java. Trimming the list after the
      * fact would still make the database materialise and ship every row in the radius,
@@ -88,7 +89,8 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
@@ -101,7 +103,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("type") String type,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
@@ -114,7 +116,8 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND a.created_at >= :since
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
@@ -128,7 +131,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
         @Param("since") Instant since,
-        @Param("type") String type,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
@@ -137,7 +140,8 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
         AND a.created_at >= :since
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
@@ -151,7 +155,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
         @Param("since") Instant since,
-        @Param("type") String type,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
@@ -159,7 +163,8 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     @Query(value = """
         SELECT * FROM alerts a
         WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
+        AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
@@ -172,7 +177,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("type") String type,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 

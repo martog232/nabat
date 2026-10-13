@@ -696,6 +696,29 @@
         "security" : [ ]
       }
     },
+    "/api/v1/categories" : {
+      "get" : {
+        "tags" : [ "category-controller" ],
+        "summary" : "Report categories — Call Sofia's groups and subcategories, with its codes",
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CategoryGroupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
     "/api/v1/auth/me" : {
       "get" : {
         "tags" : [ "auth-controller" ],
@@ -910,13 +933,15 @@
             "format" : "date-time"
           }
         }, {
-          "name" : "type",
+          "name" : "category",
           "in" : "query",
+          "description" : "A group code (every subcategory in it) or a subcategory code, from GET /api/v1/categories",
           "required" : false,
           "schema" : {
-            "type" : "string",
-            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ]
-          }
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "example" : 1006
         }, {
           "name" : "limit",
           "in" : "query",
@@ -1267,11 +1292,11 @@
             "maxLength" : 2000,
             "minLength" : 0
           },
-          "type" : {
-            "type" : "string",
-            "description" : "Category of the problem",
-            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ],
-            "example" : "POTHOLE"
+          "categoryCode" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Subcategory code from GET /api/v1/categories — Call Sofia's codes. A group code is refused.",
+            "example" : 1007
           },
           "latitude" : {
             "type" : "number",
@@ -1295,7 +1320,7 @@
             "example" : "/api/v1/uploads/uuid.jpg"
           }
         },
-        "required" : [ "description", "latitude", "longitude", "title", "type" ]
+        "required" : [ "categoryCode", "description", "latitude", "longitude", "title" ]
       },
       "AlertResponse" : {
         "type" : "object",
@@ -1314,10 +1339,11 @@
             "type" : "string",
             "description" : "Full description"
           },
-          "type" : {
-            "type" : "string",
-            "description" : "Alert category",
-            "enum" : [ "POTHOLE", "MANHOLE", "WASTE", "POLLUTION", "STREET_LIGHT", "ILLEGAL_PARKING", "OTHER" ]
+          "categoryCode" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Subcategory code; resolve the name and group with GET /api/v1/categories",
+            "example" : 1007
           },
           "latitude" : {
             "type" : "number",
@@ -1500,6 +1526,57 @@
             "type" : "string",
             "description" : "Name of the district",
             "example" : "Район Лозенец"
+          }
+        }
+      },
+      "CategoryGroupResponse" : {
+        "type" : "object",
+        "description" : "A group of report categories",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Group code; usable as the nearby `category` filter",
+            "example" : 1006
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name of the group",
+            "example" : "Пътища и шахти"
+          },
+          "color" : {
+            "type" : "string",
+            "description" : "Call Sofia's colour for the group",
+            "example" : "#1E3A8A"
+          },
+          "categories" : {
+            "type" : "array",
+            "description" : "The subcategories a report can be filed under, in display order",
+            "items" : {
+              "$ref" : "#/components/schemas/CategoryResponse"
+            }
+          }
+        }
+      },
+      "CategoryResponse" : {
+        "type" : "object",
+        "description" : "A category a report can be filed under",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Code, as sent in categoryCode",
+            "example" : 1007
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name, as Call Sofia has it",
+            "example" : "Улично платно"
+          },
+          "hint" : {
+            "type" : "string",
+            "description" : "What it covers, in everyday words",
+            "example" : "дупки, пропаднала настилка, шахти без капак"
           }
         }
       },

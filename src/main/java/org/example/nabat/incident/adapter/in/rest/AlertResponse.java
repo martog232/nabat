@@ -3,7 +3,6 @@ package org.example.nabat.incident.adapter.in.rest;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.incident.domain.ClosedBy;
 
 import java.time.Instant;
@@ -14,7 +13,7 @@ public record AlertResponse(
     @Schema(description = "Unique identifier of the alert") UUID id,
     @Schema(description = "Short title") String title,
     @Schema(description = "Full description") String description,
-    @Schema(description = "Alert category") AlertType type,
+    @Schema(description = "Subcategory code; resolve the name and group with GET /api/v1/categories", example = "1007") int categoryCode,
     @Schema(description = "Latitude of the incident location", example = "40.7128") double latitude,
     @Schema(description = "Longitude of the incident location", example = "-74.0060") double longitude,
     @Schema(description = "Timestamp when the alert was created") Instant createdAt,
@@ -37,7 +36,7 @@ public record AlertResponse(
             alert.id().value(),
             alert.title(),
             alert.description(),
-            alert.type(),
+            alert.categoryCode(),
             alert.location().latitude(),
             alert.location().longitude(),
             alert.createdAt(),

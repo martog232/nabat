@@ -5,7 +5,6 @@ import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +38,7 @@ class NewAlertFanoutTest {
             AlertId.generate(),
             "Pothole",
             "Outside number 12",
-            AlertType.POTHOLE,
+            1007,
             Location.of(42.69, 23.32),
             Instant.now(),
             AlertStatus.SUBMITTED,

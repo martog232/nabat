@@ -7,7 +7,6 @@ import org.example.nabat.identity.domain.User;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,7 +95,7 @@ class AlertPhotoReferenceQueryIntegrationTest extends PostgresTestSupport {
             AlertId.generate(),
             "Alert " + UUID.randomUUID(),
             "description",
-            AlertType.MANHOLE,
+            1008,
             Location.of(42.695, 23.329),
             Instant.now(),
             AlertStatus.SUBMITTED,
