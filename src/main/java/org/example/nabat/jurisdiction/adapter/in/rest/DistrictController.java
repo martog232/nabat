@@ -44,10 +44,11 @@ public class DistrictController {
     @Schema(description = "A district of Sofia")
     public record DistrictResponse(
         @Schema(description = "Stable code, as carried by a report's districtCode", example = "LOZENETS") String code,
-        @Schema(description = "Name of the district", example = "Район Лозенец") String name
+        @Schema(description = "Name of the district", example = "Район Лозенец") String name,
+        @Schema(description = "Estimated residents, from Yurukov's Call Sofia archive (2022) — for per-resident ratios, not a census", example = "53110") int population
     ) {
         static DistrictResponse from(District district) {
-            return new DistrictResponse(district.code(), district.name());
+            return new DistrictResponse(district.code(), district.name(), district.population());
         }
     }
 }

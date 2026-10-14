@@ -112,5 +112,9 @@ class CallSofiaArchiveImportServiceTest {
         public void saveStatusChanges(List<CallSofiaStatusChange> changes) {
             statusChanges.addAll(changes);
         }
+
+        @Override
+        public void refreshOutcomes() {
+        }
     }
 }

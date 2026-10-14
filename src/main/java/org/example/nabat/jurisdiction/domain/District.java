@@ -13,6 +13,12 @@ package org.example.nabat.jurisdiction.domain;
  * @param name        how people call it, e.g. {@code Район Лозенец}
  * @param signalEmail where the district administration receives reports (V19 — placeholders
  *                    on {@code .test} until the real addresses are checked)
+ * @param population  an estimate of the people living there (V25), for per-resident ratios
  */
-public record District(String code, String name, String signalEmail) {
+public record District(String code, String name, String signalEmail, int population) {
+
+    /** Without a population — for callers that never needed one. */
+    public District(String code, String name, String signalEmail) {
+        this(code, name, signalEmail, 0);
+    }
 }

@@ -72,6 +72,9 @@ public class CallSofiaArchiveImportService implements ImportCallSofiaArchiveUseC
             statusChanges = inBatches(attached.iterator(), "status changes", store::saveStatusChanges);
         }
 
+        // The district comparison reads outcomes worked out from all of the above, once.
+        store.refreshOutcomes();
+
         ImportSummary summary = new ImportSummary(categories.size(), signals, statusChanges, orphaned[0]);
         log.info("Call Sofia archive imported: {}", summary);
         return summary;

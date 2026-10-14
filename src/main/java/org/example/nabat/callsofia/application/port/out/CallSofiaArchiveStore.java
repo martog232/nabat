@@ -20,4 +20,7 @@ public interface CallSofiaArchiveStore {
 
     /** Inserts steps not yet recorded; a step already at its position is left as it is. */
     void saveStatusChanges(List<CallSofiaStatusChange> changes);
+
+    /** Recomputes each report's outcome (V26) from what is now stored. */
+    void refreshOutcomes();
 }

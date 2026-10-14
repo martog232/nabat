@@ -35,10 +35,14 @@ public class DistrictJpaEntity {
     @Column(name = "signal_email", nullable = false, length = 254)
     private String signalEmail;
 
+    /** An estimate, for ratios — see V25. */
+    @Column(nullable = false)
+    private int population;
+
     protected DistrictJpaEntity() {
     }
 
     public District toDomain() {
-        return new District(code, name, signalEmail);
+        return new District(code, name, signalEmail, population);
     }
 }

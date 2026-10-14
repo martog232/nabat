@@ -160,7 +160,17 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - Times are Sofia wall clock in the file and `TIMESTAMPTZ` here.
 - **Idempotent, batch by batch.** `CallSofiaArchiveImportService` is not `@Transactional`: each batch of 1 000 commits on its own, reports are upserted on Call Sofia's id and steps inserted `ON CONFLICT DO NOTHING`, so a run that dies halfway is finished by running it again. Writes are `JdbcTemplate`, not JPA — see `JdbcCallSofiaArchiveStore` for why.
 - **Running it:** `NABAT_CALLSOFIA_IMPORT_ENABLED=true` for one start. `CallSofiaArchiveImportRunner` runs it `@Async` after `ApplicationReadyEvent`, so readiness is not held for the ~2.5 minutes it takes; a second run is ~1.5 minutes and changes nothing. `NABAT_CALLSOFIA_ARCHIVE_URL` takes any Spring resource location — download the files once and point it at `file:/dir/` rather than reading ~200 MB from his server on every attempt. One replica only: two at once are safe but do the work twice.
-- **Nothing reads these tables yet.** The district comparison is the next step.
+- **The district comparison reads them** — see below.
+
+### District comparison (`callsofia`)
+- **`GET /api/v1/call-sofia/district-comparison?from&to`**, public, cacheable for an hour. Per district, for archive reports filed in `[from, to)` (Sofia calendar days; default the archive's **last twelve months**, not the calendar's — the archive ends 2026-08-01): reports; answered; median and p90 days to the first answer; answered within the 30-day deadline; how they ended — closed, answered only, rejected, still open.
+- **"Answered" is the first move to `ANSWERED`, `CLOSED` or `REJECTED`** — the first final word to the citizen, never a claim of a fix. The page says so, and points at "is it really fixed?".
+- **Medians and p90 are over answered reports only**, filtered inside `percentile_cont`: an unanswered report has no time to order by, and counting it as zero would flatter the slowest. The still-open share stands beside them for what they leave out.
+- **The 30-day share only counts reports with 30 days of runway** before the archive's last report (`dueIn30Days`). Without that, the last month of any period looks like a failure to answer.
+- **`call_sofia_signal_outcomes` (V26) is a materialised view** — one row per archived report with its first-answer time and last status — because working that out of 2.9M status changes takes seconds and changes only with an import. `CallSofiaArchiveImportService` refreshes it at the end of every import (`CallSofiaArchiveStore.refreshOutcomes`). Against the real archive the comparison query takes ~260 ms.
+- **Per-resident figures use `districts.population` (V25)**, Yurukov's 2022 estimates, served by `GET /api/v1/districts`. Good for a ratio, not a census.
+- **No category filter yet**: the archive files reports under Call Sofia's old category codes (3056, 28068, ...), not the new ones nabat's categories use, and there is no published mapping between them.
+- **Real figures, last twelve months**: answered within 30 days ranges from ~65% (Vitosha, Lyulin) to ~86% (Serdika); medians are 3–6 days everywhere, and the difference is in the slow tail (p90 15–23 days); only 20–35% end "closed", against 38–59% "answered only".
 
 ### Open reports from Call Sofia's map (`callsofia`)
 - **The archive is for statistics; this is what is open now.** `CallSofiaMapClient` reads the public map at `call.sofia.bg/signals` the way its own page does — **there is no API**: `GET /signals` for the Rails session cookie and the `csrf-token` meta tag, then `POST /signals/map` with `client_signals_grid[period]=30`, which returns every marker in one gzipped response (~10 000 reports, ~5.5 MB unzipped). Two requests per reading, hourly (`CallSofiaMapPoller`), off by default (`NABAT_CALLSOFIA_LIVE_ENABLED`), with a `User-Agent` that says who is asking. Do not shorten the interval for freshness: the site sits behind an F5 WAF and never agreed to serve us.
@@ -271,6 +281,8 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V22 | `call_sofia_open_signals` — reports on Call Sofia's live map, and when and why each left it |
 | V23 | `report_categories` — Call Sofia's category tree with its codes; `alerts.category_code` replaces `alerts.type`, existing reports mapped |
 | V24 | `fix_checks` — "is it really fixed?" answers on resolved reports; the tally on `alerts` |
+| V25 | `districts.population` — Yurukov's 2022 estimates, for per-resident ratios |
+| V26 | `call_sofia_signal_outcomes` — materialised view: each archived report's first answer and last status |
 
 ---
 

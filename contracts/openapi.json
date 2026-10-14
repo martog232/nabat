@@ -809,6 +809,43 @@
         "security" : [ ]
       }
     },
+    "/api/v1/call-sofia/district-comparison" : {
+      "get" : {
+        "tags" : [ "district-comparison-controller" ],
+        "summary" : "Sofia's districts compared on how they answered Call Sofia reports, from the archive",
+        "operationId" : "compare",
+        "parameters" : [ {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DistrictComparisonResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
     "/api/v1/auth/me" : {
       "get" : {
         "tags" : [ "auth-controller" ],
@@ -1728,6 +1765,12 @@
             "type" : "string",
             "description" : "Name of the district",
             "example" : "Район Лозенец"
+          },
+          "population" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Estimated residents, from Yurukov's Call Sofia archive (2022) — for per-resident ratios, not a census",
+            "example" : 53110
           }
         }
       },
@@ -1779,6 +1822,106 @@
             "type" : "string",
             "description" : "What it covers, in everyday words",
             "example" : "дупки, пропаднала настилка, шахти без капак"
+          }
+        }
+      },
+      "DistrictComparisonResponse" : {
+        "type" : "object",
+        "description" : "Districts compared over a period of Call Sofia's archive",
+        "properties" : {
+          "archiveFrom" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "First filing date in the archive; null if no archive is imported",
+            "example" : "2021-12-14"
+          },
+          "archiveTo" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "Last filing date in the archive — everything is as of this day",
+            "example" : "2026-08-01"
+          },
+          "from" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "Start of the period, inclusive",
+            "example" : "2025-08-02"
+          },
+          "to" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "End of the period, exclusive",
+            "example" : "2026-08-02"
+          },
+          "districts" : {
+            "type" : "array",
+            "description" : "One entry per district with reports in the period",
+            "items" : {
+              "$ref" : "#/components/schemas/DistrictOutcomesResponse"
+            }
+          }
+        }
+      },
+      "DistrictOutcomesResponse" : {
+        "type" : "object",
+        "description" : "How one district handled its reports. \"Answered\" is the first final word to the citizen — a reply, a closure or a rejection — not a fix.",
+        "properties" : {
+          "districtCode" : {
+            "type" : "string",
+            "description" : "District code, as in GET /api/v1/districts",
+            "example" : "LOZENETS"
+          },
+          "signals" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Reports filed in the period"
+          },
+          "answered" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Of those, answered at all"
+          },
+          "medianDaysToAnswer" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Median days to the first answer, over answered reports; null if none",
+            "example" : 12.4
+          },
+          "p90DaysToAnswer" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Nine in ten answered reports were answered within this many days",
+            "example" : 41.0
+          },
+          "dueIn30Days" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Reports filed at least 30 days before the archive ends — the ones the 30-day deadline can be judged on"
+          },
+          "answeredIn30Days" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Of those, answered within 30 days"
+          },
+          "closed" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Ended as „Приключен“"
+          },
+          "answeredOnly" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Ended as „Получил уведомление“ — a reply, and nothing after it"
+          },
+          "rejected" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Ended as „Отхвърлен“"
+          },
+          "stillOpen" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "No final answer when the archive was taken"
           }
         }
       },

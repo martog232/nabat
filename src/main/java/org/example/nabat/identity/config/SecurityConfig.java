@@ -66,7 +66,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/alerts/ranked",
                     "/api/v1/districts",
-                    "/api/v1/categories").permitAll()
+                    "/api/v1/categories",
+                    "/api/v1/call-sofia/district-comparison").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 // The probe groups are listed individually rather than as /actuator/health/**:
                 // that wildcard would also expose any future health group, and `anyRequest()`

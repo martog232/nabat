@@ -51,7 +51,9 @@ class ContractDocumentsAuthenticationTest {
         // The public list of reports, and the district and category names it is shown with.
         "GET /api/v1/alerts/ranked",
         "GET /api/v1/districts",
-        "GET /api/v1/categories"
+        "GET /api/v1/categories",
+        // How the districts answered Call Sofia reports - published data, about administrations.
+        "GET /api/v1/call-sofia/district-comparison"
     );
 
     private static JsonNode spec() throws Exception {

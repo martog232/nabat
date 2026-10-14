@@ -93,6 +93,13 @@ public class JdbcCallSofiaArchiveStore implements CallSofiaArchiveStore {
         jdbc.batchUpdate(INSERT_STATUS_CHANGE, changes, changes.size(), JdbcCallSofiaArchiveStore::bind);
     }
 
+    /** Not CONCURRENTLY: an import is rare, and a plain refresh needs no unique-index dance. */
+    @Override
+    @Transactional
+    public void refreshOutcomes() {
+        jdbc.execute("REFRESH MATERIALIZED VIEW call_sofia_signal_outcomes");
+    }
+
     private static void bind(PreparedStatement ps, CallSofiaStatusChange change) throws SQLException {
         ps.setLong(1, change.signalId());
         ps.setInt(2, change.position());
