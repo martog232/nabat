@@ -104,6 +104,14 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `Alert` grew `fixCheck` as its last component; a constructor without it remains (= `FixCheckTally.NONE`) so the many positional constructions in tests did not all change, and the compact constructor turns a null into `NONE` because `AlertCreated` rows stored before V24 replay without it.
 - **Not done yet**: Call Sofia's own closed reports (the archive and the map's departures) cannot be checked — they are not `alerts`. Photos as evidence, and a district view of how many of its "resolved" are disputed, are the obvious next steps.
 
+### Comments on a report (`incident`)
+- **`GET`/`POST /api/v1/alerts/{id}/comments`, `DELETE …/comments/{commentId}`** (`alert_comments`, V27). Anyone signed in writes, 1–2000 characters, trimmed. The thread is oldest first, removed comments included as a row without text, so replies still read as replies. No editing: a reply to words that later changed is not a conversation anyone can follow.
+- **Marked, not ranked.** `byDistrict` (an official of the report's own district) and `byReporter` are the author's standing *when they wrote*, kept on the row; so is `author_name`, because users belongs to identity and a later rename is not carried back. Officials of other districts write as citizens.
+- **Closed with the report.** On `RESOLVED` or `REJECTED` — both final — no comment is added (**409 `COMMENTS_LOCKED`**) and authors cannot take theirs back either; the thread is kept as a record. A **moderator** can still take a comment down at any time — frozen for participants, not for abuse — and the row says `removed_by` `AUTHOR` or `MODERATOR`. "Is it really fixed?" stays open after a resolve; it is what is left to say.
+- **No comment slips in as a report closes.** `JdbcCommentStore.holdReport` reads the status `FOR SHARE`; a status change is a JPA update of the same row, so the two serialise, and a comment waiting on a resolve then reads it closed. Shared, not `FOR UPDATE`, so comments do not queue behind each other. `JdbcCommentStoreIntegrationTest` pins both directions with two real transactions, and both tests fail without the lock.
+- **The thread hears of it.** `add` publishes `CommentAdded` carrying its recipients — the reporter and everyone with a comment standing, never the author — worked out in `incident`, so `notification` needs no way to read comments. `TellThreadAboutComment` sends one `COMMENT_ADDED` notification each, through the Event Publication Registry. A failure part way and its replay can show someone the same notification twice; accepted, as for the reporter's question. Do not rename the listener or `on` with publications outstanding.
+- **Not done yet**: comments are not pushed over the WebSocket — a thread open on screen shows a new comment on its next fetch; no rate limit beyond Kong's; no photos in comments.
+
 ### "Is this already reported?" (`incident` + `callsofia`)
 - **`GET /api/v1/alerts/similar?latitude&longitude&category`** — asked by the report form once it has a place and a subcategory. Returns open reports within **100 m** in the **same category group**, nearest first, at most 5 — from nabat and from Call Sofia. Advice only: nothing refuses a report because a similar one exists, and the form keeps its submit button live throughout.
 - **By group, not subcategory**: the same pothole is „Улично платно“ to one person and „Тротоар“ to the next. A group or unknown `category` is a 400 `UNKNOWN_CATEGORY`, like creating with one.
@@ -283,6 +291,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V24 | `fix_checks` — "is it really fixed?" answers on resolved reports; the tally on `alerts` |
 | V25 | `districts.population` — Yurukov's 2022 estimates, for per-resident ratios |
 | V26 | `call_sofia_signal_outcomes` — materialised view: each archived report's first answer and last status |
+| V27 | `alert_comments` — a report's thread; closed with the report |
 
 ---
 

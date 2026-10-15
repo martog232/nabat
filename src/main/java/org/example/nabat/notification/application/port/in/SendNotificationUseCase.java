@@ -37,6 +37,20 @@ public interface SendNotificationUseCase {
     record ResolvedNotificationCommand(UserId reporterId, AlertId alertId, String alertTitle, boolean byDistrict) {
     }
 
+    /** Tells one person in a report's thread that someone wrote in it. */
+    Notification sendCommentNotification(CommentNotificationCommand command);
+
+    /** @param byDistrict true if the report's own district wrote it, which the message says instead of a name */
+    record CommentNotificationCommand(
+            UserId recipientId,
+            AlertId alertId,
+            String alertTitle,
+            UserId authorId,
+            String authorName,
+            boolean byDistrict
+    ) {
+    }
+
     record MilestoneNotificationCommand(
             UserId alertOwnerId,           // owner of the alert
             AlertId alertId,               // alert that reached the milestone

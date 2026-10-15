@@ -425,6 +425,73 @@
         }
       }
     },
+    "/api/v1/alerts/{id}/comments" : {
+      "get" : {
+        "tags" : [ "comment-controller" ],
+        "summary" : "A report's comments, oldest first",
+        "operationId" : "thread",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CommentResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "comment-controller" ],
+        "summary" : "Comment on an open report",
+        "operationId" : "add",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CommentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/{alertId}/votes" : {
       "post" : {
         "tags" : [ "alert-vote-controller" ],
@@ -1214,6 +1281,42 @@
           }
         }
       }
+    },
+    "/api/v1/alerts/{id}/comments/{commentId}" : {
+      "delete" : {
+        "tags" : [ "comment-controller" ],
+        "summary" : "Take a comment down",
+        "operationId" : "remove",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -1307,7 +1410,7 @@
           "type" : {
             "type" : "string",
             "description" : "What triggered the notification",
-            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED" ],
+            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED", "COMMENT_ADDED" ],
             "example" : "VOTE"
           },
           "title" : {
@@ -1650,6 +1753,59 @@
           "fixCheck" : {
             "$ref" : "#/components/schemas/FixCheckSummary",
             "description" : "Whether people say a resolved report is really fixed. All zero and UNCHECKED on reports nobody has checked"
+          }
+        }
+      },
+      "CommentRequest" : {
+        "type" : "object",
+        "description" : "A comment to add",
+        "properties" : {
+          "body" : {
+            "type" : "string",
+            "description" : "The text, 1 to 2000 characters",
+            "example" : "Още е там, и е по-дълбока след дъжда.",
+            "maxLength" : 2000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "body" ]
+      },
+      "CommentResponse" : {
+        "type" : "object",
+        "description" : "One comment in a report's thread",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "authorName" : {
+            "type" : "string",
+            "description" : "The author's display name when they wrote it"
+          },
+          "byDistrict" : {
+            "type" : "boolean",
+            "description" : "Written by an official of the report's own district"
+          },
+          "byReporter" : {
+            "type" : "boolean",
+            "description" : "Written by the person who reported it"
+          },
+          "mine" : {
+            "type" : "boolean",
+            "description" : "Written by the caller"
+          },
+          "body" : {
+            "type" : "string",
+            "description" : "The text; null once taken down"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "removedBy" : {
+            "type" : "string",
+            "description" : "Who took it down — AUTHOR or MODERATOR; null while it stands",
+            "enum" : [ "AUTHOR", "MODERATOR" ]
           }
         }
       },

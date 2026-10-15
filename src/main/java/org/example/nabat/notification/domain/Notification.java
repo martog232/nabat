@@ -75,6 +75,26 @@ public record Notification(
         );
     }
 
+    public static Notification createCommentNotification(
+            UserId recipientId,
+            AlertId alertId,
+            UserId authorId,
+            String title,
+            String message
+    ) {
+        return new Notification(
+                NotificationId.generate(),
+                recipientId,
+                NotificationType.COMMENT_ADDED,
+                title,
+                message,
+                alertId,
+                authorId,
+                false,
+                Instant.now()
+        );
+    }
+
     /** Returns a copy of this notification with isRead = true. Notification is immutable. */
     public Notification markAsRead() {
         return new Notification(

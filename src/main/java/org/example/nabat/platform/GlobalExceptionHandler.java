@@ -2,6 +2,8 @@ package org.example.nabat.platform;
 
 import org.example.nabat.shared.exception.ExternalServiceUnavailableException;
 import org.example.nabat.incident.domain.AlertNotFoundException;
+import org.example.nabat.incident.domain.CommentNotFoundException;
+import org.example.nabat.incident.domain.CommentsLockedException;
 import org.example.nabat.incident.domain.OutsideServiceAreaException;
 import org.example.nabat.incident.domain.UnknownCategoryException;
 import org.example.nabat.identity.domain.AuthenticationFailedException;
@@ -66,6 +68,7 @@ public class GlobalExceptionHandler {
     static final String MSG_UNSUPPORTED_MEDIA = "Unsupported file type";
     static final String MSG_OUTSIDE_AREA    = "nabat only accepts reports inside Sofia";
     static final String MSG_UNKNOWN_CATEGORY = "Choose a category from the list";
+    static final String MSG_COMMENTS_LOCKED = "This report is closed, and so is its discussion";
     static final String MSG_UNAVAILABLE     = "A required service is temporarily unavailable. Please try again.";
     static final String MSG_INTERNAL        = "Something went wrong. Please try again.";
 
@@ -181,6 +184,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleEmailTaken(EmailAlreadyRegisteredException ex) {
         log.info("Registration conflict: {}", ex.getMessage());
         return build(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", ex.getMessage());
+    }
+
+    /**
+     * Its own code, so the client can put away the comment box and say why, instead of
+     * showing the conflict every other refused state change shares.
+     */
+    @ExceptionHandler(CommentsLockedException.class)
+    public ResponseEntity<ErrorResponse> handleCommentsLocked(CommentsLockedException ex) {
+        log.debug("CommentsLocked: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "COMMENTS_LOCKED", MSG_COMMENTS_LOCKED);
+    }
+
+    @ExceptionHandler(CommentNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCommentNotFound(CommentNotFoundException ex) {
+        log.warn("CommentNotFound: {}", ex.getMessage());
+        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", MSG_NOT_FOUND);
     }
 
     @ExceptionHandler(AlertNotFoundException.class)
