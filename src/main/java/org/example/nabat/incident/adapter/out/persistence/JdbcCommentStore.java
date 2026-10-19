@@ -34,7 +34,7 @@ import java.util.UUID;
 public class JdbcCommentStore implements CommentStore {
 
     private static final String COLUMNS =
-        "id, alert_id, author_id, author_name, by_district, by_reporter, body, created_at, removed_at, removed_by";
+        "id, alert_id, author_id, author_name, by_authority, by_reporter, body, created_at, removed_at, removed_by";
 
     private static final RowMapper<Comment> COMMENT = (rs, row) -> {
         String removedBy = rs.getString("removed_by");
@@ -44,7 +44,7 @@ public class JdbcCommentStore implements CommentStore {
             AlertId.of(rs.getObject("alert_id", UUID.class)),
             rs.getObject("author_id", UUID.class),
             rs.getString("author_name"),
-            rs.getBoolean("by_district"),
+            rs.getBoolean("by_authority"),
             rs.getBoolean("by_reporter"),
             // The text stays in the row for moderation, but a removed comment does not say it.
             removedBy == null ? rs.getString("body") : null,
@@ -73,7 +73,7 @@ public class JdbcCommentStore implements CommentStore {
     @Transactional(propagation = Propagation.MANDATORY)
     public void insert(Comment c) {
         jdbc.update("INSERT INTO alert_comments (" + COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
-            c.id(), c.alertId().value(), c.authorId(), c.authorName(), c.byDistrict(), c.byReporter(), c.body(),
+            c.id(), c.alertId().value(), c.authorId(), c.authorName(), c.byAuthority(), c.byReporter(), c.body(),
             c.createdAt().atOffset(ZoneOffset.UTC));
     }
 

@@ -50,7 +50,7 @@ class JdbcFixCheckStoreIntegrationTest extends PostgresTestSupport {
         alertId = AlertId.generate();
         alertJpa.saveAndFlush(AlertJpaEntity.from(new Alert(alertId, "Дупка", "Дълбока", 1007,
             Location.of(42.67, 23.32), Instant.now(), AlertStatus.RESOLVED, reporterId,
-            0, 0, 0, 0, Instant.now(), null, "LOZENETS", ClosedBy.DISTRICT)));
+            0, 0, 0, 0, Instant.now(), null, "LOZENETS", ClosedBy.AUTHORITY)));
     }
 
     @Test

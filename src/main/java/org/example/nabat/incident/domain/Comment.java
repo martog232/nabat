@@ -6,8 +6,8 @@ import java.util.UUID;
 /**
  * One message in a report's thread.
  *
- * <p>{@code byDistrict} and {@code byReporter} are the author's standing on this report when
- * they wrote, kept rather than looked up: an official later moved to another district still
+ * <p>{@code byAuthority} and {@code byReporter} are the author's standing on this report when
+ * they wrote, kept rather than looked up: an official later moved to another authority still
  * spoke for this one, and the thread should keep saying so.
  *
  * @param authorName the author's display name when they wrote — see V27 for why it is kept
@@ -20,7 +20,7 @@ public record Comment(
     AlertId alertId,
     UUID authorId,
     String authorName,
-    boolean byDistrict,
+    boolean byAuthority,
     boolean byReporter,
     String body,
     Instant createdAt,

@@ -131,7 +131,7 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
                 LocaleContextHolder.getLocale()
         );
         String message = messageSource.getMessage(
-                command.byDistrict() ? "notification.resolved.message.district" : "notification.resolved.message.moderator",
+                command.byAuthority() ? "notification.resolved.message.authority" : "notification.resolved.message.moderator",
                 new Object[]{command.alertTitle()},
                 LocaleContextHolder.getLocale()
         );
@@ -156,7 +156,7 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
                 LocaleContextHolder.getLocale()
         );
         String message = messageSource.getMessage(
-                command.byDistrict() ? "notification.comment.message.district" : "notification.comment.message",
+                command.byAuthority() ? "notification.comment.message.authority" : "notification.comment.message",
                 new Object[]{command.alertTitle(), command.authorName()},
                 LocaleContextHolder.getLocale()
         );

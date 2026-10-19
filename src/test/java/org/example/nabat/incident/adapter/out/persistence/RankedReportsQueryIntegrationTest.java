@@ -104,7 +104,7 @@ class RankedReportsQueryIntegrationTest extends PostgresTestSupport {
         save("lozenets open", "LOZENETS", 1, 0, AlertStatus.SENT);
         save("lozenets open 2", "LOZENETS", 2, 0, AlertStatus.IN_PROGRESS);
         save("triaditsa open", "TRIADITSA", 1, 0, AlertStatus.SENT);
-        Alert closed = save("lozenets closed", "LOZENETS", 3, 0, AlertStatus.SENT).resolve(ClosedBy.DISTRICT);
+        Alert closed = save("lozenets closed", "LOZENETS", 3, 0, AlertStatus.SENT).resolve(ClosedBy.AUTHORITY);
         alerts.save(closed);
 
         assertThat(titles(ReportRanking.NEWEST, "LOZENETS", OPEN))

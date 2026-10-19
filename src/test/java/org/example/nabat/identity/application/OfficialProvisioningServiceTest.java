@@ -1,8 +1,8 @@
 package org.example.nabat.identity.application;
 
-import org.example.nabat.identity.application.port.in.ProvisionDistrictOfficialsUseCase.Result;
-import org.example.nabat.identity.application.port.out.DistrictDirectoryPort;
-import org.example.nabat.identity.application.port.out.DistrictDirectoryPort.DistrictEntry;
+import org.example.nabat.identity.application.port.in.ProvisionOfficialsUseCase.Result;
+import org.example.nabat.identity.application.port.out.AuthorityDirectoryPort;
+import org.example.nabat.identity.application.port.out.AuthorityDirectoryPort.AuthorityEntry;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -23,28 +23,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class DistrictOfficialProvisioningServiceTest {
+class OfficialProvisioningServiceTest {
 
     private static final String PASSWORD = "Rayon2026pass";
-    private static final DistrictEntry LOZENETS =
-        new DistrictEntry("LOZENETS", "Район Лозенец", "lozenets@rayon.nabat.test");
-    private static final DistrictEntry SREDETS =
-        new DistrictEntry("SREDETS", "Район Средец", "sredets@rayon.nabat.test");
+    private static final AuthorityEntry LOZENETS =
+        new AuthorityEntry("LOZENETS", "Район Лозенец", "lozenets@rayon.nabat.test");
+    private static final AuthorityEntry SREDETS =
+        new AuthorityEntry("SREDETS", "Район Средец", "sredets@rayon.nabat.test");
 
     @Mock
     private UserRepository userRepository;
 
     @Mock
-    private DistrictDirectoryPort districts;
+    private AuthorityDirectoryPort districts;
 
     @Mock
     private PasswordEncoder passwordEncoder;
 
-    private DistrictOfficialProvisioningService service;
+    private OfficialProvisioningService service;
 
     @BeforeEach
     void setUp() {
-        service = new DistrictOfficialProvisioningService(userRepository, districts, passwordEncoder);
+        service = new OfficialProvisioningService(userRepository, districts, passwordEncoder);
     }
 
     @Test
@@ -61,8 +61,8 @@ class DistrictOfficialProvisioningServiceTest {
         assertEquals("lozenets@rayon.nabat.test", official.email());
         assertEquals("Район Лозенец", official.displayName());
         assertEquals("hashed", official.password());
-        assertEquals(Role.DISTRICT_OFFICIAL, official.role());
-        assertTrue(official.actsForDistrict("LOZENETS"));
+        assertEquals(Role.OFFICIAL, official.role());
+        assertTrue(official.actsFor("LOZENETS"));
         assertTrue(official.emailVerified());
         assertTrue(official.enabled());
         assertEquals(new Result(1, 0, List.of()), result);
@@ -71,7 +71,7 @@ class DistrictOfficialProvisioningServiceTest {
     /** A second start must not reset a password the official may have changed since. */
     @Test
     void leavesAnExistingOfficialUntouched() {
-        User existing = Fixtures.user(LOZENETS.mailbox()).appointToDistrict("LOZENETS");
+        User existing = Fixtures.user(LOZENETS.mailbox()).appointTo("LOZENETS");
         when(districts.all()).thenReturn(List.of(LOZENETS));
         when(userRepository.findByEmail(LOZENETS.mailbox())).thenReturn(Optional.of(existing));
 

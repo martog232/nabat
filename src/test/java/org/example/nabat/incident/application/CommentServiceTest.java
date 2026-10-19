@@ -66,7 +66,7 @@ class CommentServiceTest {
 
         assertThat(added.body()).isEqualTo("Още е там.");
         assertThat(added.authorName()).isEqualTo("Гражданин");
-        assertThat(added.byDistrict()).isFalse();
+        assertThat(added.byAuthority()).isFalse();
         assertThat(added.byReporter()).isFalse();
         verify(store).insert(added);
         ArgumentCaptor<CommentAdded> event = ArgumentCaptor.forClass(CommentAdded.class);
@@ -79,18 +79,18 @@ class CommentServiceTest {
     void marksTheDistrictsOwnComment() {
         openReport();
 
-        Comment added = service.add(alertId, user(Role.DISTRICT_OFFICIAL, "LOZENETS"), "Насочено към поддръжката.");
+        Comment added = service.add(alertId, user(Role.OFFICIAL, "LOZENETS"), "Насочено към поддръжката.");
 
-        assertThat(added.byDistrict()).isTrue();
+        assertThat(added.byAuthority()).isTrue();
     }
 
     @Test
     void anotherDistrictsOfficialWritesLikeAnyoneElse() {
         openReport();
 
-        Comment added = service.add(alertId, user(Role.DISTRICT_OFFICIAL, "MLADOST"), "И при нас има такава.");
+        Comment added = service.add(alertId, user(Role.OFFICIAL, "MLADOST"), "И при нас има такава.");
 
-        assertThat(added.byDistrict()).isFalse();
+        assertThat(added.byAuthority()).isFalse();
     }
 
     /** The reporter writing alone in their own thread has nobody to tell. */
@@ -177,7 +177,7 @@ class CommentServiceTest {
         Comment someones = comment(UUID.randomUUID());
         when(store.find(alertId.value(), someones.id())).thenReturn(Optional.of(someones));
 
-        assertThatThrownBy(() -> service.remove(alertId, someones.id(), user(Role.DISTRICT_OFFICIAL, "LOZENETS")))
+        assertThatThrownBy(() -> service.remove(alertId, someones.id(), user(Role.OFFICIAL, "LOZENETS")))
             .isInstanceOf(NotAuthorizedException.class);
     }
 

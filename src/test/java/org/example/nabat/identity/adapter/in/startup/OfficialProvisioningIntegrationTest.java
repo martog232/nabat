@@ -2,8 +2,8 @@ package org.example.nabat.identity.adapter.in.startup;
 
 import org.example.nabat.PostgresTestSupport;
 import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
-import org.example.nabat.identity.application.port.in.ProvisionDistrictOfficialsUseCase;
-import org.example.nabat.identity.application.port.in.ProvisionDistrictOfficialsUseCase.Result;
+import org.example.nabat.identity.application.port.in.ProvisionOfficialsUseCase;
+import org.example.nabat.identity.application.port.in.ProvisionOfficialsUseCase.Result;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,12 +27,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class DistrictOfficialProvisioningIntegrationTest extends PostgresTestSupport {
+class OfficialProvisioningIntegrationTest extends PostgresTestSupport {
 
     private static final String PASSWORD = "Rayon2026pass";
 
     @Autowired
-    private ProvisionDistrictOfficialsUseCase provisioning;
+    private ProvisionOfficialsUseCase provisioning;
 
     @Autowired
     private UserJpaRepository userJpaRepository;
@@ -53,8 +53,8 @@ class DistrictOfficialProvisioningIntegrationTest extends PostgresTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"lozenets@rayon.nabat.test\",\"password\":\"" + PASSWORD + "\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.user.role").value("DISTRICT_OFFICIAL"))
-            .andExpect(jsonPath("$.user.districtCode").value("LOZENETS"));
+            .andExpect(jsonPath("$.user.role").value("OFFICIAL"))
+            .andExpect(jsonPath("$.user.authorityCode").value("LOZENETS"));
     }
 
     @Test

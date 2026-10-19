@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.nabat.shared.UseCase;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
-import org.example.nabat.incident.application.port.in.ListDistrictReportsUseCase;
+import org.example.nabat.incident.application.port.in.ListAssignedReportsUseCase;
 import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
@@ -30,7 +30,7 @@ import java.util.function.UnaryOperator;
 @RequiredArgsConstructor
 public class AlertLifecycleService
         implements GetAlertByIdUseCase, ResolveAlertUseCase, ListAlertsUseCase, RecordDeliveryUseCase,
-                   ProgressReportUseCase, ListDistrictReportsUseCase {
+                   ProgressReportUseCase, ListAssignedReportsUseCase {
 
     private final AlertRepository alertRepository;
     private final AlertNotificationPort alertNotificationPort;
@@ -70,14 +70,14 @@ public class AlertLifecycleService
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert acknowledge(AlertId id, User actor) {
-        return transition(id, alert -> requireDistrict(alert, actor).acknowledge());
+        return transition(id, alert -> requireAuthority(alert, actor).acknowledge());
     }
 
     @Override
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert startWork(AlertId id, User actor) {
-        return transition(id, alert -> requireDistrict(alert, actor).startWork());
+        return transition(id, alert -> requireAuthority(alert, actor).startWork());
     }
 
     @Override
@@ -89,12 +89,12 @@ public class AlertLifecycleService
 
     @Override
     @Transactional(readOnly = true)
-    public List<Alert> listForOwnDistrict(User actor, Set<AlertStatus> statuses) {
-        if (!actor.role().canActForDistrict()) {
-            throw new NotAuthorizedException("Only a district official has a district to list");
+    public List<Alert> listForOwnAuthority(User actor, Set<AlertStatus> statuses) {
+        if (!actor.role().canActForAuthority()) {
+            throw new NotAuthorizedException("Only an official has reports assigned to them");
         }
         Set<AlertStatus> wanted = statuses == null || statuses.isEmpty() ? OPEN : statuses;
-        return alertRepository.findInDistrict(actor.districtCode(), wanted, LIMIT);
+        return alertRepository.findAssignedTo(actor.authorityCode(), wanted, LIMIT);
     }
 
     @Override
@@ -115,10 +115,10 @@ public class AlertLifecycleService
     /**
      * Who is closing this report, or a refusal.
      *
-     * <p>In order of standing: the report's own district first, because "fixed" from the body
+     * <p>In order of standing: the report's authority first, because "fixed" from the body
      * responsible is the strongest statement there is; then its reporter; then a moderator.
-     * An official of <em>another</em> district is none of these — the capability answers,
-     * not the role, and for someone else's district it answers no.
+     * An official of <em>another</em> authority is none of these — the capability answers,
+     * not the role, and for someone else's reports it answers no.
      *
      * <p>The capability, not the role, for moderators too: closing someone else's report is
      * content moderation, and asking {@code role == ADMIN} is what once tied it to the one
@@ -130,8 +130,8 @@ public class AlertLifecycleService
      *                    own report, but not reject it as not a real problem
      */
     private static ClosedBy closerOf(Alert alert, User actor, boolean reporterMay) {
-        if (actor.actsForDistrict(alert.districtCode())) {
-            return ClosedBy.DISTRICT;
+        if (actor.actsFor(alert.authorityCode())) {
+            return ClosedBy.AUTHORITY;
         }
         if (reporterMay && alert.reportedBy().equals(actor.id().value())) {
             return ClosedBy.REPORTER;
@@ -140,14 +140,14 @@ public class AlertLifecycleService
             return ClosedBy.MODERATOR;
         }
         throw new NotAuthorizedException(reporterMay
-            ? "Only the reporter, the report's district or a moderator can close this report"
-            : "Only the report's district or a moderator can reject this report");
+            ? "Only the reporter, the report's authority or a moderator can close this report"
+            : "Only the report's authority or a moderator can reject this report");
     }
 
-    /** Only an official of the report's own district may speak for the district about it. */
-    private static Alert requireDistrict(Alert alert, User actor) {
-        if (!actor.actsForDistrict(alert.districtCode())) {
-            throw new NotAuthorizedException("Only an official of the report's district can do this");
+    /** Only an official of the report's authority may speak for the authority about it. */
+    private static Alert requireAuthority(Alert alert, User actor) {
+        if (!actor.actsFor(alert.authorityCode())) {
+            throw new NotAuthorizedException("Only an official of the report's authority can do this");
         }
         return alert;
     }

@@ -85,6 +85,9 @@ public class AlertJpaEntity {
     @Column(name = "district_code", length = 32)
     private String districtCode;
 
+    @Column(name = "authority_code", length = 32)
+    private String authorityCode;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "closed_by", length = 20)
     private ClosedBy closedBy;
@@ -152,6 +155,7 @@ public class AlertJpaEntity {
         this.resolvedAt = alert.resolvedAt();
         this.photoUrl = alert.photoUrl();
         this.districtCode = alert.districtCode();
+        this.authorityCode = alert.authorityCode();
         this.closedBy = alert.closedBy();
     }
 
@@ -173,7 +177,8 @@ public class AlertJpaEntity {
                 photoUrl,
                 districtCode,
                 closedBy,
-                new FixCheckTally(fixFixedCount, fixPartlyCount, fixNotFixedCount, reporterFixVerdict)
+                new FixCheckTally(fixFixedCount, fixPartlyCount, fixNotFixedCount, reporterFixVerdict),
+                authorityCode
         );
     }
 }

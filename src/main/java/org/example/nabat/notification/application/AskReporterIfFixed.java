@@ -41,6 +41,6 @@ public class AskReporterIfFixed {
             UserId.of(alert.reportedBy()),
             alert.id(),
             alert.title(),
-            alert.closedBy() == ClosedBy.DISTRICT));
+            alert.closedBy() == ClosedBy.AUTHORITY));
     }
 }

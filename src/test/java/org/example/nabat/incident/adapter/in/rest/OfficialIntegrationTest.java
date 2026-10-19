@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
-class DistrictOfficialIntegrationTest extends PostgresTestSupport {
+class OfficialIntegrationTest extends PostgresTestSupport {
 
     /** Studentski grad, in STUDENTSKI. */
     private static final double LAT = 42.6515;
@@ -89,7 +89,7 @@ class DistrictOfficialIntegrationTest extends PostgresTestSupport {
         perform(patch("/api/v1/alerts/{id}/resolve", report), studentski)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("RESOLVED"))
-            .andExpect(jsonPath("$.closedBy").value("DISTRICT"));
+            .andExpect(jsonPath("$.closedBy").value("AUTHORITY"));
     }
 
     @Test
@@ -112,24 +112,24 @@ class DistrictOfficialIntegrationTest extends PostgresTestSupport {
     /** Each official sees their own district, and a citizen has no district list at all. */
     @Test
     void theWorkingListIsTheOfficialsOwnDistrict() throws Exception {
-        perform(get("/api/v1/alerts/district"), studentski)
+        perform(get("/api/v1/alerts/assigned"), studentski)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$", hasSize(1)))
             .andExpect(jsonPath("$[0].districtCode").value("STUDENTSKI"));
-        perform(get("/api/v1/alerts/district"), lozenets)
+        perform(get("/api/v1/alerts/assigned"), lozenets)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$", hasSize(0)));
-        perform(get("/api/v1/alerts/district"), reporter).andExpect(status().isForbidden());
+        perform(get("/api/v1/alerts/assigned"), reporter).andExpect(status().isForbidden());
     }
 
-    /** V20: an official without a district, or a district on anyone else, cannot be stored. */
+    /** V20, V28: an official without an authority, or an authority on anyone else, cannot be stored. */
     @Test
     void theDatabaseRefusesAnOfficialWithoutADistrictAndADistrictWithoutAnOfficial() {
         assertThatThrownBy(() -> jdbc.update(
-            "UPDATE users SET role = 'DISTRICT_OFFICIAL', district_code = NULL WHERE email = 'reporter@example.com'"))
+            "UPDATE users SET role = 'OFFICIAL', authority_code = NULL WHERE email = 'reporter@example.com'"))
             .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update(
-            "UPDATE users SET district_code = 'LOZENETS' WHERE email = 'reporter@example.com'"))
+            "UPDATE users SET authority_code = 'LOZENETS' WHERE email = 'reporter@example.com'"))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -143,7 +143,7 @@ class DistrictOfficialIntegrationTest extends PostgresTestSupport {
     }
 
     private String appoint(AuthResponse account, String district) {
-        jdbc.update("UPDATE users SET role = 'DISTRICT_OFFICIAL', district_code = ? WHERE id = ?",
+        jdbc.update("UPDATE users SET role = 'OFFICIAL', authority_code = ? WHERE id = ?",
             district, account.user().id());
         return account.accessToken();
     }

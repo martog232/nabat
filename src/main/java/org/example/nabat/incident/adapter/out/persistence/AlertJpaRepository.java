@@ -59,8 +59,8 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         """, nativeQuery = true)
     long countRanked(@Param("statuses") Collection<String> statuses, @Param("district") String districtCode);
 
-    List<AlertJpaEntity> findByDistrictCodeAndStatusInOrderByCreatedAtDesc(
-        String districtCode, Collection<AlertStatus> statuses, Limit limit);
+    List<AlertJpaEntity> findByAuthorityCodeAndStatusInOrderByCreatedAtDesc(
+        String authorityCode, Collection<AlertStatus> statuses, Limit limit);
 
     /*
      * The four spatial queries below share a shape: circle predicate, optional category

@@ -122,7 +122,7 @@ class FixCheckServiceTest {
     private Alert report(AlertStatus status) {
         return new Alert(alertId, "Дупка", "Дълбока", 1007, Location.of(42.67, 23.32), Instant.now(), status,
             reporterId, 0, 0, 0, 0, status == AlertStatus.RESOLVED ? Instant.now() : null, null, "LOZENETS",
-            status == AlertStatus.RESOLVED ? ClosedBy.DISTRICT : null);
+            status == AlertStatus.RESOLVED ? ClosedBy.AUTHORITY : null);
     }
 
     private static User citizen(UUID id) {
@@ -131,7 +131,7 @@ class FixCheckServiceTest {
     }
 
     private static User official(String district) {
-        return new User(UserId.of(UUID.randomUUID()), "o@example.com", "p", "Служител", Role.DISTRICT_OFFICIAL, true, true,
+        return new User(UserId.of(UUID.randomUUID()), "o@example.com", "p", "Служител", Role.OFFICIAL, true, true,
             Instant.now(), Instant.now(), 0, district);
     }
 }

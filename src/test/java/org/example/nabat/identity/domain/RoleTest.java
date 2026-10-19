@@ -35,11 +35,11 @@ class RoleTest {
     /** Trusted with a territory, not with content or accounts. */
     @Test
     void aDistrictOfficialActsForADistrictAndNothingElse() {
-        assertTrue(Role.DISTRICT_OFFICIAL.canActForDistrict());
-        assertFalse(Role.DISTRICT_OFFICIAL.canModerateContent());
-        assertFalse(Role.DISTRICT_OFFICIAL.canAdministerUsers());
-        assertFalse(Role.ADMIN.canActForDistrict());
-        assertFalse(Role.MODERATOR.canActForDistrict());
+        assertTrue(Role.OFFICIAL.canActForAuthority());
+        assertFalse(Role.OFFICIAL.canModerateContent());
+        assertFalse(Role.OFFICIAL.canAdministerUsers());
+        assertFalse(Role.ADMIN.canActForAuthority());
+        assertFalse(Role.MODERATOR.canActForAuthority());
     }
 
     /**
@@ -50,7 +50,7 @@ class RoleTest {
     @Test
     void theRoleSetIsExactlyWhatTheDatabaseConstraintAllows() {
         assertArrayEquals(
-            new Role[] {Role.USER, Role.MODERATOR, Role.ADMIN, Role.DISTRICT_OFFICIAL},
+            new Role[] {Role.USER, Role.MODERATOR, Role.ADMIN, Role.OFFICIAL},
             Role.values(),
             "Adding or reordering roles means updating the CHECK constraint on users.role"
         );

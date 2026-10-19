@@ -21,9 +21,9 @@ import java.time.Instant;
  * Who may answer, and when.
  *
  * <p>Anyone signed in, about any resolved report — the people who walk past it are the
- * ones who know. Except an official of the report's own district: the check is of the
- * district's work, and an answer from the district would be the claim checking itself.
- * Officials of other districts are citizens here like anyone else.
+ * ones who know. Except an official of the report's authority: the check is of the
+ * authority's work, and an answer from the authority would be the claim checking itself.
+ * Officials of other authorities are citizens here like anyone else.
  */
 @UseCase
 public class FixCheckService implements CheckFixUseCase {
@@ -70,8 +70,8 @@ public class FixCheckService implements CheckFixUseCase {
         if (alert.status() != AlertStatus.RESOLVED) {
             throw new IllegalStateException("Only a resolved report can be checked; this one is " + alert.status());
         }
-        if (actor.actsForDistrict(alert.districtCode())) {
-            throw new NotAuthorizedException("The report's own district cannot check its own work");
+        if (actor.actsFor(alert.authorityCode())) {
+            throw new NotAuthorizedException("The report's authority cannot check its own work");
         }
         return alert;
     }

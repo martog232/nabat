@@ -53,8 +53,8 @@ public interface AlertRepository {
 
     List<Alert> findByStatus(AlertStatus status);
 
-    /** A district's reports in any of {@code statuses}, newest first, at most {@code limit}. */
-    List<Alert> findInDistrict(String districtCode, Set<AlertStatus> statuses, int limit);
+    /** The reports an authority answers for, in any of {@code statuses}, newest first, at most {@code limit}. */
+    List<Alert> findAssignedTo(String authorityCode, Set<AlertStatus> statuses, int limit);
 
     /** One page of the public list, in the order {@code search} asks for. */
     List<Alert> findRanked(RankedSearch search);

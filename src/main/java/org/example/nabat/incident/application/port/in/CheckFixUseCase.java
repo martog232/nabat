@@ -15,7 +15,7 @@ public interface CheckFixUseCase {
      *
      * @throws IllegalStateException if the report is not resolved — there is nothing to check
      * @throws org.example.nabat.shared.domain.NotAuthorizedException if the actor speaks for the
-     *         report's own district, whose work this checks
+     *         report's authority, whose work this checks
      */
     FixCheckView check(AlertId id, User actor, FixVerdict verdict);
 

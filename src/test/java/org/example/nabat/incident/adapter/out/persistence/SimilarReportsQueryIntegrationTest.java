@@ -89,7 +89,7 @@ class SimilarReportsQueryIntegrationTest extends PostgresTestSupport {
         alertJpa.saveAndFlush(AlertJpaEntity.from(new Alert(AlertId.generate(), title, "d", category,
             Location.of(lat, LON), Instant.now(), status, reporterId, 0, 0, 0, 0,
             status == AlertStatus.RESOLVED ? Instant.now() : null, null, "LOZENETS",
-            status == AlertStatus.RESOLVED ? org.example.nabat.incident.domain.ClosedBy.DISTRICT : null)));
+            status == AlertStatus.RESOLVED ? org.example.nabat.incident.domain.ClosedBy.AUTHORITY : null)));
     }
 
     private void callSofiaSignal(long id, int category, double lat, String leftReason) {

@@ -147,7 +147,7 @@ class AlertLifecycleServiceTest {
     // District officials. The report is in LOZENETS throughout.
 
     private User official(String district) {
-        return User.create("official-" + district + "@example.com", "p", "Official").appointToDistrict(district);
+        return User.create("official-" + district + "@example.com", "p", "Official").appointTo(district);
     }
 
     private void saves() {
@@ -194,7 +194,7 @@ class AlertLifecycleServiceTest {
     @Test
     void recordsWhoClosedTheReport() {
         saves();
-        assertEquals(ClosedBy.DISTRICT, service.resolve(alertId, official("LOZENETS")).closedBy());
+        assertEquals(ClosedBy.AUTHORITY, service.resolve(alertId, official("LOZENETS")).closedBy());
         assertEquals(ClosedBy.REPORTER, service.resolve(alertId, user(ownerId, Role.USER)).closedBy());
         assertEquals(ClosedBy.MODERATOR, service.resolve(alertId, user(UUID.randomUUID(), Role.MODERATOR)).closedBy());
     }
@@ -210,24 +210,24 @@ class AlertLifecycleServiceTest {
     @Test
     void theDistrictOrAModeratorMayReject() {
         saves();
-        assertEquals(ClosedBy.DISTRICT, service.reject(alertId, official("LOZENETS")).closedBy());
+        assertEquals(ClosedBy.AUTHORITY, service.reject(alertId, official("LOZENETS")).closedBy());
         assertEquals(ClosedBy.MODERATOR, service.reject(alertId, user(UUID.randomUUID(), Role.MODERATOR)).closedBy());
     }
 
     @Test
     void anOfficialListsOnlyTheirOwnDistrict() {
-        when(alertRepository.findInDistrict(eq("LOZENETS"), any(), anyInt())).thenReturn(List.of(active()));
+        when(alertRepository.findAssignedTo(eq("LOZENETS"), any(), anyInt())).thenReturn(List.of(active()));
 
-        List<Alert> listed = service.listForOwnDistrict(official("LOZENETS"), Set.of());
+        List<Alert> listed = service.listForOwnAuthority(official("LOZENETS"), Set.of());
 
         assertEquals(1, listed.size());
-        verify(alertRepository).findInDistrict("LOZENETS", AlertLifecycleService.OPEN, AlertLifecycleService.LIMIT);
+        verify(alertRepository).findAssignedTo("LOZENETS", AlertLifecycleService.OPEN, AlertLifecycleService.LIMIT);
     }
 
     @Test
     void someoneWithoutADistrictHasNoDistrictList() {
         assertThrows(NotAuthorizedException.class,
-                () -> service.listForOwnDistrict(user(UUID.randomUUID(), Role.MODERATOR), Set.of()));
+                () -> service.listForOwnAuthority(user(UUID.randomUUID(), Role.MODERATOR), Set.of()));
         verifyNoInteractions(alertRepository);
     }
 }

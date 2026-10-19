@@ -82,7 +82,7 @@ public class CommentController {
     public record CommentResponse(
         UUID id,
         @Schema(description = "The author's display name when they wrote it") String authorName,
-        @Schema(description = "Written by an official of the report's own district") boolean byDistrict,
+        @Schema(description = "Written by an official of the report's authority") boolean byAuthority,
         @Schema(description = "Written by the person who reported it") boolean byReporter,
         @Schema(description = "Written by the caller") boolean mine,
         @Schema(description = "The text; null once taken down") String body,
@@ -90,7 +90,7 @@ public class CommentController {
         @Schema(description = "Who took it down — AUTHOR or MODERATOR; null while it stands") CommentRemoval removedBy
     ) {
         static CommentResponse from(Comment c, User caller) {
-            return new CommentResponse(c.id(), c.authorName(), c.byDistrict(), c.byReporter(),
+            return new CommentResponse(c.id(), c.authorName(), c.byAuthority(), c.byReporter(),
                 caller != null && c.isBy(caller.id().value()), c.body(), c.createdAt(), c.removedBy());
         }
     }

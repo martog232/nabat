@@ -56,7 +56,7 @@ class SignalDispatcherTest {
         dispatcher = new SignalDispatcher(districts, dispatches, mailer, users, recordDelivery, categories);
         reporter = User.create("ivan@example.com", "hash", "Иван Петров");
         alert = Alert.create("Дупка", "Пред номер 12", 1007,
-            Location.of(42.6750, 23.3200), reporter.id().value(), null, "LOZENETS");
+            Location.of(42.6750, 23.3200), reporter.id().value(), null, "LOZENETS", "LOZENETS");
     }
 
     private void knownDistrictAndReporter() {

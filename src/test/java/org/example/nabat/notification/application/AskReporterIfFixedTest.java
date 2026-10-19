@@ -28,7 +28,7 @@ class AskReporterIfFixedTest {
 
     @Test
     void asksTheReporterWhenTheDistrictClosedIt() {
-        listener.on(new AlertResolved(resolvedBy(ClosedBy.DISTRICT)));
+        listener.on(new AlertResolved(resolvedBy(ClosedBy.AUTHORITY)));
 
         verify(notifications).sendResolvedNotification(
             new ResolvedNotificationCommand(UserId.of(reporterId), alertId, "Дупка", true));

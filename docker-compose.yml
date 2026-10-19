@@ -127,7 +127,7 @@ services:
       # switched on here because this stack owns a volume that would otherwise only grow.
       NABAT_ORPHAN_SWEEP_ENABLED: "true"
       # One account per district, signing in with its mailbox. Set in .env; unset creates none.
-      NABAT_DISTRICT_ACCOUNTS_PASSWORD: ${NABAT_DISTRICT_ACCOUNTS_PASSWORD:-}
+      NABAT_OFFICIAL_ACCOUNTS_PASSWORD: ${NABAT_OFFICIAL_ACCOUNTS_PASSWORD:-}
       # Object storage rather than the container's own disk, so compose runs the same
       # storage path a multi-replica deployment does.
       NABAT_STORAGE_TYPE: s3

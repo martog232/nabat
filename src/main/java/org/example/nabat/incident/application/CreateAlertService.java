@@ -80,6 +80,7 @@ public class CreateAlertService implements CreateAlertUseCase {
             location,
             command.reportedBy(),
             command.photoUrl(),
+            district.code(),
             district.code()
         );
 

@@ -32,14 +32,16 @@ public enum Role {
     ADMIN,
 
     /**
-     * Acts for one district administration: acknowledges, starts work on, resolves and rejects
-     * the reports in that district, and no other. Which district is on the account
-     * ({@link User#districtCode()}), not on the role — it is the same role for all 24.
+     * Acts for one authority — a district administration, or a city-wide institution such as
+     * the Centre for Urban Mobility: acknowledges, starts work on, resolves and rejects the
+     * reports that authority answers for, and no other. Which authority is on the account
+     * ({@link User#authorityCode()}), not on the role — it is the same role for all of them.
+     * Was {@code DISTRICT_OFFICIAL} until V28, when districts stopped being the only authority.
      *
-     * <p>Not a moderator. An official is trusted with their own territory, and nothing about
-     * that makes them fit to close a report in the next district, or anyone else's content.
+     * <p>Not a moderator. An official is trusted with their own authority's reports, and
+     * nothing about that makes them fit to close another authority's, or anyone else's content.
      */
-    DISTRICT_OFFICIAL;
+    OFFICIAL;
 
     /**
      * May act on content someone else created — resolving another user's alert, or listing
@@ -60,12 +62,12 @@ public enum Role {
     }
 
     /**
-     * Speaks for a district: may move that district's reports through their lifecycle.
+     * Speaks for an authority: may move the reports it answers for through their lifecycle.
      *
-     * <p>Only half the question. The other half — is this report in <em>their</em> district —
-     * needs the account's {@link User#districtCode()}; see {@link User#actsForDistrict}.
+     * <p>Only half the question. The other half — is this report <em>their</em> authority's —
+     * needs the account's {@link User#authorityCode()}; see {@link User#actsFor}.
      */
-    public boolean canActForDistrict() {
-        return this == DISTRICT_OFFICIAL;
+    public boolean canActForAuthority() {
+        return this == OFFICIAL;
     }
 }

@@ -36,18 +36,18 @@ public interface AdministerUsersUseCase {
     }
 
     /**
-     * Assigns a role, and for {@link Role#DISTRICT_OFFICIAL} the district it acts for.
+     * Assigns a role, and for {@link Role#OFFICIAL} the authority it acts for.
      *
-     * <p>{@code districtCode} is required for a district official and refused for any other
-     * role, and it must name a district that exists. An official for a district nobody can
-     * report in would be an account that can do nothing, and look as if it could.
+     * <p>{@code authorityCode} is required for an official and refused for any other role,
+     * and it must name an authority that exists. An official of an authority no report can go
+     * to would be an account that can do nothing, and look as if it could.
      *
      * <p>Refuses when the actor is the target. An admin demoting themselves is how an
      * installation ends up with no one who can hand the role back — the platform has no
      * break-glass path, so the only safe answer is that the last step must be taken by
      * someone else.
      */
-    User changeRole(UserId actorId, UserId targetId, Role newRole, String districtCode);
+    User changeRole(UserId actorId, UserId targetId, Role newRole, String authorityCode);
 
     /**
      * Enables or disables an account.

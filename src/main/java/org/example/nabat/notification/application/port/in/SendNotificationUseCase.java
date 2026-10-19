@@ -33,21 +33,21 @@ public interface SendNotificationUseCase {
      */
     Notification sendResolvedNotification(ResolvedNotificationCommand command);
 
-    /** @param byDistrict true if the report's district closed it, false if a moderator did */
-    record ResolvedNotificationCommand(UserId reporterId, AlertId alertId, String alertTitle, boolean byDistrict) {
+    /** @param byAuthority true if the report's authority closed it, false if a moderator did */
+    record ResolvedNotificationCommand(UserId reporterId, AlertId alertId, String alertTitle, boolean byAuthority) {
     }
 
     /** Tells one person in a report's thread that someone wrote in it. */
     Notification sendCommentNotification(CommentNotificationCommand command);
 
-    /** @param byDistrict true if the report's own district wrote it, which the message says instead of a name */
+    /** @param byAuthority true if the report's authority wrote it, which the message says instead of a name */
     record CommentNotificationCommand(
             UserId recipientId,
             AlertId alertId,
             String alertTitle,
             UserId authorId,
             String authorName,
-            boolean byDistrict
+            boolean byAuthority
     ) {
     }
 

@@ -24,7 +24,7 @@ import java.util.UUID;
 /**
  * "Is it really fixed?" on a resolved report. One answer per person: {@code PUT} sets or
  * changes it, {@code DELETE} takes it back. 409 on a report that is not resolved, 403 for
- * an official of the report's own district.
+ * an official of the report's authority.
  */
 @RestController
 @RequestMapping("/api/v1/alerts/{id}/fix-check")

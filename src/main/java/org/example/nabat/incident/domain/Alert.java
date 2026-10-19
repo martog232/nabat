@@ -36,9 +36,9 @@ public record Alert(
         Instant resolvedAt,
         String photoUrl,
         /**
-         * The district the report is in, which decides who is responsible for it. Written
-         * once at creation and never changed: the report does not move. Null only on reports
-         * that predate districts and lie outside the city (V18).
+         * The district the report is in. Written once at creation and never changed: the report
+         * does not move. Null only on reports that predate districts and lie outside the city
+         * (V18). Where it is, not who answers for it: see {@link #authorityCode}.
          */
         String districtCode,
         /** Who closed the report; null while it is open, and on reports closed before V20. */
@@ -48,16 +48,40 @@ public record Alert(
          * {@link FixCheckTally#NONE} until someone answers. Written by the fix-check store,
          * never by saving the report.
          */
-        FixCheckTally fixCheck
+        FixCheckTally fixCheck,
+        /**
+         * Who answers for the report: its district, or the city-wide institution its category
+         * belongs to (V29). Officials of this authority, and only they, speak for it. Decided
+         * once at creation, like the district.
+         */
+        String authorityCode
 ) {
     /**
      * Null becomes {@link FixCheckTally#NONE}: events stored before V24 replay from JSON that
-     * has no {@code fixCheck}, and a report must not lose its outbox row over that.
+     * has no {@code fixCheck}, and a report must not lose its outbox row over that. A null
+     * authority becomes the district for the same reason — before V28, the district was the
+     * only authority there was.
      */
     public Alert {
         if (fixCheck == null) {
             fixCheck = FixCheckTally.NONE;
         }
+        if (authorityCode == null) {
+            authorityCode = districtCode;
+        }
+    }
+
+    /** Answered for by its district — what everything before V28 constructed. */
+    public Alert(
+            AlertId id, String title, String description, int categoryCode, Location location,
+            Instant createdAt, AlertStatus status, UUID reportedBy,
+            int upvoteCount, int downvoteCount, int confirmationCount, int credibilityScore,
+            Instant resolvedAt, String photoUrl, String districtCode, ClosedBy closedBy,
+            FixCheckTally fixCheck
+    ) {
+        this(id, title, description, categoryCode, location, createdAt, status, reportedBy,
+                upvoteCount, downvoteCount, confirmationCount, credibilityScore,
+                resolvedAt, photoUrl, districtCode, closedBy, fixCheck, districtCode);
     }
 
     /** A report nobody has checked yet — what everything before V24 constructed. */
@@ -69,7 +93,7 @@ public record Alert(
     ) {
         this(id, title, description, categoryCode, location, createdAt, status, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount, credibilityScore,
-                resolvedAt, photoUrl, districtCode, closedBy, FixCheckTally.NONE);
+                resolvedAt, photoUrl, districtCode, closedBy, FixCheckTally.NONE, districtCode);
     }
 
     public static Alert create(
@@ -79,7 +103,8 @@ public record Alert(
             Location location,
             UUID reportedBy,
             String photoUrl,
-            String districtCode
+            String districtCode,
+            String authorityCode
     ) {
         return new Alert(
                 AlertId.generate(),
@@ -94,7 +119,9 @@ public record Alert(
                 null,
                 photoUrl,
                 districtCode,
-                null
+                null,
+                FixCheckTally.NONE,
+                authorityCode
         );
     }
 
@@ -149,7 +176,7 @@ public record Alert(
                 id, title, description, categoryCode, location,
                 createdAt, target, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount, credibilityScore,
-                resolvedAt, photoUrl, districtCode, by, fixCheck
+                resolvedAt, photoUrl, districtCode, by, fixCheck, authorityCode
         );
     }
 
@@ -164,7 +191,7 @@ public record Alert(
                 id, title, description, categoryCode, location,
                 createdAt, status, reportedBy,
                 upvotes, downvotes, confirmations, credibilityScore,
-                resolvedAt, photoUrl, districtCode, closedBy, fixCheck
+                resolvedAt, photoUrl, districtCode, closedBy, fixCheck, authorityCode
         );
     }
 
@@ -174,7 +201,7 @@ public record Alert(
                 id, title, description, categoryCode, location,
                 createdAt, status, reportedBy,
                 upvoteCount, downvoteCount, confirmationCount, credibilityScore,
-                resolvedAt, photoUrl, districtCode, closedBy, tally
+                resolvedAt, photoUrl, districtCode, closedBy, tally, authorityCode
         );
     }
 }

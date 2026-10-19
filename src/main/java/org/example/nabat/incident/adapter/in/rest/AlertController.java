@@ -13,7 +13,7 @@ import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
-import org.example.nabat.incident.application.port.in.ListDistrictReportsUseCase;
+import org.example.nabat.incident.application.port.in.ListAssignedReportsUseCase;
 import org.example.nabat.incident.application.port.in.ListRankedReportsUseCase;
 import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
@@ -52,7 +52,7 @@ public class AlertController {
     private final ResolveAlertUseCase resolveAlertUseCase;
     private final ListAlertsUseCase listAlertsUseCase;
     private final ProgressReportUseCase progressReportUseCase;
-    private final ListDistrictReportsUseCase listDistrictReportsUseCase;
+    private final ListAssignedReportsUseCase listAssignedReportsUseCase;
     private final ListRankedReportsUseCase listRankedReportsUseCase;
 
     public AlertController(
@@ -64,7 +64,7 @@ public class AlertController {
         // directly — which let the REST layer reach past the application layer entirely.
         ListAlertsUseCase listAlertsUseCase,
         ProgressReportUseCase progressReportUseCase,
-        ListDistrictReportsUseCase listDistrictReportsUseCase,
+        ListAssignedReportsUseCase listAssignedReportsUseCase,
         ListRankedReportsUseCase listRankedReportsUseCase
     ) {
         this.createAlertUseCase = createAlertUseCase;
@@ -73,7 +73,7 @@ public class AlertController {
         this.resolveAlertUseCase = resolveAlertUseCase;
         this.listAlertsUseCase = listAlertsUseCase;
         this.progressReportUseCase = progressReportUseCase;
-        this.listDistrictReportsUseCase = listDistrictReportsUseCase;
+        this.listAssignedReportsUseCase = listAssignedReportsUseCase;
         this.listRankedReportsUseCase = listRankedReportsUseCase;
     }
 
@@ -149,9 +149,9 @@ public class AlertController {
         return ResponseEntity.ok(AlertResponse.from(resolved));
     }
 
-    /** The district has received the report. Its own officials only. */
+    /** The authority that answers for the report has received it. Its own officials only. */
     @PatchMapping("/{id}/acknowledge")
-    @Operation(summary = "The report's district confirms it has received it")
+    @Operation(summary = "The report's authority confirms it has received it")
     public ResponseEntity<AlertResponse> acknowledge(
             @PathVariable UUID id,
             @AuthenticationPrincipal User currentUser
@@ -159,9 +159,9 @@ public class AlertController {
         return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.acknowledge(AlertId.of(id), currentUser)));
     }
 
-    /** The district has started work on it. Its own officials only. */
+    /** The authority that answers for the report has started work on it. Its own officials only. */
     @PatchMapping("/{id}/start-work")
-    @Operation(summary = "The report's district says work has started")
+    @Operation(summary = "The report's authority says work has started")
     public ResponseEntity<AlertResponse> startWork(
             @PathVariable UUID id,
             @AuthenticationPrincipal User currentUser
@@ -169,7 +169,7 @@ public class AlertController {
         return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.startWork(AlertId.of(id), currentUser)));
     }
 
-    /** Closed without a fix. The report's district or a moderator — not the reporter. */
+    /** Closed without a fix. The report's authority or a moderator — not the reporter. */
     @PatchMapping("/{id}/reject")
     @Operation(summary = "Close a report without a fix: a duplicate, not a real problem, not anyone's to fix")
     public ResponseEntity<AlertResponse> reject(
@@ -182,7 +182,7 @@ public class AlertController {
     /**
      * The public list of reports — anyone may read it, signed in or not.
      *
-     * <p>Public because that is what it is for: what a district has been told, and what it has
+     * <p>Public because that is what it is for: what an authority has been told, and what it has
      * done about it, visible to the people who told it and to anyone else who wants to look.
      * It carries nothing the map does not already show a signed-in user; reporters appear as
      * an id, never a name or an address.
@@ -209,18 +209,18 @@ public class AlertController {
     }
 
     /**
-     * The working list of a district official: the reports in their own district, open ones
-     * unless {@code status} says otherwise. Which district comes from the account — there is
+     * The working list of an official: the reports their authority answers for, open ones
+     * unless {@code status} says otherwise. Which authority comes from the account — there is
      * no parameter for it, so there is nothing to tamper with.
      */
-    @GetMapping("/district")
-    @PreAuthorize("hasRole('DISTRICT_OFFICIAL')")
-    @Operation(summary = "Reports in the district the caller acts for, newest first")
-    public ResponseEntity<List<AlertResponse>> listForOwnDistrict(
+    @GetMapping("/assigned")
+    @PreAuthorize("hasRole('OFFICIAL')")
+    @Operation(summary = "Reports the caller's authority answers for, newest first")
+    public ResponseEntity<List<AlertResponse>> listForOwnAuthority(
             @RequestParam(required = false) Set<AlertStatus> status,
             @AuthenticationPrincipal User currentUser
     ) {
-        List<AlertResponse> response = listDistrictReportsUseCase.listForOwnDistrict(currentUser, status).stream()
+        List<AlertResponse> response = listAssignedReportsUseCase.listForOwnAuthority(currentUser, status).stream()
                 .map(AlertResponse::from)
                 .toList();
         return ResponseEntity.ok(response);

@@ -1,9 +1,9 @@
 package org.example.nabat.identity.application;
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.nabat.identity.application.port.in.ProvisionDistrictOfficialsUseCase;
-import org.example.nabat.identity.application.port.out.DistrictDirectoryPort;
-import org.example.nabat.identity.application.port.out.DistrictDirectoryPort.DistrictEntry;
+import org.example.nabat.identity.application.port.in.ProvisionOfficialsUseCase;
+import org.example.nabat.identity.application.port.out.AuthorityDirectoryPort;
+import org.example.nabat.identity.application.port.out.AuthorityDirectoryPort.AuthorityEntry;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.PasswordPolicy;
 import org.example.nabat.identity.domain.User;
@@ -17,19 +17,19 @@ import java.util.Optional;
 
 @UseCase
 @Slf4j
-public class DistrictOfficialProvisioningService implements ProvisionDistrictOfficialsUseCase {
+public class OfficialProvisioningService implements ProvisionOfficialsUseCase {
 
     private final UserRepository userRepository;
-    private final DistrictDirectoryPort districts;
+    private final AuthorityDirectoryPort authorities;
     private final PasswordEncoder passwordEncoder;
 
-    public DistrictOfficialProvisioningService(
+    public OfficialProvisioningService(
         UserRepository userRepository,
-        DistrictDirectoryPort districts,
+        AuthorityDirectoryPort authorities,
         PasswordEncoder passwordEncoder
     ) {
         this.userRepository = userRepository;
-        this.districts = districts;
+        this.authorities = authorities;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -37,36 +37,36 @@ public class DistrictOfficialProvisioningService implements ProvisionDistrictOff
     @Transactional
     public Result provision(String password) {
         PasswordPolicy.check(password).ifPresent(violation -> {
-            throw new IllegalArgumentException("District account password rejected: " + violation);
+            throw new IllegalArgumentException("Official account password rejected: " + violation);
         });
 
         int created = 0;
         int present = 0;
         List<String> conflicts = new ArrayList<>();
-        for (DistrictEntry district : districts.all()) {
-            Optional<User> existing = userRepository.findByEmail(district.mailbox());
+        for (AuthorityEntry authority : authorities.all()) {
+            Optional<User> existing = userRepository.findByEmail(authority.mailbox());
             if (existing.isEmpty()) {
-                userRepository.save(official(district, password));
+                userRepository.save(official(authority, password));
                 created++;
-            } else if (existing.get().actsForDistrict(district.code())) {
+            } else if (existing.get().actsFor(authority.code())) {
                 present++;
             } else {
                 log.warn("{} already belongs to an account that does not act for {}; left alone",
-                    district.mailbox(), district.code());
-                conflicts.add(district.code());
+                    authority.mailbox(), authority.code());
+                conflicts.add(authority.code());
             }
         }
         return new Result(created, present, List.copyOf(conflicts));
     }
 
     /**
-     * Verified from the start. The address is the district's own mailbox, set by whoever runs
+     * Verified from the start. The address is the authority's own mailbox, set by whoever runs
      * nabat rather than claimed by a stranger, and the verification link proves only the
      * latter.
      */
-    private User official(DistrictEntry district, String password) {
-        return User.create(district.mailbox(), passwordEncoder.encode(password), district.name())
+    private User official(AuthorityEntry authority, String password) {
+        return User.create(authority.mailbox(), passwordEncoder.encode(password), authority.name())
             .verifyEmail()
-            .appointToDistrict(district.code());
+            .appointTo(authority.code());
     }
 }

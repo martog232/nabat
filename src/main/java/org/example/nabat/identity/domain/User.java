@@ -40,17 +40,17 @@ public record User(
      */
     int tokenVersion,
     /**
-     * The district this account acts for. Set exactly when the role is
-     * {@link Role#DISTRICT_OFFICIAL}, and null otherwise — enforced here and by a CHECK
-     * constraint (V20), because an official with no district acts nowhere and a district on
-     * any other role is a grant waiting to be misread.
+     * The authority this account acts for: a district or an institution. Set exactly when
+     * the role is {@link Role#OFFICIAL}, and null otherwise — enforced here and by a CHECK
+     * constraint (V28), because an official with no authority acts nowhere and an authority
+     * on any other role is a grant waiting to be misread.
      */
-    String districtCode
+    String authorityCode
 ) {
     public User {
-        if ((role == Role.DISTRICT_OFFICIAL) != (districtCode != null)) {
+        if ((role == Role.OFFICIAL) != (authorityCode != null)) {
             throw new IllegalArgumentException(
-                "A district is set exactly for DISTRICT_OFFICIAL, not for " + role);
+                "An authority is set exactly for OFFICIAL, not for " + role);
         }
     }
 
@@ -89,28 +89,31 @@ public record User(
     }
 
     /**
-     * Any role but {@link Role#DISTRICT_OFFICIAL}, which needs a district — see
-     * {@link #appointToDistrict}. Clears the district, so moving an official to another role
-     * takes their territory away with the role.
+     * Any role but {@link Role#OFFICIAL}, which needs an authority — see
+     * {@link #appointTo}. Clears the authority, so moving an official to another role takes
+     * their reports away with the role.
      */
     public User withRole(Role newRole) {
-        if (newRole == Role.DISTRICT_OFFICIAL) {
-            throw new IllegalArgumentException("A district official needs a district: use appointToDistrict");
+        if (newRole == Role.OFFICIAL) {
+            throw new IllegalArgumentException("An official needs an authority: use appointTo");
         }
-        return toBuilder().role(newRole).districtCode(null).touch().build();
+        return toBuilder().role(newRole).authorityCode(null).touch().build();
     }
 
-    /** Makes this account the voice of one district. */
-    public User appointToDistrict(String code) {
+    /** Makes this account the voice of one authority. */
+    public User appointTo(String code) {
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("District code is required");
+            throw new IllegalArgumentException("Authority code is required");
         }
-        return toBuilder().role(Role.DISTRICT_OFFICIAL).districtCode(code).touch().build();
+        return toBuilder().role(Role.OFFICIAL).authorityCode(code).touch().build();
     }
 
-    /** Whether this account may act on a report in {@code code}: the right role, and that district. */
-    public boolean actsForDistrict(String code) {
-        return role.canActForDistrict() && code != null && code.equals(districtCode);
+    /**
+     * Whether this account may act on a report that authority {@code code} answers for: the
+     * right role, and that authority.
+     */
+    public boolean actsFor(String code) {
+        return role.canActForAuthority() && code != null && code.equals(authorityCode);
     }
 
     /** Disables the account and invalidates all existing sessions. */
@@ -142,7 +145,7 @@ public record User(
         private Instant createdAt;
         private Instant updatedAt;
         private int tokenVersion;
-        private String districtCode;
+        private String authorityCode;
 
         private Builder(User source) {
             this.id = source.id;
@@ -155,7 +158,7 @@ public record User(
             this.createdAt = source.createdAt;
             this.updatedAt = source.updatedAt;
             this.tokenVersion = source.tokenVersion;
-            this.districtCode = source.districtCode;
+            this.authorityCode = source.authorityCode;
         }
 
         public Builder id(UserId value) { this.id = value; return this; }
@@ -168,7 +171,7 @@ public record User(
         public Builder createdAt(Instant value) { this.createdAt = value; return this; }
         public Builder updatedAt(Instant value) { this.updatedAt = value; return this; }
         public Builder tokenVersion(int value) { this.tokenVersion = value; return this; }
-        public Builder districtCode(String value) { this.districtCode = value; return this; }
+        public Builder authorityCode(String value) { this.authorityCode = value; return this; }
 
         /** Sets {@code updatedAt} to now. */
         public Builder touch() { this.updatedAt = Instant.now(); return this; }
@@ -176,7 +179,7 @@ public record User(
         public User build() {
             return new User(
                 id, email, password, displayName, role, enabled, emailVerified,
-                createdAt, updatedAt, tokenVersion, districtCode
+                createdAt, updatedAt, tokenVersion, authorityCode
             );
         }
     }

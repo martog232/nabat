@@ -7,7 +7,7 @@ import org.example.nabat.identity.domain.User;
 public interface ResolveAlertUseCase {
 
     /**
-     * Marks the alert as RESOLVED, recording who closed it: an official of its district, its
+     * Marks the alert as RESOLVED, recording who closed it: an official of its authority, its
      * reporter, or a moderator — in that order of standing, see {@code ClosedBy}.
      * @throws org.example.nabat.incident.domain.AlertNotFoundException if no such alert
      * @throws org.example.nabat.shared.domain.NotAuthorizedException if {@code actor}

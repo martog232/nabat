@@ -89,9 +89,9 @@ public class AlertRepositoryAdapter implements AlertRepository {
     }
 
     @Override
-    public List<Alert> findInDistrict(String districtCode, Set<AlertStatus> statuses, int limit) {
-        return toDomain(jpaRepository.findByDistrictCodeAndStatusInOrderByCreatedAtDesc(
-            districtCode, statuses, Limit.of(limit)));
+    public List<Alert> findAssignedTo(String authorityCode, Set<AlertStatus> statuses, int limit) {
+        return toDomain(jpaRepository.findByAuthorityCodeAndStatusInOrderByCreatedAtDesc(
+            authorityCode, statuses, Limit.of(limit)));
     }
 
     /**

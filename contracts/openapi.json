@@ -557,7 +557,7 @@
     "/api/v1/alerts/{id}/start-work" : {
       "patch" : {
         "tags" : [ "alert-controller" ],
-        "summary" : "The report's district says work has started",
+        "summary" : "The report's authority says work has started",
         "operationId" : "startWork",
         "parameters" : [ {
           "name" : "id",
@@ -640,7 +640,7 @@
     "/api/v1/alerts/{id}/acknowledge" : {
       "patch" : {
         "tags" : [ "alert-controller" ],
-        "summary" : "The report's district confirms it has received it",
+        "summary" : "The report's authority confirms it has received it",
         "operationId" : "acknowledge",
         "parameters" : [ {
           "name" : "id",
@@ -1210,11 +1210,11 @@
         }
       }
     },
-    "/api/v1/alerts/district" : {
+    "/api/v1/alerts/assigned" : {
       "get" : {
         "tags" : [ "alert-controller" ],
-        "summary" : "Reports in the district the caller acts for, newest first",
-        "operationId" : "listForOwnDistrict",
+        "summary" : "Reports the caller's authority answers for, newest first",
+        "operationId" : "listForOwnAuthority",
         "parameters" : [ {
           "name" : "status",
           "in" : "query",
@@ -1538,7 +1538,7 @@
           "role" : {
             "type" : "string",
             "description" : "Assigned role",
-            "enum" : [ "USER", "MODERATOR", "ADMIN", "DISTRICT_OFFICIAL" ],
+            "enum" : [ "USER", "MODERATOR", "ADMIN", "OFFICIAL" ],
             "example" : "USER"
           },
           "emailVerified" : {
@@ -1549,9 +1549,9 @@
             "type" : "boolean",
             "description" : "Whether the account may sign in — an admin can switch this off"
           },
-          "districtCode" : {
+          "authorityCode" : {
             "type" : "string",
-            "description" : "For a district official, the district they act for; null for every other role",
+            "description" : "For an official, the authority they act for: a district or an institution; null for every other role",
             "example" : "LOZENETS"
           }
         }
@@ -1746,13 +1746,18 @@
           },
           "closedBy" : {
             "type" : "string",
-            "description" : "Who closed the report — the district, the reporter, or a moderator. Null while open, and on reports closed before this was recorded",
-            "enum" : [ "DISTRICT", "REPORTER", "MODERATOR" ],
-            "example" : "DISTRICT"
+            "description" : "Who closed the report — the authority that answers for it, the reporter, or a moderator. Null while open, and on reports closed before this was recorded",
+            "enum" : [ "AUTHORITY", "REPORTER", "MODERATOR" ],
+            "example" : "AUTHORITY"
           },
           "fixCheck" : {
             "$ref" : "#/components/schemas/FixCheckSummary",
             "description" : "Whether people say a resolved report is really fixed. All zero and UNCHECKED on reports nobody has checked"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "Who answers for the report: its district, or the city-wide institution its category belongs to. See GET /api/v1/authorities for names",
+            "example" : "LOZENETS"
           }
         }
       },
@@ -1782,9 +1787,9 @@
             "type" : "string",
             "description" : "The author's display name when they wrote it"
           },
-          "byDistrict" : {
+          "byAuthority" : {
             "type" : "boolean",
-            "description" : "Written by an official of the report's own district"
+            "description" : "Written by an official of the report's authority"
           },
           "byReporter" : {
             "type" : "boolean",
@@ -1885,12 +1890,12 @@
           "role" : {
             "type" : "string",
             "description" : "The role to assign",
-            "enum" : [ "USER", "MODERATOR", "ADMIN", "DISTRICT_OFFICIAL" ],
+            "enum" : [ "USER", "MODERATOR", "ADMIN", "OFFICIAL" ],
             "example" : "MODERATOR"
           },
-          "districtCode" : {
+          "authorityCode" : {
             "type" : "string",
-            "description" : "Required for DISTRICT_OFFICIAL, and only for it: the district the account acts for",
+            "description" : "Required for OFFICIAL, and only for it: the authority the account acts for, a district or an institution",
             "example" : "LOZENETS"
           }
         },

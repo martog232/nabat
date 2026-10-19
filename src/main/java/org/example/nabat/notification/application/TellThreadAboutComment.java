@@ -36,7 +36,7 @@ public class TellThreadAboutComment {
                 event.alertTitle(),
                 UserId.of(event.authorId()),
                 event.authorName(),
-                event.byDistrict()));
+                event.byAuthority()));
         }
     }
 }

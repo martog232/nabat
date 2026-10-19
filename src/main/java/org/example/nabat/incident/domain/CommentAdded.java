@@ -13,14 +13,14 @@ import java.util.UUID;
  * <p>Stored by the Event Publication Registry and replayed from JSON, like
  * {@link AlertResolved}: anything added here must survive a Jackson round-trip.
  *
- * @param byDistrict whether the report's own district wrote it, which the notification says
+ * @param byAuthority whether the report's authority wrote it, which the notification says
  */
 public record CommentAdded(
     AlertId alertId,
     String alertTitle,
     UUID authorId,
     String authorName,
-    boolean byDistrict,
+    boolean byAuthority,
     Set<UUID> recipients
 ) {
 }

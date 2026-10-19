@@ -1,6 +1,6 @@
 package org.example.nabat.identity.application;
 
-import org.example.nabat.identity.application.port.out.DistrictDirectoryPort;
+import org.example.nabat.identity.application.port.out.AuthorityDirectoryPort;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -28,7 +28,7 @@ class UserAdministrationServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private DistrictDirectoryPort districts;
+    private AuthorityDirectoryPort districts;
 
     private UserAdministrationService service;
     private User admin;
@@ -166,12 +166,12 @@ class UserAdministrationServiceTest {
         given(admin, plainUser);
         when(districts.exists("LOZENETS")).thenReturn(true);
 
-        User official = service.changeRole(admin.id(), plainUser.id(), Role.DISTRICT_OFFICIAL, "LOZENETS");
+        User official = service.changeRole(admin.id(), plainUser.id(), Role.OFFICIAL, "LOZENETS");
 
-        assertEquals(Role.DISTRICT_OFFICIAL, official.role());
-        assertEquals("LOZENETS", official.districtCode());
-        assertTrue(official.actsForDistrict("LOZENETS"));
-        assertFalse(official.actsForDistrict("TRIADITSA"));
+        assertEquals(Role.OFFICIAL, official.role());
+        assertEquals("LOZENETS", official.authorityCode());
+        assertTrue(official.actsFor("LOZENETS"));
+        assertFalse(official.actsFor("TRIADITSA"));
         assertFalse(official.role().canModerateContent(), "an official is trusted with a territory, not with content");
     }
 
@@ -180,7 +180,7 @@ class UserAdministrationServiceTest {
     void anOfficialNeedsADistrict() {
         assertThrows(
             IllegalArgumentException.class,
-            () -> service.changeRole(admin.id(), plainUser.id(), Role.DISTRICT_OFFICIAL, null)
+            () -> service.changeRole(admin.id(), plainUser.id(), Role.OFFICIAL, null)
         );
         verifyNoInteractions(userRepository);
     }
@@ -200,7 +200,7 @@ class UserAdministrationServiceTest {
 
         assertThrows(
             IllegalArgumentException.class,
-            () -> service.changeRole(admin.id(), plainUser.id(), Role.DISTRICT_OFFICIAL, "ATLANTIS")
+            () -> service.changeRole(admin.id(), plainUser.id(), Role.OFFICIAL, "ATLANTIS")
         );
         verifyNoInteractions(userRepository);
     }
@@ -208,26 +208,26 @@ class UserAdministrationServiceTest {
     /** Moving to another district is a change, even though the role stays the same. */
     @Test
     void movesAnOfficialToAnotherDistrict() {
-        User official = plainUser.appointToDistrict("LOZENETS");
+        User official = plainUser.appointTo("LOZENETS");
         given(admin, official);
         when(districts.exists("TRIADITSA")).thenReturn(true);
 
-        User moved = service.changeRole(admin.id(), official.id(), Role.DISTRICT_OFFICIAL, "TRIADITSA");
+        User moved = service.changeRole(admin.id(), official.id(), Role.OFFICIAL, "TRIADITSA");
 
-        assertEquals("TRIADITSA", moved.districtCode());
+        assertEquals("TRIADITSA", moved.authorityCode());
     }
 
     /** The territory goes with the role: a former official keeps no district. */
     @Test
     void demotingAnOfficialTakesTheDistrictAway() {
-        User official = plainUser.appointToDistrict("LOZENETS");
+        User official = plainUser.appointTo("LOZENETS");
         given(admin, official);
 
         User demoted = service.changeRole(admin.id(), official.id(), Role.USER, null);
 
         assertEquals(Role.USER, demoted.role());
-        assertNull(demoted.districtCode());
-        assertFalse(demoted.actsForDistrict("LOZENETS"));
+        assertNull(demoted.authorityCode());
+        assertFalse(demoted.actsFor("LOZENETS"));
     }
 
     @Test

@@ -1,7 +1,7 @@
 package org.example.nabat.identity.application;
 
 import org.example.nabat.identity.application.port.in.AdministerUsersUseCase;
-import org.example.nabat.identity.application.port.out.DistrictDirectoryPort;
+import org.example.nabat.identity.application.port.out.AuthorityDirectoryPort;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -15,11 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserAdministrationService implements AdministerUsersUseCase {
 
     private final UserRepository userRepository;
-    private final DistrictDirectoryPort districts;
+    private final AuthorityDirectoryPort authorities;
 
-    public UserAdministrationService(UserRepository userRepository, DistrictDirectoryPort districts) {
+    public UserAdministrationService(UserRepository userRepository, AuthorityDirectoryPort authorities) {
         this.userRepository = userRepository;
-        this.districts = districts;
+        this.authorities = authorities;
     }
 
     @Override
@@ -33,32 +33,32 @@ public class UserAdministrationService implements AdministerUsersUseCase {
 
     @Override
     @Transactional
-    public User changeRole(UserId actorId, UserId targetId, Role newRole, String districtCode) {
+    public User changeRole(UserId actorId, UserId targetId, Role newRole, String authorityCode) {
         if (newRole == null) {
             throw new IllegalArgumentException("Role is required");
         }
-        boolean official = newRole == Role.DISTRICT_OFFICIAL;
-        if (official == (districtCode == null)) {
+        boolean official = newRole == Role.OFFICIAL;
+        if (official == (authorityCode == null)) {
             throw new IllegalArgumentException(official
-                ? "A district official needs a district"
-                : "Only a district official has a district");
+                ? "An official needs an authority"
+                : "Only an official has an authority");
         }
-        if (official && !districts.exists(districtCode)) {
-            throw new IllegalArgumentException("No such district: " + districtCode);
+        if (official && !authorities.exists(authorityCode)) {
+            throw new IllegalArgumentException("No such authority: " + authorityCode);
         }
 
         User actor = requireActorWhoCanAdminister(actorId);
         requireNotSelf(actor, targetId, "change your own role");
 
         User target = requireUser(targetId);
-        if (target.role() == newRole && java.util.Objects.equals(target.districtCode(), districtCode)) {
+        if (target.role() == newRole && java.util.Objects.equals(target.authorityCode(), authorityCode)) {
             // Idempotent rather than a conflict: the caller asked for a state that already
             // holds, and a 409 here would make a retry after a timeout look like a failure.
             return target;
         }
 
         return userRepository.save(official
-            ? target.appointToDistrict(districtCode)
+            ? target.appointTo(authorityCode)
             : target.withRole(newRole));
     }
 

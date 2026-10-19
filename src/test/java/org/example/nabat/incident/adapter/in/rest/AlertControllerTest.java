@@ -7,7 +7,7 @@ import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
-import org.example.nabat.incident.application.port.in.ListDistrictReportsUseCase;
+import org.example.nabat.incident.application.port.in.ListAssignedReportsUseCase;
 import org.example.nabat.incident.application.port.in.ListRankedReportsUseCase;
 import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.domain.Alert;
@@ -75,7 +75,7 @@ class AlertControllerTest {
     private ProgressReportUseCase progressReportUseCase;
 
     @MockitoBean
-    private ListDistrictReportsUseCase listDistrictReportsUseCase;
+    private ListAssignedReportsUseCase listAssignedReportsUseCase;
 
     @MockitoBean
     private ListRankedReportsUseCase listRankedReportsUseCase;

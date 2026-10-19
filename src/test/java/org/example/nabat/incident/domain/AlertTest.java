@@ -23,7 +23,7 @@ class AlertTest {
                 1007,
                 Location.of(42.0, 23.0),
                 reportedBy,
-                null, "LOZENETS"
+                null, "LOZENETS", "LOZENETS"
         );
 
         assertNotNull(alert.id());
@@ -44,7 +44,7 @@ class AlertTest {
                 1007,
                 location,
                 reportedBy,
-                null, "LOZENETS"
+                null, "LOZENETS", "LOZENETS"
         );
 
         assertEquals("Pothole on Shipka", alert.title());
@@ -62,7 +62,7 @@ class AlertTest {
                 1001,
                 Location.of(42.0, 23.0),
                 UUID.randomUUID(),
-                null, "LOZENETS"
+                null, "LOZENETS", "LOZENETS"
         );
 
         assertEquals(0, alert.upvoteCount());
@@ -72,8 +72,8 @@ class AlertTest {
 
     @Test
     void shouldGenerateUniqueIds() {
-        Alert alert1 = Alert.create("A1", "D1", 1007, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS");
-        Alert alert2 = Alert.create("A2", "D2", 1001, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS");
+        Alert alert1 = Alert.create("A1", "D1", 1007, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS", "LOZENETS");
+        Alert alert2 = Alert.create("A2", "D2", 1001, Location.of(42.0, 23.0), UUID.randomUUID(), null, "LOZENETS", "LOZENETS");
 
         assertNotEquals(alert1.id(), alert2.id());
     }
@@ -83,7 +83,7 @@ class AlertTest {
 
         private final Alert submitted = Alert.create(
                 "T", "D", 1007,
-                Location.of(42.69, 23.32), UUID.randomUUID(), null, "LOZENETS");
+                Location.of(42.69, 23.32), UUID.randomUUID(), null, "LOZENETS", "LOZENETS");
 
         @Test
         void walksTheForwardPathOneStepAtATime() {
@@ -151,7 +151,7 @@ class AlertTest {
         void recordsWhoClosedItAndNothingBeforeThat() {
             assertNull(submitted.closedBy());
             assertNull(submitted.startWork().closedBy());
-            assertEquals(ClosedBy.DISTRICT, submitted.resolve(ClosedBy.DISTRICT).closedBy());
+            assertEquals(ClosedBy.AUTHORITY, submitted.resolve(ClosedBy.AUTHORITY).closedBy());
             assertEquals(ClosedBy.MODERATOR, submitted.reject(ClosedBy.MODERATOR).closedBy());
         }
 

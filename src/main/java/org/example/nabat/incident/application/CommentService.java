@@ -28,9 +28,9 @@ import java.util.UUID;
 /**
  * Who may write in a report's thread, and when.
  *
- * <p>Anyone signed in, while the report is open — the district that answers for it included,
- * since a thread where the district cannot reply is only a complaints box. Its comments are
- * marked as the district's, so they do not get lost among the rest.
+ * <p>Anyone signed in, while the report is open — the authority that answers for it included,
+ * since a thread where the authority cannot reply is only a complaints box. Its comments are
+ * marked as the authority's, so they do not get lost among the rest.
  *
  * <p>Closed with the report. Once it is resolved or rejected, both of which are final, the
  * thread is kept as it was: nothing added, and authors cannot take their words back either,
@@ -63,7 +63,7 @@ public class CommentService implements CommentOnReportUseCase {
         requireOpen(alertId);
 
         UUID authorId = author.id().value();
-        boolean byDistrict = author.actsForDistrict(alert.districtCode());
+        boolean byAuthority = author.actsFor(alert.authorityCode());
         // The reporter and everyone who has spoken here, but never the author: nobody needs
         // telling about what they just wrote.
         Set<UUID> recipients = new HashSet<>(store.authorsOn(alertId.value()));
@@ -71,7 +71,7 @@ public class CommentService implements CommentOnReportUseCase {
         recipients.remove(authorId);
 
         // Microseconds, as TIMESTAMPTZ keeps them, so the comment returned is the one stored.
-        Comment comment = new Comment(UUID.randomUUID(), alertId, authorId, author.displayName(), byDistrict,
+        Comment comment = new Comment(UUID.randomUUID(), alertId, authorId, author.displayName(), byAuthority,
             alert.reportedBy().equals(authorId), text, Instant.now().truncatedTo(ChronoUnit.MICROS), null, null);
         store.insert(comment);
 
@@ -79,7 +79,7 @@ public class CommentService implements CommentOnReportUseCase {
             // Through the Event Publication Registry: told after this commits, and again if
             // that fails, like the reporter's question when a report is resolved.
             events.publishEvent(new CommentAdded(alertId, alert.title(), authorId, author.displayName(),
-                byDistrict, Set.copyOf(recipients)));
+                byAuthority, Set.copyOf(recipients)));
         }
         return comment;
     }
@@ -108,7 +108,7 @@ public class CommentService implements CommentOnReportUseCase {
         Instant at = Instant.now().truncatedTo(ChronoUnit.MICROS);
         store.markRemoved(commentId, at, by);
         return new Comment(comment.id(), comment.alertId(), comment.authorId(), comment.authorName(),
-            comment.byDistrict(), comment.byReporter(), null, comment.createdAt(), at, by);
+            comment.byAuthority(), comment.byReporter(), null, comment.createdAt(), at, by);
     }
 
     @Override
