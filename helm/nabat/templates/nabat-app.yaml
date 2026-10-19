@@ -125,6 +125,9 @@ spec:
         # so without this it fills with files nothing will ever request.
         - name: NABAT_ORPHAN_SWEEP_ENABLED
           value: {{ .Values.nabatApp.orphanSweep.enabled | quote }}
+        # Remind authorities past the answer deadline, and escalate to the municipality.
+        - name: NABAT_DEADLINE_WATCH_ENABLED
+          value: {{ .Values.nabatApp.deadlineWatch.enabled | quote }}
         - name: NABAT_ORPHAN_GRACE
           value: {{ .Values.nabatApp.orphanSweep.grace | quote }}
         - name: NABAT_STORAGE_TYPE

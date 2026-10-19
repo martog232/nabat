@@ -142,6 +142,18 @@ class SmtpSignalMailerTest {
         assertThat(mailer.reportLink(mail())).isEqualTo(LINK);
     }
 
+    /** The subject says what the mail is, before anyone opens it. */
+    @Test
+    void theSubjectSaysWhetherItIsAReminderOrAnEscalation() {
+        SignalMail reminder = new SignalMail(
+            ALERT_ID, "lozenets@rayon.nabat.test", "Район Лозенец", "Район Лозенец", "Пътища и шахти — Улично платно",
+            "Дупка", "Дълбока", 42.671234, 23.318765, Instant.parse("2026-09-28T16:42:00Z"),
+            "Иван Петров", "ivan@example.com", "Напомняне: ...", null, SignalMail.Kind.REMINDER);
+
+        assertThat(SmtpSignalMailer.subject(reminder)).startsWith("Напомняне — сигнал без отговор: ");
+        assertThat(SmtpSignalMailer.body(reminder, LINK)).contains("Напомняне: ...");
+    }
+
     /** A title is not markup: unescaped, any citizen could put their own link in the mail. */
     @Test
     void escapesWhatTheReporterWrote() {

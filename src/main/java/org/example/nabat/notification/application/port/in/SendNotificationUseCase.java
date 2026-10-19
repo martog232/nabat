@@ -58,7 +58,7 @@ public interface SendNotificationUseCase {
     Notification sendProgressNotification(ProgressNotificationCommand command);
 
     /** The moves a reporter hears about through {@link #sendProgressNotification}. */
-    enum Progress { ACKNOWLEDGED, IN_PROGRESS, REJECTED, REJECTION_UPHELD, REOPENED }
+    enum Progress { ACKNOWLEDGED, IN_PROGRESS, REJECTED, REJECTION_UPHELD, REOPENED, OVERDUE_REMINDED, ESCALATED }
 
     /**
      * @param byModerator a rejection by a moderator rather than by the authority

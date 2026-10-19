@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * The official accounts against the real authorities and the real {@code users} table.
  *
- * <p>What a mocked repository cannot show: that all 27 rows — 24 districts and 3 institutions —
+ * <p>What a mocked repository cannot show: that all 28 rows — 24 districts and 4 institutions —
  * pass the V28 constraint pairing the role with an authority, and that an account can actually
  * sign in with its mailbox.
  */
@@ -48,7 +48,7 @@ class OfficialProvisioningIntegrationTest extends PostgresTestSupport {
 
     @Test
     void everyAuthorityGetsOneOfficialWhoCanSignInWithItsMailbox() throws Exception {
-        assertEquals(new Result(27, 0, List.of()), provisioning.provision(PASSWORD));
+        assertEquals(new Result(28, 0, List.of()), provisioning.provision(PASSWORD));
 
         mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -68,7 +68,7 @@ class OfficialProvisioningIntegrationTest extends PostgresTestSupport {
     void aSecondRunCreatesNothing() {
         provisioning.provision(PASSWORD);
 
-        assertEquals(new Result(0, 27, List.of()), provisioning.provision("Another2026pass"));
-        assertEquals(27, userJpaRepository.count());
+        assertEquals(new Result(0, 28, List.of()), provisioning.provision("Another2026pass"));
+        assertEquals(28, userJpaRepository.count());
     }
 }

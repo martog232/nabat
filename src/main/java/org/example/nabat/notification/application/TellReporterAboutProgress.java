@@ -2,6 +2,7 @@ package org.example.nabat.notification.application;
 
 import org.example.nabat.identity.domain.UserId;
 import org.example.nabat.incident.domain.Alert;
+import org.example.nabat.incident.domain.AnswerOverdue;
 import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.incident.domain.RejectionDecided;
 import org.example.nabat.incident.domain.ReportProgressed;
@@ -51,6 +52,24 @@ public class TellReporterAboutProgress {
             event.authorityName(),
             alert.closedBy() == ClosedBy.MODERATOR,
             event.reason()));
+    }
+
+    /**
+     * The authority let the deadline pass: the reporter hears that it was reminded, and later,
+     * if that did nothing, that the municipality was told. Silence is the one thing a reporter
+     * could otherwise not tell from patience.
+     */
+    @ApplicationModuleListener
+    public void on(AnswerOverdue event) {
+        Alert alert = event.alert();
+        notifications.sendProgressNotification(new ProgressNotificationCommand(
+            UserId.of(alert.reportedBy()),
+            alert.id(),
+            alert.title(),
+            event.stage() == AnswerOverdue.Stage.REMINDER ? Progress.OVERDUE_REMINDED : Progress.ESCALATED,
+            event.authorityName(),
+            false,
+            null));
     }
 
     /** The answer to the reporter's dispute of a rejection: it stands, or the report is open again. */

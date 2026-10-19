@@ -145,6 +145,8 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - `Alert.isOverdue(now)`; `AlertResponse.answerDueAt`; `GET /api/v1/alerts/ranked?overdue=true` lists only reports past it (`answer_due_at < now()`), partial index `idx_alerts_answer_due`.
 - V32 gave reports already waiting their period from their latest dispatch, so the long-overdue show as such at once.
 - **Answered is not fixed.** This deadline is for the first word; a deadline for the fix is not modelled.
+- **Past the deadline, the authority is chased** (`DeadlineWatch` → `WatchDeadlinesUseCase`, hourly, `NABAT_DEADLINE_WATCH_ENABLED`, on in compose and Helm). First a reminder to the authority itself; if the report is still waiting on the same deadline `nabat.reports.escalate-after` (P14D) after that, a mail to the municipality (`nabat.reports.escalate-to`, `STOLICHNA_OBSHTINA`, an institution since V34 — and a forward target, since a boulevard is its, not the district's). Each is `AnswerOverdue` through the registry: `jurisdiction`'s `OverdueMailer` mails (subject „Напомняне — …“ / „Ескалиран …“, with a sign-in key), `notification` tells the reporter (`OVERDUE_REMINDED`, `ESCALATED`).
+- **Once per step and deadline.** `report_deadline_steps` (V33) is keyed by report, deadline and stage; the watch inserts the row `ON CONFLICT DO NOTHING` and publishes only if it went in, so two replicas running at once act once. A new deadline — forwarded, reopened — is chased in its own right. Each report is its own transaction, re-read inside it, so one answered meanwhile is skipped; `OverdueMailer` re-reads it again before mailing.
 
 ### Rejections (`incident` + `notification`)
 - **Why it is guarded.** A rejection is final and locks the thread, so it was the easiest way for an authority to be rid of a report — easier than forwarding, which needs a reason. And a resolved report could be contested ("is it really fixed?") while a rejected one could not.
@@ -332,6 +334,8 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V30 | `report_forwards` — every forward of a report, with why; `signal_dispatches` keyed by `(alert_id, sequence)` |
 | V31 | `report_rejections` — every rejection with its reason, the reporter's dispute and a moderator's decision |
 | V32 | `alerts.answer_due_at` — when a report's authority has to have answered by; backfilled for reports already waiting |
+| V33 | `report_deadline_steps` — reminders and escalations taken, once per report, deadline and stage |
+| V34 | Столична община (`STOLICHNA_OBSHTINA`) as an institution: escalation target and forward target |
 
 ---
 

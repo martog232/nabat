@@ -90,7 +90,7 @@ class ForwardIntegrationTest extends PostgresTestSupport {
         verify(signalMailer, timeout(10_000).times(2)).send(mail.capture());
         SignalMail second = mail.getAllValues().get(1);
         assertThat(second.to()).isEqualTo("cgm@institution.nabat.test");
-        assertThat(second.forwardNote()).isEqualTo("Препратен към вас от Район Студентски: Знакът е на ЦГМ");
+        assertThat(second.note()).isEqualTo("Препратен към вас от Район Студентски: Знакът е на ЦГМ");
         awaitStatus("SENT");
         assertThat(jdbc.queryForObject(
             "SELECT authority_code FROM signal_dispatches WHERE alert_id = ? AND sequence = 1", String.class, report))

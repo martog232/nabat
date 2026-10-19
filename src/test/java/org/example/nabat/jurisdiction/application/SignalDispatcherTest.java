@@ -189,7 +189,7 @@ class SignalDispatcherTest {
         ArgumentCaptor<SignalMail> mail = ArgumentCaptor.forClass(SignalMail.class);
         verify(mailer).send(mail.capture());
         assertEquals("cgm@institution.nabat.test", mail.getValue().to());
-        assertEquals("Препратен към вас от Район Лозенец: Спирката е на градския транспорт", mail.getValue().forwardNote());
+        assertEquals("Препратен към вас от Район Лозенец: Спирката е на градския транспорт", mail.getValue().note());
         ArgumentCaptor<SignalDispatch> dispatch = ArgumentCaptor.forClass(SignalDispatch.class);
         verify(dispatches).save(dispatch.capture());
         assertEquals(1, dispatch.getValue().sequence());

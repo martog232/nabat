@@ -106,9 +106,9 @@ public class SignalDispatcher {
 
     /**
      * @param sequence    which delivery this is: 0 for the creation mail, n for the n-th forward
-     * @param forwardNote said at the top of a forwarded report's mail; null otherwise
+     * @param note        said at the top of a forwarded report's mail; null for a new one
      */
-    private void deliver(Alert alert, int sequence, String forwardNote) {
+    private void deliver(Alert alert, int sequence, String note) {
         UUID id = alert.id().value();
 
         if (dispatches.exists(id, sequence)) {
@@ -160,7 +160,7 @@ public class SignalDispatcher {
             alert.createdAt(),
             reporter.displayName(),
             reporter.email(),
-            forwardNote,
+            note,
             // A fresh link with every mail, so it is good for as long as the report is new.
             signInLinks.issueFor(authority.code()).orElse(null)
         ));

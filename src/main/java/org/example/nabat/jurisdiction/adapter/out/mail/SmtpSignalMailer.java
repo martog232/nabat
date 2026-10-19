@@ -75,18 +75,23 @@ public class SmtpSignalMailer implements SignalMailer {
     }
 
     static String subject(SignalMail mail) {
-        String kind = mail.forwardNote() == null ? "Сигнал: " : "Препратен сигнал: ";
+        String kind = switch (mail.kind()) {
+            case NEW -> "Сигнал: ";
+            case FORWARDED -> "Препратен сигнал: ";
+            case REMINDER -> "Напомняне — сигнал без отговор: ";
+            case ESCALATION -> "Ескалиран сигнал без отговор: ";
+        };
         return kind + mail.categoryLabel() + " — " + mail.title();
     }
 
     /**
-     * What the mail is: a new report, or one forwarded by another authority — then who and why
-     * come first, because they are what the recipient has to judge.
+     * What the mail is: a new report — or, said first because it is what the recipient has to
+     * judge, who forwarded it and why, or how long it has waited for an answer.
      */
     private static String intro(SignalMail mail) {
-        return mail.forwardNote() == null
+        return mail.note() == null
             ? "Чрез nabat е подаден сигнал за проблем, за който отговаряте."
-            : mail.forwardNote();
+            : mail.note();
     }
 
     /**

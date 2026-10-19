@@ -178,6 +178,9 @@ nabatApp:
     accessKey: nabat
     # No committed default, same reasoning as postgres.password: pass it at install time.
     secretKey: ""
+  # Reminds authorities past the answer deadline and escalates to the municipality.
+  deadlineWatch:
+    enabled: true
   orphanSweep:
     enabled: true
     # ISO-8601. How long a photo may sit unreferenced before it is reclaimed. Long on

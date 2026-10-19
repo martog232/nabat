@@ -4,6 +4,7 @@ import org.example.nabat.identity.domain.UserId;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
+import org.example.nabat.incident.domain.AnswerOverdue;
 import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.incident.domain.RejectionDecided;
 import org.example.nabat.incident.domain.ReportProgressed;
@@ -67,6 +68,19 @@ class TellReporterAboutProgressTest {
             UserId.of(reporterId), alertId, "Дупка", Progress.REOPENED, "Район Лозенец", false, null));
         verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
             UserId.of(reporterId), alertId, "Дупка", Progress.REJECTION_UPHELD, "Район Лозенец", false, null));
+    }
+
+    /** Silence is news too: the reminder, and later the escalation. */
+    @Test
+    void tellsTheReporterTheAuthorityWasChased() {
+        Alert waiting = report(AlertStatus.SENT, null);
+        listener.on(new AnswerOverdue(waiting, AnswerOverdue.Stage.REMINDER, Instant.now(), "Район Лозенец"));
+        listener.on(new AnswerOverdue(waiting, AnswerOverdue.Stage.ESCALATION, Instant.now(), "Район Лозенец"));
+
+        verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
+            UserId.of(reporterId), alertId, "Дупка", Progress.OVERDUE_REMINDED, "Район Лозенец", false, null));
+        verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
+            UserId.of(reporterId), alertId, "Дупка", Progress.ESCALATED, "Район Лозенец", false, null));
     }
 
     /** Resolving has its own notification, which also asks whether it is really fixed. */

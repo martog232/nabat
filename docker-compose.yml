@@ -126,6 +126,8 @@ services:
       # Reclaim photos whose alert was never submitted. Off by default in the application;
       # switched on here because this stack owns a volume that would otherwise only grow.
       NABAT_ORPHAN_SWEEP_ENABLED: "true"
+      # Remind authorities past the answer deadline, and escalate to the municipality.
+      NABAT_DEADLINE_WATCH_ENABLED: "true"
       # One account per district, signing in with its mailbox. Set in .env; unset creates none.
       NABAT_OFFICIAL_ACCOUNTS_PASSWORD: ${NABAT_OFFICIAL_ACCOUNTS_PASSWORD:-}
       # Object storage rather than the container's own disk, so compose runs the same

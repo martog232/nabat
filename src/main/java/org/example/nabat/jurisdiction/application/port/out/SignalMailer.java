@@ -31,10 +31,11 @@ public interface SignalMailer {
      *                      following the report can see the answer
      * @param categoryLabel the category in words, group and subcategory:
      *                      „Пътища и шахти — Улично платно“
-     * @param forwardNote   for a forwarded report, who sent it on and why, said first; null for
-     *                      a report mailed when it was made
+     * @param note          said first, for any mail but a new report's: who forwarded it and why,
+     *                      or how long it has been waiting; null for a new report
      * @param signInKey     the secret of a link that signs the authority's official in, behind
      *                      the button; null when the authority has no account to sign in to
+     * @param kind          what the mail is, which its subject says
      */
     record SignalMail(
         UUID alertId,
@@ -49,8 +50,30 @@ public interface SignalMailer {
         Instant reportedAt,
         String reporterName,
         String reporterEmail,
-        String forwardNote,
-        String signInKey
+        String note,
+        String signInKey,
+        Kind kind
     ) {
+
+        public enum Kind {
+            /** The report, as it was made. */
+            NEW,
+            /** Sent on by another authority. */
+            FORWARDED,
+            /** Its deadline passed with no answer: the authority is reminded. */
+            REMINDER,
+            /** Still no answer after the reminder: the municipality is told. */
+            ESCALATION
+        }
+
+        /** A new report, or a forwarded one when there is a note — the two the dispatch sends. */
+        public SignalMail(
+            UUID alertId, String to, String recipientName, String districtName, String categoryLabel,
+            String title, String description, double latitude, double longitude, Instant reportedAt,
+            String reporterName, String reporterEmail, String note, String signInKey
+        ) {
+            this(alertId, to, recipientName, districtName, categoryLabel, title, description, latitude, longitude,
+                reportedAt, reporterName, reporterEmail, note, signInKey, note == null ? Kind.NEW : Kind.FORWARDED);
+        }
     }
 }

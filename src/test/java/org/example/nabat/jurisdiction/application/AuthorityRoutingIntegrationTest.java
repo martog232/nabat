@@ -65,9 +65,9 @@ class AuthorityRoutingIntegrationTest extends PostgresTestSupport {
     void listsTheDistrictsThenTheInstitutions() {
         List<Authority> all = authorities.listAuthorities();
 
-        assertThat(all).hasSize(27);
+        assertThat(all).hasSize(28);
         assertThat(all.subList(0, 24)).allMatch(a -> a.kind() == Authority.Kind.DISTRICT);
-        assertThat(all.subList(24, 27)).allMatch(a -> a.kind() == Authority.Kind.INSTITUTION);
+        assertThat(all.subList(24, 28)).allMatch(a -> a.kind() == Authority.Kind.INSTITUTION);
         assertThat(authorities.findAuthority("CGM")).map(Authority::mailbox)
             .contains("cgm@institution.nabat.test");
     }
