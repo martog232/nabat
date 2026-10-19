@@ -90,7 +90,9 @@ class SignalDispatchIntegrationTest extends PostgresTestSupport {
 
         await(() -> status(created.id().value()) == AlertStatus.SENT);
         assertThat(dispatchesFor(created.id().value())).isEqualTo(1);
-        assertThat(outstandingDispatches()).isZero();
+        // Awaited, not asserted: the registry completes the publication after the listener's
+        // transaction commits, so SENT can be visible a moment before that.
+        await(() -> outstandingDispatches() == 0);
     }
 
     /**
