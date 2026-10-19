@@ -149,6 +149,9 @@ nabatApp:
   # that. It used to be hardcoded http://localhost:8080 even in-cluster, which made every
   # emailed link wrong and bypassed the gateway.
   baseUrl: ""
+  # Where nabat-fe is served, for the "Отговори" button in report mails. The chart does not
+  # deploy the frontend; this is its default local address.
+  frontendUrl: http://localhost:5173
   votingServiceUrl: http://nabat-voting-app:8081
   mailHost: mailhog
   mailPort: 1025

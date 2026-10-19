@@ -117,7 +117,7 @@ public class AlertLifecycleService
         Alert alert = alertRepository.findById(id)
                 .orElseThrow(() -> new AlertNotFoundException(id));
 
-        if (alert.status() != AlertStatus.SUBMITTED || !alert.authorityCode().equals(authorityCode)) {
+        if (alert.status() != AlertStatus.SUBMITTED || !java.util.Objects.equals(alert.authorityCode(), authorityCode)) {
             return;
         }
 

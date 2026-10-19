@@ -90,6 +90,10 @@ spec:
           # Derived from the ingress host unless explicitly overridden, so the links in
           # verification emails point at the address a browser can actually reach.
           value: {{ .Values.nabatApp.baseUrl | default (printf "http://%s" .Values.ingress.host) | quote }}
+        # Where nabat-fe is served: the "Отговори" button in a report mail opens the report
+        # there. The chart does not deploy the frontend, so this is wherever it is run.
+        - name: NABAT_FRONTEND_BASE_URL
+          value: {{ .Values.nabatApp.frontendUrl | quote }}
         - name: NABAT_VOTING_SERVICE_BASE_URL
           value: {{ .Values.nabatApp.votingServiceUrl }}
         # The denormalised vote counts on `alerts` are written by consuming nabat-voting's
