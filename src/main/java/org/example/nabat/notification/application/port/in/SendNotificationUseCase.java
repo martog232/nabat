@@ -51,6 +51,26 @@ public interface SendNotificationUseCase {
     ) {
     }
 
+    /**
+     * Tells a reporter what the authority did with their report: took it, started on it, or
+     * turned it down. Resolving and forwarding have their own.
+     */
+    Notification sendProgressNotification(ProgressNotificationCommand command);
+
+    /** The moves a reporter hears about through {@link #sendProgressNotification}. */
+    enum Progress { ACKNOWLEDGED, IN_PROGRESS, REJECTED }
+
+    /** @param byModerator a rejection by a moderator rather than by the authority */
+    record ProgressNotificationCommand(
+            UserId reporterId,
+            AlertId alertId,
+            String alertTitle,
+            Progress progress,
+            String authorityName,
+            boolean byModerator
+    ) {
+    }
+
     /** Tells a reporter their report went to another authority, and why. */
     Notification sendForwardedNotification(ForwardedNotificationCommand command);
 

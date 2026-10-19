@@ -10,8 +10,10 @@ import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
+import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
 import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.AlertResolved;
+import org.example.nabat.incident.domain.ReportProgressed;
 import org.example.nabat.shared.domain.NotAuthorizedException;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
@@ -35,6 +37,7 @@ public class AlertLifecycleService
     private final AlertRepository alertRepository;
     private final AlertNotificationPort alertNotificationPort;
     private final ApplicationEventPublisher events;
+    private final ResponsibleAuthorityPort authorities;
 
     @Override
     @Transactional(readOnly = true)
@@ -70,21 +73,31 @@ public class AlertLifecycleService
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert acknowledge(AlertId id, User actor) {
-        return transition(id, alert -> requireAuthority(alert, actor).acknowledge());
+        return announced(transition(id, alert -> requireAuthority(alert, actor).acknowledge()));
     }
 
     @Override
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert startWork(AlertId id, User actor) {
-        return transition(id, alert -> requireAuthority(alert, actor).startWork());
+        return announced(transition(id, alert -> requireAuthority(alert, actor).startWork()));
     }
 
     @Override
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert reject(AlertId id, User actor) {
-        return transition(id, alert -> alert.reject(closerOf(alert, actor, false)));
+        return announced(transition(id, alert -> alert.reject(closerOf(alert, actor, false))));
+    }
+
+    /**
+     * Tells the reporter, after commit and through the registry like the other report events.
+     * The authority goes by name: "Район Лозенец прие сигнала" says more than "it was accepted".
+     */
+    private Alert announced(Alert moved) {
+        String name = authorities.nameOf(moved.authorityCode()).orElse(moved.authorityCode());
+        events.publishEvent(new ReportProgressed(moved, name));
+        return moved;
     }
 
     @Override

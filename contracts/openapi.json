@@ -1502,7 +1502,7 @@
           "type" : {
             "type" : "string",
             "description" : "What triggered the notification",
-            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED", "COMMENT_ADDED", "REPORT_FORWARDED" ],
+            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED", "COMMENT_ADDED", "REPORT_FORWARDED", "REPORT_PROGRESSED" ],
             "example" : "VOTE"
           },
           "title" : {

@@ -149,6 +149,32 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
 
     @Override
     @Transactional
+    public Notification sendProgressNotification(ProgressNotificationCommand command) {
+        String key = command.progress().name().toLowerCase(java.util.Locale.ROOT);
+        String title = messageSource.getMessage(
+                "notification.progress.title." + key,
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                "notification.progress.message." + key + (command.byModerator() ? ".moderator" : ""),
+                new Object[]{command.alertTitle(), command.authorityName()},
+                LocaleContextHolder.getLocale()
+        );
+
+        Notification n = Notification.createProgressNotification(
+                command.reporterId(),
+                command.alertId(),
+                title,
+                message
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.reporterId(), saved);
+        return saved;
+    }
+
+    @Override
+    @Transactional
     public Notification sendForwardedNotification(ForwardedNotificationCommand command) {
         String title = messageSource.getMessage(
                 "notification.forwarded.title",

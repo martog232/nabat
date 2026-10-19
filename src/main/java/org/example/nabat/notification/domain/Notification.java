@@ -95,6 +95,25 @@ public record Notification(
         );
     }
 
+    public static Notification createProgressNotification(
+            UserId reporterId,
+            AlertId alertId,
+            String title,
+            String message
+    ) {
+        return new Notification(
+                NotificationId.generate(),
+                reporterId,
+                NotificationType.REPORT_PROGRESSED,
+                title,
+                message,
+                alertId,
+                null,
+                false,
+                Instant.now()
+        );
+    }
+
     public static Notification createForwardedNotification(
             UserId reporterId,
             AlertId alertId,

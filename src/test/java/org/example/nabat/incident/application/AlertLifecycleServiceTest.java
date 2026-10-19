@@ -2,11 +2,13 @@ package org.example.nabat.incident.application;
 
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
+import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
 import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertResolved;
 import org.example.nabat.incident.domain.AlertStatus;
+import org.example.nabat.incident.domain.ReportProgressed;
 import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.shared.domain.Location;
 import org.example.nabat.identity.domain.Role;
@@ -15,6 +17,7 @@ import org.example.nabat.identity.domain.UserId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,6 +42,8 @@ class AlertLifecycleServiceTest {
     private AlertNotificationPort alertNotificationPort;
     @Mock
     private ApplicationEventPublisher events;
+    @Mock
+    private ResponsibleAuthorityPort authorities;
 
     private AlertLifecycleService service;
 
@@ -47,7 +52,8 @@ class AlertLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AlertLifecycleService(alertRepository, alertNotificationPort, events);
+        service = new AlertLifecycleService(alertRepository, alertNotificationPort, events, authorities);
+        lenient().when(authorities.nameOf("LOZENETS")).thenReturn(Optional.of("Район Лозенец"));
     }
 
     private Alert active() {
@@ -189,6 +195,33 @@ class AlertLifecycleServiceTest {
             assertThrows(NotAuthorizedException.class, () -> service.startWork(alertId, actor));
         }
         verify(alertRepository, never()).save(any());
+    }
+
+    /** The reporter hears each move, with the authority by name. */
+    @Test
+    void tellsTheReporterWhatTheAuthorityDid() {
+        saves();
+        User lozenets = official("LOZENETS");
+
+        service.acknowledge(alertId, lozenets);
+        service.startWork(alertId, lozenets);
+        service.reject(alertId, user(UUID.randomUUID(), Role.MODERATOR));
+
+        ArgumentCaptor<ReportProgressed> event = ArgumentCaptor.forClass(ReportProgressed.class);
+        verify(events, times(3)).publishEvent(event.capture());
+        assertEquals(List.of(AlertStatus.ACKNOWLEDGED, AlertStatus.IN_PROGRESS, AlertStatus.REJECTED),
+            event.getAllValues().stream().map(e -> e.alert().status()).toList());
+        assertEquals("Район Лозенец", event.getAllValues().getFirst().authorityName());
+        assertEquals(ClosedBy.MODERATOR, event.getAllValues().get(2).alert().closedBy());
+    }
+
+    /** A refused move is not news. */
+    @Test
+    void aRefusedMoveTellsNobody() {
+        when(alertRepository.findById(alertId)).thenReturn(Optional.of(active()));
+
+        assertThrows(NotAuthorizedException.class, () -> service.acknowledge(alertId, official("TRIADITSA")));
+        verifyNoInteractions(events);
     }
 
     @Test
