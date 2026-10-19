@@ -21,7 +21,9 @@ public interface SignalMailer {
      *
      * @param reporterName  the citizen's display name. A report to an administration is
      *                      considered only when its author is identifiable, so it is sent
-     * @param reporterEmail used as Reply-To, so an answer reaches the citizen directly
+     * @param reporterEmail shown with the name, for the same reason. Not the Reply-To: the
+     *                      district answers in nabat, where the reporter and everyone else
+     *                      following the report can see the answer
      * @param categoryLabel the category in words, group and subcategory:
      *                      „Пътища и шахти — Улично платно“
      */

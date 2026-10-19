@@ -51,14 +51,21 @@ class SmtpSignalMailerTest {
         return captor.getValue();
     }
 
+    /**
+     * No Reply-To. An answer by mail would reach the reporter alone and leave the report at
+     * SENT; the district answers in nabat, through the button.
+     */
     @Test
-    void addressesTheDistrictAndLetsItAnswerTheCitizen() throws Exception {
+    void addressesTheDistrictAndDoesNotRouteAnswersToTheReporter() throws Exception {
         MimeMessage message = sent();
 
         assertThat(message.getRecipients(Message.RecipientType.TO))
             .extracting(Address::toString)
             .containsExactly("lozenets@rayon.nabat.test");
-        assertThat(((InternetAddress) message.getReplyTo()[0]).getAddress()).isEqualTo("ivan@example.com");
+        assertThat(message.getHeader("Reply-To")).isNull();
+        assertThat(message.getReplyTo())
+            .extracting(a -> ((InternetAddress) a).getAddress())
+            .doesNotContain("ivan@example.com");
         assertThat(message.getHeader("X-Nabat-Signal-Id")).containsExactly(ALERT_ID.toString());
     }
 

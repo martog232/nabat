@@ -59,14 +59,15 @@ public class SmtpSignalMailer implements SignalMailer {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(from);
             helper.setTo(mail.to());
-            // An answer from the district goes to the citizen who reported, not to nabat.
-            helper.setReplyTo(mail.reporterEmail(), mail.reporterName());
+            // No Reply-To. An answer by mail would reach one person and leave nabat at SENT;
+            // the button takes the district to the report, where the answer is public and
+            // moves the status. A reply goes to the From address, which nobody reads.
             helper.setSubject(subject(mail));
             String link = reportLink(mail);
             helper.setText(body(mail, link), html(mail, link));
             // Stable across retries, so a receiving system can recognise a second copy.
             message.setHeader("X-Nabat-Signal-Id", mail.alertId().toString());
-        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+        } catch (MessagingException e) {
             throw new MailSendException("Could not build the report email for " + mail.alertId(), e);
         }
         mailSender.send(message);
@@ -110,10 +111,11 @@ public class SmtpSignalMailer implements SignalMailer {
             Подаден:   %s
 
             Подател:   %s <%s>
-            Отговорът на този имейл отива директно при подателя.
 
             Отговорете и сменете статуса в nabat:
             %s
+
+            Моля, не отговаряйте на този имейл: отговорът няма да бъде прочетен.
 
             Номер на сигнала: %s
             """.formatted(
@@ -157,7 +159,7 @@ public class SmtpSignalMailer implements SignalMailer {
             <a href="%s" style="display:inline-block;padding:12px 28px;color:#ffffff;text-decoration:none;font-weight:bold">Отговори</a>
             </td></tr>
             </table>
-            <p style="color:#64748b;font-size:12px">Бутонът отваря сигнала в nabat, където районът отговаря и сменя статуса му. Отговорът на този имейл отива директно при подателя.<br>Номер на сигнала: %s</p>
+            <p style="color:#64748b;font-size:12px">Бутонът отваря сигнала в nabat, където районът отговаря и сменя статуса му. Моля, не отговаряйте на този имейл: отговорът няма да бъде прочетен.<br>Номер на сигнала: %s</p>
             </div>
             """.formatted(
                 esc(mail.districtName()),
