@@ -39,7 +39,7 @@ class SmtpSignalMailerTest {
             "Дупка на Черни връх", "Дълбока дупка в дясното платно",
             42.671234, 23.318765,
             Instant.parse("2026-09-28T16:42:00Z"),
-            "Иван Петров", "ivan@example.com", null
+            "Иван Петров", "ivan@example.com", null, null
         );
     }
 
@@ -118,7 +118,7 @@ class SmtpSignalMailerTest {
             ALERT_ID, "cgm@institution.nabat.test", "Център за градска мобилност", "Район Лозенец",
             "Градски транспорт — Спирки", "Счупен заслон", "Спирка пред номер 5",
             42.671234, 23.318765, Instant.parse("2026-09-28T16:42:00Z"),
-            "Иван Петров", "ivan@example.com", null
+            "Иван Петров", "ivan@example.com", null, null
         );
 
         assertThat(SmtpSignalMailer.body(busStop, LINK))
@@ -129,6 +129,19 @@ class SmtpSignalMailerTest {
             .contains("<td>Район Лозенец</td>");
     }
 
+    /** With a key, the button signs the official in on its way to the report: no password to type. */
+    @Test
+    void theButtonSignsTheOfficialInWhenThereIsAKey() {
+        SignalMail withKey = new SignalMail(
+            ALERT_ID, "lozenets@rayon.nabat.test", "Район Лозенец", "Район Лозенец", "Пътища и шахти — Улично платно",
+            "Дупка", "Дълбока", 42.671234, 23.318765, Instant.parse("2026-09-28T16:42:00Z"),
+            "Иван Петров", "ivan@example.com", null, "s3cr3t-Key_x");
+
+        assertThat(mailer.reportLink(withKey))
+            .isEqualTo("http://localhost:5173/link?key=s3cr3t-Key_x&alert=" + ALERT_ID);
+        assertThat(mailer.reportLink(mail())).isEqualTo(LINK);
+    }
+
     /** A title is not markup: unescaped, any citizen could put their own link in the mail. */
     @Test
     void escapesWhatTheReporterWrote() {
@@ -136,7 +149,7 @@ class SmtpSignalMailerTest {
             ALERT_ID, "lozenets@rayon.nabat.test", "Район Лозенец", "Район Лозенец", "Пътища и шахти — Улично платно",
             "<a href=\"https://evil.example\">Натиснете</a>", "<script>x</script> & още",
             42.671234, 23.318765, Instant.parse("2026-09-28T16:42:00Z"),
-            "Иван Петров", "ivan@example.com", null
+            "Иван Петров", "ivan@example.com", null, null
         );
 
         assertThat(SmtpSignalMailer.html(hostile, LINK))

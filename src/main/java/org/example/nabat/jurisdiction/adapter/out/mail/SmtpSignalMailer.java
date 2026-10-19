@@ -92,10 +92,17 @@ public class SmtpSignalMailer implements SignalMailer {
     /**
      * The report on nabat's map. The authority answers there, signed in with the account that
      * acts for it: acknowledge, start work, resolve or reject, and a comment marked as the
-     * authority's. A session is needed, and the login page brings the official back here.
+     * authority's.
+     *
+     * <p>With a sign-in key, the link goes through nabat-fe's {@code /link}, which trades the key
+     * for a session and opens the report: the official has no password to type, and should not
+     * need one. Without one — an authority with no account — it opens the report, and the login
+     * page brings whoever signs in back to it. The key is base64url, safe in a URL as it is.
      */
     String reportLink(SignalMail mail) {
-        return frontendBaseUrl + "/map?alert=" + mail.alertId();
+        return mail.signInKey() == null
+            ? frontendBaseUrl + "/map?alert=" + mail.alertId()
+            : frontendBaseUrl + "/link?key=" + mail.signInKey() + "&alert=" + mail.alertId();
     }
 
     private static String coordinates(SignalMail mail) {

@@ -1,5 +1,6 @@
 package org.example.nabat.jurisdiction.application;
 
+import org.example.nabat.identity.application.port.in.SignInLinkUseCase;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
@@ -56,6 +57,7 @@ class SignalDispatcherTest {
     @Mock private RecordDeliveryUseCase recordDelivery;
     @Mock private ListReportCategoriesUseCase categories;
     @Mock private GetAlertByIdUseCase reports;
+    @Mock private SignInLinkUseCase signInLinks;
 
     private SignalDispatcher dispatcher;
     private User reporter;
@@ -63,7 +65,7 @@ class SignalDispatcherTest {
 
     @BeforeEach
     void setUp() {
-        dispatcher = new SignalDispatcher(districts, authorities, dispatches, mailer, users, recordDelivery, categories, reports);
+        dispatcher = new SignalDispatcher(districts, authorities, dispatches, mailer, users, recordDelivery, categories, reports, signInLinks);
         reporter = User.create("ivan@example.com", "hash", "Иван Петров");
         alert = Alert.create("Дупка", "Пред номер 12", 1007,
             Location.of(42.6750, 23.3200), reporter.id().value(), null, "LOZENETS", "LOZENETS");
@@ -79,6 +81,7 @@ class SignalDispatcherTest {
     @Test
     void sendsTheReportToItsDistrictInTheReportersName() {
         knownDistrictAndReporter();
+        when(signInLinks.issueFor("LOZENETS")).thenReturn(Optional.of("link-secret"));
 
         dispatcher.on(new AlertCreated(alert));
 
@@ -88,6 +91,7 @@ class SignalDispatcherTest {
         assertEquals("Район Лозенец", mail.getValue().recipientName());
         assertEquals("Район Лозенец", mail.getValue().districtName());
         assertEquals("Иван Петров", mail.getValue().reporterName());
+        assertEquals("link-secret", mail.getValue().signInKey());
         assertEquals("ivan@example.com", mail.getValue().reporterEmail());
         assertEquals(alert.id().value(), mail.getValue().alertId());
     }

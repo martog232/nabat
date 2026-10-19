@@ -8,6 +8,7 @@ import org.example.nabat.identity.application.port.in.LoginUserUseCase;
 import org.example.nabat.identity.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.identity.application.port.in.RegisterUserUseCase;
 import org.example.nabat.identity.application.port.in.ResetPasswordUseCase;
+import org.example.nabat.identity.application.port.in.SignInLinkUseCase;
 import org.example.nabat.identity.application.port.in.VerifyEmailUseCase;
 import org.example.nabat.shared.config.AllowedOrigins;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,8 @@ class AuthEndpointSecurityTest {
     private ForgotPasswordUseCase forgotPasswordUseCase;
     @MockitoBean
     private ResetPasswordUseCase resetPasswordUseCase;
+    @MockitoBean
+    private SignInLinkUseCase signInLinkUseCase;
 
     @Test
     void meRequiresAuthentication() throws Exception {

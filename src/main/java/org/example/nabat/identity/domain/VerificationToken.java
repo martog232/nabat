@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 
 /**
- * A single-use email verification or password-reset token.
+ * An email verification or password-reset token — both single-use — or a sign-in link.
  *
  * <h2>Only the hash is stored</h2>
  * {@link #id()} is the SHA-256 of the secret, not the secret itself. The raw value
@@ -33,6 +33,8 @@ public record VerificationToken(
 ) {
     private static final int EMAIL_VERIFICATION_EXPIRY_HOURS = 24;
     private static final int PASSWORD_RESET_EXPIRY_HOURS = 1;
+    /** As long as an authority may reasonably take to open a report it was sent. */
+    private static final int SIGN_IN_LINK_EXPIRY_HOURS = 30 * 24;
 
     /** 256 bits of entropy, matching the digest width. */
     private static final int TOKEN_BYTES = 32;
@@ -55,6 +57,18 @@ public record VerificationToken(
     /** Factory: create a password-reset token (valid 1 h). */
     public static Issued createPasswordReset(UserId userId) {
         return create(userId, VerificationTokenType.PASSWORD_RESET, PASSWORD_RESET_EXPIRY_HOURS);
+    }
+
+    /**
+     * Factory: a sign-in link for an official, put behind the button in a report mail (valid
+     * 30 days, and not spent on use).
+     *
+     * <p>It adds no power the mailbox did not have: the official account signs in with that
+     * mailbox, so whoever reads it could already reset the password from it. It only spares
+     * them doing so to answer a report.
+     */
+    public static Issued createSignInLink(UserId userId) {
+        return create(userId, VerificationTokenType.SIGN_IN_LINK, SIGN_IN_LINK_EXPIRY_HOURS);
     }
 
     private static Issued create(UserId userId, VerificationTokenType type, int expiryHours) {

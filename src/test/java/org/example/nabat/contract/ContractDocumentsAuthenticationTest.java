@@ -48,6 +48,7 @@ class ContractDocumentsAuthenticationTest {
         "POST /api/v1/auth/reset-password",
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/refresh",
+        "POST /api/v1/auth/link",
         // The public list of reports, and the district, authority and category names it is shown with.
         "GET /api/v1/alerts/ranked",
         "GET /api/v1/districts",

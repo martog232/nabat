@@ -339,6 +339,35 @@
         "security" : [ ]
       }
     },
+    "/api/v1/auth/link" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "signInWithLink",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SignInLinkRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
     "/api/v1/auth/forgot-password" : {
       "post" : {
         "tags" : [ "auth-controller" ],
@@ -1831,6 +1860,16 @@
           }
         },
         "required" : [ "email", "password" ]
+      },
+      "SignInLinkRequest" : {
+        "type" : "object",
+        "properties" : {
+          "token" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "token" ]
       },
       "ForgotPasswordRequest" : {
         "type" : "object",

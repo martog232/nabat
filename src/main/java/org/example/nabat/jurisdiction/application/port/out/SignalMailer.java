@@ -33,6 +33,8 @@ public interface SignalMailer {
      *                      „Пътища и шахти — Улично платно“
      * @param forwardNote   for a forwarded report, who sent it on and why, said first; null for
      *                      a report mailed when it was made
+     * @param signInKey     the secret of a link that signs the authority's official in, behind
+     *                      the button; null when the authority has no account to sign in to
      */
     record SignalMail(
         UUID alertId,
@@ -47,7 +49,8 @@ public interface SignalMailer {
         Instant reportedAt,
         String reporterName,
         String reporterEmail,
-        String forwardNote
+        String forwardNote,
+        String signInKey
     ) {
     }
 }

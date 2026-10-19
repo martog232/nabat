@@ -59,7 +59,8 @@ public class SecurityConfig {
                     "/api/v1/auth/forgot-password",
                     "/api/v1/auth/reset-password",
                     "/api/v1/auth/login",
-                    "/api/v1/auth/refresh").permitAll()
+                    "/api/v1/auth/refresh",
+                    "/api/v1/auth/link").permitAll()
                 // The public list of reports, and the district, authority and category names it is shown
                 // with. Read-only, and nothing in any of them is more than the map shows a
                 // signed-in user. Kong's rate limits apply to them like everything else.

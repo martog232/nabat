@@ -1,5 +1,6 @@
 package org.example.nabat.jurisdiction.application;
 
+import org.example.nabat.identity.application.port.in.SignInLinkUseCase;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.identity.domain.UserId;
@@ -60,6 +61,7 @@ public class SignalDispatcher {
     private final RecordDeliveryUseCase recordDelivery;
     private final ListReportCategoriesUseCase categories;
     private final GetAlertByIdUseCase reports;
+    private final SignInLinkUseCase signInLinks;
 
     public SignalDispatcher(
         DistrictRepository districts,
@@ -69,7 +71,8 @@ public class SignalDispatcher {
         UserRepository users,
         RecordDeliveryUseCase recordDelivery,
         ListReportCategoriesUseCase categories,
-        GetAlertByIdUseCase reports
+        GetAlertByIdUseCase reports,
+        SignInLinkUseCase signInLinks
     ) {
         this.districts = districts;
         this.authorities = authorities;
@@ -79,6 +82,7 @@ public class SignalDispatcher {
         this.recordDelivery = recordDelivery;
         this.categories = categories;
         this.reports = reports;
+        this.signInLinks = signInLinks;
     }
 
     @ApplicationModuleListener
@@ -156,7 +160,9 @@ public class SignalDispatcher {
             alert.createdAt(),
             reporter.displayName(),
             reporter.email(),
-            forwardNote
+            forwardNote,
+            // A fresh link with every mail, so it is good for as long as the report is new.
+            signInLinks.issueFor(authority.code()).orElse(null)
         ));
 
         dispatches.save(new SignalDispatch(

@@ -8,6 +8,7 @@ import org.example.nabat.identity.application.port.in.LoginUserUseCase;
 import org.example.nabat.identity.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.identity.application.port.in.RegisterUserUseCase;
 import org.example.nabat.identity.application.port.in.ResetPasswordUseCase;
+import org.example.nabat.identity.application.port.in.SignInLinkUseCase;
 import org.example.nabat.identity.application.port.in.VerifyEmailUseCase;
 import org.example.nabat.identity.domain.User;
 import org.slf4j.Logger;
@@ -34,6 +35,7 @@ public class AuthController {
     private final VerifyEmailUseCase verifyEmailUseCase;
     private final ForgotPasswordUseCase forgotPasswordUseCase;
     private final ResetPasswordUseCase resetPasswordUseCase;
+    private final SignInLinkUseCase signInLinkUseCase;
 
     public AuthController(
         RegisterUserUseCase registerUserUseCase,
@@ -41,7 +43,8 @@ public class AuthController {
         RefreshTokenUseCase refreshTokenUseCase,
         VerifyEmailUseCase verifyEmailUseCase,
         ForgotPasswordUseCase forgotPasswordUseCase,
-        ResetPasswordUseCase resetPasswordUseCase
+        ResetPasswordUseCase resetPasswordUseCase,
+        SignInLinkUseCase signInLinkUseCase
     ) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUserUseCase = loginUserUseCase;
@@ -49,6 +52,7 @@ public class AuthController {
         this.verifyEmailUseCase = verifyEmailUseCase;
         this.forgotPasswordUseCase = forgotPasswordUseCase;
         this.resetPasswordUseCase = resetPasswordUseCase;
+        this.signInLinkUseCase = signInLinkUseCase;
     }
 
     @SecurityRequirements
@@ -107,6 +111,16 @@ public class AuthController {
         return ResponseEntity.ok(AuthResponse.from(result));
     }
 
+    /**
+     * Signs an official in from the link behind the "Отговори" button in a report mail. 401 for
+     * an unknown or expired link, with the same message whatever the reason.
+     */
+    @SecurityRequirements
+    @PostMapping("/link")
+    public ResponseEntity<AuthResponse> signInWithLink(@Valid @RequestBody SignInLinkRequest request) {
+        return ResponseEntity.ok(AuthResponse.from(signInLinkUseCase.signIn(request.token())));
+    }
+
     @SecurityRequirements
     @PostMapping("/refresh")
     public ResponseEntity<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
@@ -130,6 +144,10 @@ public class AuthController {
     public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(UserResponse.from(user));
     }
+
+    public record SignInLinkRequest(
+        @NotBlank(message = "token is required") String token
+    ) {}
 
     public record RefreshTokenRequest(
         @NotBlank(message = "refreshToken is required") String refreshToken
