@@ -27,8 +27,11 @@ class SmtpSignalMailerTest {
 
     private static final UUID ALERT_ID = UUID.fromString("0b7f5a4e-2f3c-4c6e-9d1a-2a3b4c5d6e7f");
 
+    private static final String LINK = "http://localhost:5173/map?alert=" + ALERT_ID;
+
     private final JavaMailSender sender = mock(JavaMailSender.class);
-    private final SmtpSignalMailer mailer = new SmtpSignalMailer(sender, "noreply@nabat.local");
+    // With a trailing slash on purpose: the link must not come out as //map.
+    private final SmtpSignalMailer mailer = new SmtpSignalMailer(sender, "noreply@nabat.local", "http://localhost:5173/");
 
     private static SignalMail mail() {
         return new SignalMail(
@@ -65,7 +68,7 @@ class SmtpSignalMailerTest {
         MimeMessage message = sent();
 
         assertThat(message.getSubject()).isEqualTo("Сигнал: Пътища и шахти — Улично платно — Дупка на Черни връх");
-        assertThat((String) message.getContent())
+        assertThat(SmtpSignalMailer.body(mail(), LINK))
             .contains("Уважаеми служители на Район Лозенец")
             .contains("Дълбока дупка в дясното платно")
             .contains("Подател:   Иван Петров <ivan@example.com>")
@@ -75,15 +78,46 @@ class SmtpSignalMailerTest {
     /** Sofia time, not UTC: 16:42Z is 19:42 in late September. */
     @Test
     void givesTheTimeInSofia() {
-        assertThat(SmtpSignalMailer.body(mail())).contains("Подаден:   28.09.2026 19:42");
+        assertThat(SmtpSignalMailer.body(mail(), LINK)).contains("Подаден:   28.09.2026 19:42");
     }
 
     /** Dot decimals whatever the JVM locale — a comma would break the map link. */
     @Test
     void linksToThePlaceOnAMap() {
-        assertThat(SmtpSignalMailer.body(mail()))
+        assertThat(SmtpSignalMailer.body(mail(), LINK))
             .contains("Място:     42.671234, 23.318765")
             .contains("https://www.openstreetmap.org/?mlat=42.671234&mlon=23.318765#map=19/42.671234/23.318765");
+    }
+
+    /** The button: the district answers in nabat, on the report itself. */
+    @Test
+    void sendsAnHtmlPartWithAnAnswerButtonOnTheReport() throws Exception {
+        MimeMessage message = sent();
+        message.saveChanges();
+
+        assertThat(message.getContentType()).startsWith("multipart/");
+        assertThat(mailer.reportLink(mail())).isEqualTo(LINK);
+        assertThat(SmtpSignalMailer.html(mail(), LINK))
+            .contains("<a href=\"" + LINK + "\"")
+            .contains(">Отговори</a>");
+        // And for a client that shows no HTML.
+        assertThat(SmtpSignalMailer.body(mail(), LINK)).contains(LINK);
+    }
+
+    /** A title is not markup: unescaped, any citizen could put their own link in the mail. */
+    @Test
+    void escapesWhatTheReporterWrote() {
+        SignalMail hostile = new SignalMail(
+            ALERT_ID, "lozenets@rayon.nabat.test", "Район Лозенец", "Пътища и шахти — Улично платно",
+            "<a href=\"https://evil.example\">Натиснете</a>", "<script>x</script> & още",
+            42.671234, 23.318765, Instant.parse("2026-09-28T16:42:00Z"),
+            "Иван Петров", "ivan@example.com"
+        );
+
+        assertThat(SmtpSignalMailer.html(hostile, LINK))
+            .doesNotContain("evil.example\">")
+            .doesNotContain("<script>")
+            .contains("&lt;script&gt;x&lt;/script&gt; &amp; още");
     }
 
 
