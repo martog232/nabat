@@ -118,6 +118,22 @@ class RankedReportsQueryIntegrationTest extends PostgresTestSupport {
         assertThat(alerts.countRanked(secondPage)).isEqualTo(3);
     }
 
+    /** Past its deadline and still waiting: only those, and the count agrees. */
+    @Test
+    void filtersToReportsPastTheirAnswerDeadline() {
+        Alert late = save("late", "LOZENETS", 40, 0, AlertStatus.SUBMITTED);
+        alerts.save(late.markSent(Instant.now().minus(Duration.ofDays(10))));
+        Alert inTime = save("in time", "LOZENETS", 2, 0, AlertStatus.SUBMITTED);
+        alerts.save(inTime.markSent(Instant.now().plus(Duration.ofDays(28))));
+        // Answered: no deadline running, however old.
+        save("answered", "LOZENETS", 60, 0, AlertStatus.ACKNOWLEDGED);
+
+        RankedSearch overdue = new RankedSearch(null, OPEN, ReportRanking.LONGEST_WAITING, 0, 50, true);
+        assertThat(alerts.findRanked(overdue)).extracting(Alert::title).containsExactly("late");
+        assertThat(alerts.countRanked(overdue)).isEqualTo(1);
+        assertThat(titles(ReportRanking.LONGEST_WAITING, null, OPEN)).hasSize(3);
+    }
+
     private java.util.List<String> titles(ReportRanking ranking, String district, Set<AlertStatus> statuses) {
         return alerts.findRanked(new RankedSearch(district, statuses, ranking, 0, 50)).stream()
             .map(Alert::title)

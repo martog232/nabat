@@ -22,8 +22,11 @@ public interface ListRankedReportsUseCase {
      * @param districtCode null for the whole city
      * @param statuses     empty means the open ones — what the page is mostly for
      * @param page         zero-based
+     * @param overdue      only reports past the deadline for their authority's answer (V32)
      */
-    record RankedQuery(String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int page, int size) {
+    record RankedQuery(
+        String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int page, int size, boolean overdue
+    ) {
 
         public static final int MAX_SIZE = 100;
 
@@ -39,6 +42,11 @@ public interface ListRankedReportsUseCase {
             }
             statuses = statuses == null || statuses.isEmpty() ? OPEN : Set.copyOf(statuses);
             ranking = ranking == null ? ReportRanking.HOT : ranking;
+        }
+
+        /** Every report, late or not. */
+        public RankedQuery(String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int page, int size) {
+            this(districtCode, statuses, ranking, page, size, false);
         }
     }
 

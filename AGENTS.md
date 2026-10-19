@@ -140,6 +140,12 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - **One code space.** `AuthorityService` looks a code up as a district, then as an institution; `AuthorityRoutingIntegrationTest` holds that no institution shares a code with a district, and that every routed code is a real subcategory (`category_authorities` names another module's table, so there is no foreign key).
 - `GET /api/v1/authorities` is public, like `/districts`: code, name and kind (`DISTRICT` or `INSTITUTION`), districts first. No mailboxes.
 
+### Answer deadline (`incident`)
+- **Every report waiting on an authority has a deadline** (`alerts.answer_due_at`, V32): set as it reaches the authority — `markSent` when the mail is recorded, again after a forward, and `reopen` after a disputed rejection — to now plus `nabat.reports.answer-within` (`NABAT_ANSWER_WITHIN`, default `P30D`, as Call Sofia gives), and cleared by the authority's first answer: acknowledge, start work, resolve, reject, forward — or by anyone closing it. **Non-null exactly while the report is `SENT`.** Stored as the instant, so a report keeps the deadline it was given if the period changes.
+- `Alert.isOverdue(now)`; `AlertResponse.answerDueAt`; `GET /api/v1/alerts/ranked?overdue=true` lists only reports past it (`answer_due_at < now()`), partial index `idx_alerts_answer_due`.
+- V32 gave reports already waiting their period from their latest dispatch, so the long-overdue show as such at once.
+- **Answered is not fixed.** This deadline is for the first word; a deadline for the fix is not modelled.
+
 ### Rejections (`incident` + `notification`)
 - **Why it is guarded.** A rejection is final and locks the thread, so it was the easiest way for an authority to be rid of a report — easier than forwarding, which needs a reason. And a resolved report could be contested ("is it really fixed?") while a rejected one could not.
 - **`PATCH /api/v1/alerts/{id}/reject` `{reason}`** — the report's authority or a moderator; 1–1000 characters, 400 without. A `report_rejections` row (V31), „Отхвърлен: причина“ in the thread (written to the store directly: the thread is closed by the rejection), and `ReportProgressed` with the reason, so the reporter reads why and that they may dispute it.
@@ -325,6 +331,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V29 | `institutions` and `category_authorities` — city-wide bodies some categories go to instead of the district (placeholders on `.test`); `signal_dispatches.authority_code` |
 | V30 | `report_forwards` — every forward of a report, with why; `signal_dispatches` keyed by `(alert_id, sequence)` |
 | V31 | `report_rejections` — every rejection with its reason, the reporter's dispute and a moderator's decision |
+| V32 | `alerts.answer_due_at` — when a report's authority has to have answered by; backfilled for reports already waiting |
 
 ---
 

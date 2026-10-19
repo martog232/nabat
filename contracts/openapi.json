@@ -1352,6 +1352,15 @@
             "maximum" : 100,
             "minimum" : 1
           }
+        }, {
+          "name" : "overdue",
+          "in" : "query",
+          "description" : "Only reports past the deadline for their authority's answer",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
         } ],
         "responses" : {
           "200" : {
@@ -2028,6 +2037,11 @@
             "type" : "string",
             "description" : "Who answers for the report: its district, or the city-wide institution its category belongs to. See GET /api/v1/authorities for names",
             "example" : "LOZENETS"
+          },
+          "answerDueAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "When its authority has to have answered by; null when nothing is waiting on it. Past this, the report is overdue"
           }
         }
       },

@@ -52,7 +52,8 @@ class AlertLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AlertLifecycleService(alertRepository, alertNotificationPort, events, authorities);
+        service = new AlertLifecycleService(alertRepository, alertNotificationPort, events, authorities,
+            new AnswerDeadline(java.time.Duration.ofDays(30)));
         lenient().when(authorities.nameOf("LOZENETS")).thenReturn(Optional.of("Район Лозенец"));
     }
 

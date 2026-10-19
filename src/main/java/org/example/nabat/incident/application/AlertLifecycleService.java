@@ -38,6 +38,7 @@ public class AlertLifecycleService
     private final AlertNotificationPort alertNotificationPort;
     private final ApplicationEventPublisher events;
     private final ResponsibleAuthorityPort authorities;
+    private final AnswerDeadline deadline;
 
     @Override
     @Transactional(readOnly = true)
@@ -114,7 +115,7 @@ public class AlertLifecycleService
             return;
         }
 
-        Alert sent = alertRepository.save(alert.markSent());
+        Alert sent = alertRepository.save(alert.markSent(deadline.fromNow()));
         alertNotificationPort.broadcastAlertUpdate(sent);
     }
 

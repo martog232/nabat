@@ -46,6 +46,7 @@ public class RejectionService implements RejectReportUseCase {
     private final ResponsibleAuthorityPort authorities;
     private final AlertNotificationPort broadcast;
     private final ApplicationEventPublisher events;
+    private final AnswerDeadline deadline;
 
     public RejectionService(
         AlertRepository alerts,
@@ -53,8 +54,10 @@ public class RejectionService implements RejectReportUseCase {
         CommentStore comments,
         ResponsibleAuthorityPort authorities,
         AlertNotificationPort broadcast,
-        ApplicationEventPublisher events
+        ApplicationEventPublisher events,
+        AnswerDeadline deadline
     ) {
+        this.deadline = deadline;
         this.alerts = alerts;
         this.rejections = rejections;
         this.comments = comments;
@@ -135,7 +138,7 @@ public class RejectionService implements RejectReportUseCase {
 
         Alert after = alert;
         if (decision == Decision.REOPENED) {
-            after = alerts.save(alert.reopen());
+            after = alerts.save(alert.reopen(deadline.fromNow()));
             broadcast.broadcastAlertUpdate(after);
         }
         comments.insert(new Comment(UUID.randomUUID(), id, moderatorId, moderator.displayName(), false,

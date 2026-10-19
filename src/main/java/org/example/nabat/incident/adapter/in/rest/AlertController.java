@@ -185,9 +185,11 @@ public class AlertController {
             @RequestParam(required = false) Set<AlertStatus> status,
             @RequestParam(defaultValue = "HOT") ReportRanking ranking,
             @RequestParam(defaultValue = "0") @Min(0) Integer page,
-            @RequestParam(defaultValue = "50") @Min(1) @Max(ListRankedReportsUseCase.RankedQuery.MAX_SIZE) Integer size
+            @RequestParam(defaultValue = "50") @Min(1) @Max(ListRankedReportsUseCase.RankedQuery.MAX_SIZE) Integer size,
+            @Parameter(description = "Only reports past the deadline for their authority's answer")
+            @RequestParam(defaultValue = "false") boolean overdue
     ) {
-        var query = new ListRankedReportsUseCase.RankedQuery(district, status, ranking, page, size);
+        var query = new ListRankedReportsUseCase.RankedQuery(district, status, ranking, page, size, overdue);
         var result = listRankedReportsUseCase.listRanked(query);
         return ResponseEntity.ok(new RankedReportsResponse(
             result.alerts().stream().map(AlertResponse::from).toList(),

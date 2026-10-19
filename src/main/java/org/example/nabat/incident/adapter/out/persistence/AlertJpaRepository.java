@@ -34,6 +34,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT * FROM alerts a
         WHERE a.status IN (:statuses)
         AND (CAST(:district AS text) IS NULL OR a.district_code = CAST(:district AS text))
+        AND (NOT :overdue OR a.answer_due_at < now())
         ORDER BY
           CASE WHEN :ranking = 'HOT' THEN
             (GREATEST(a.confirmation_count + a.upvote_count - a.downvote_count, 0) + 1)
@@ -47,6 +48,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     List<AlertJpaEntity> findRanked(
         @Param("statuses") Collection<String> statuses,
         @Param("district") String districtCode,
+        @Param("overdue") boolean overdue,
         @Param("ranking") String ranking,
         @Param("offset") int offset,
         @Param("limit") int limit
@@ -56,8 +58,12 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         SELECT count(*) FROM alerts a
         WHERE a.status IN (:statuses)
         AND (CAST(:district AS text) IS NULL OR a.district_code = CAST(:district AS text))
+        AND (NOT :overdue OR a.answer_due_at < now())
         """, nativeQuery = true)
-    long countRanked(@Param("statuses") Collection<String> statuses, @Param("district") String districtCode);
+    long countRanked(
+        @Param("statuses") Collection<String> statuses,
+        @Param("district") String districtCode,
+        @Param("overdue") boolean overdue);
 
     List<AlertJpaEntity> findByAuthorityCodeAndStatusInOrderByCreatedAtDesc(
         String authorityCode, Collection<AlertStatus> statuses, Limit limit);

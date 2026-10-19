@@ -120,13 +120,13 @@ public class AlertRepositoryAdapter implements AlertRepository {
     @Override
     public List<Alert> findRanked(RankedSearch search) {
         return toDomain(jpaRepository.findRanked(
-            search.statusNames(), search.districtCode(), search.ranking().name(),
+            search.statusNames(), search.districtCode(), search.overdue(), search.ranking().name(),
             search.offset(), search.limit()));
     }
 
     @Override
     public long countRanked(RankedSearch search) {
-        return jpaRepository.countRanked(search.statusNames(), search.districtCode());
+        return jpaRepository.countRanked(search.statusNames(), search.districtCode(), search.overdue());
     }
 
     private static List<Alert> toDomain(List<AlertJpaEntity> entities) {

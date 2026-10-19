@@ -57,7 +57,8 @@ class RejectionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RejectionService(alerts, rejections, comments, authorities, broadcast, events);
+        service = new RejectionService(alerts, rejections, comments, authorities, broadcast, events,
+            new AnswerDeadline(java.time.Duration.ofDays(30)));
         lenient().when(authorities.nameOf("LOZENETS")).thenReturn(Optional.of("Район Лозенец"));
         lenient().when(alerts.save(any(Alert.class))).thenAnswer(i -> i.getArgument(0));
     }
@@ -152,6 +153,8 @@ class RejectionServiceTest {
         assertThat(reopened.status()).isEqualTo(AlertStatus.SENT);
         assertThat(reopened.authorityCode()).isEqualTo("LOZENETS");
         assertThat(reopened.closedBy()).isNull();
+        // Back with a full deadline, as if just delivered.
+        assertThat(reopened.answerDueAt()).isAfter(Instant.now().plus(java.time.Duration.ofDays(29)));
         ArgumentCaptor<RejectionDecided> event = ArgumentCaptor.forClass(RejectionDecided.class);
         verify(events).publishEvent(event.capture());
         assertThat(event.getValue().decision()).isEqualTo(Decision.REOPENED);

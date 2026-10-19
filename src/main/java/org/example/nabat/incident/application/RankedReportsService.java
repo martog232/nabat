@@ -24,7 +24,7 @@ public class RankedReportsService implements ListRankedReportsUseCase {
     public RankedPage listRanked(RankedQuery query) {
         RankedSearch search = new RankedSearch(
             query.districtCode(), query.statuses(), query.ranking(),
-            query.page() * query.size(), query.size());
+            query.page() * query.size(), query.size(), query.overdue());
         return new RankedPage(alertRepository.findRanked(search), alertRepository.countRanked(search));
     }
 }

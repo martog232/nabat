@@ -13,6 +13,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AlertTest {
 
+    /** A deadline for tests where its value does not matter, only that there is one. */
+    private static final Instant DUE = Instant.parse("2026-11-19T10:00:00Z");
+
     @Test
     void shouldCreateAlertWithCorrectDefaultValues() {
         UUID reportedBy = UUID.randomUUID();
@@ -87,7 +90,7 @@ class AlertTest {
 
         @Test
         void walksTheForwardPathOneStepAtATime() {
-            Alert alert = submitted.markSent();
+            Alert alert = submitted.markSent(DUE);
             assertEquals(AlertStatus.SENT, alert.status());
 
             alert = alert.acknowledge();
@@ -112,7 +115,7 @@ class AlertTest {
             Alert inProgress = submitted.startWork();
 
             assertThrows(IllegalStateException.class, inProgress::acknowledge);
-            assertThrows(IllegalStateException.class, inProgress::markSent);
+            assertThrows(IllegalStateException.class, () -> inProgress.markSent(DUE));
         }
 
         /**
@@ -121,7 +124,7 @@ class AlertTest {
          */
         @Test
         void aForwardGoesBackToSubmittedWithTheNewAuthority() {
-            Alert forwarded = submitted.markSent().startWork().forwardTo("CGM");
+            Alert forwarded = submitted.markSent(DUE).startWork().forwardTo("CGM");
 
             assertEquals(AlertStatus.SUBMITTED, forwarded.status());
             assertEquals("CGM", forwarded.authorityCode());
@@ -131,13 +134,13 @@ class AlertTest {
         /** Back to the authority that rejected it, which has it already: SENT, not SUBMITTED. */
         @Test
         void aReopenedRejectionGoesBackToSentWithItsAuthority() {
-            Alert reopened = submitted.markSent().reject(ClosedBy.AUTHORITY).reopen();
+            Alert reopened = submitted.markSent(DUE).reject(ClosedBy.AUTHORITY).reopen(DUE);
 
             assertEquals(AlertStatus.SENT, reopened.status());
             assertEquals("LOZENETS", reopened.authorityCode());
             assertNull(reopened.closedBy());
-            assertThrows(IllegalStateException.class, submitted::reopen);
-            assertThrows(IllegalStateException.class, () -> submitted.resolve(ClosedBy.REPORTER).reopen());
+            assertThrows(IllegalStateException.class, () -> submitted.reopen(DUE));
+            assertThrows(IllegalStateException.class, () -> submitted.resolve(ClosedBy.REPORTER).reopen(DUE));
         }
 
         @Test
@@ -147,9 +150,40 @@ class AlertTest {
             assertThrows(IllegalArgumentException.class, () -> submitted.forwardTo(" "));
         }
 
+        /** The clock runs from delivery to the authority's first word, and no longer. */
+        @Test
+        void theDeadlineRunsWhileTheReportWaitsOnItsAuthority() {
+            Alert sent = submitted.markSent(DUE);
+            assertEquals(DUE, sent.answerDueAt());
+            assertNull(submitted.answerDueAt());
+
+            assertNull(sent.acknowledge().answerDueAt());
+            assertNull(sent.startWork().answerDueAt());
+            assertNull(sent.resolve(ClosedBy.REPORTER).answerDueAt());
+            assertNull(sent.reject(ClosedBy.AUTHORITY).answerDueAt());
+            // A forward stops the old authority's clock; the new one's starts on delivery.
+            assertNull(sent.forwardTo("CGM").answerDueAt());
+        }
+
+        @Test
+        void isOverdueOnlyPastTheDeadline() {
+            Alert sent = submitted.markSent(DUE);
+
+            assertFalse(sent.isOverdue(DUE.minusSeconds(1)));
+            assertTrue(sent.isOverdue(DUE.plusSeconds(1)));
+            assertFalse(sent.acknowledge().isOverdue(DUE.plusSeconds(1)));
+        }
+
+        /** Reopened after a disputed rejection: a full deadline again. */
+        @Test
+        void aReopenedReportGetsANewDeadline() {
+            Instant later = DUE.plusSeconds(86_400);
+            assertEquals(later, submitted.markSent(DUE).reject(ClosedBy.AUTHORITY).reopen(later).answerDueAt());
+        }
+
         @Test
         void doesNotRepeatAStep() {
-            assertThrows(IllegalStateException.class, submitted.markSent()::markSent);
+            assertThrows(IllegalStateException.class, () -> submitted.markSent(DUE).markSent(DUE));
         }
 
         /** A fix that happens before the institution answers must still be recordable. */
@@ -196,7 +230,7 @@ class AlertTest {
         private Alert inStatus(AlertStatus status) {
             return switch (status) {
                 case SUBMITTED -> submitted;
-                case SENT -> submitted.markSent();
+                case SENT -> submitted.markSent(DUE);
                 case ACKNOWLEDGED -> submitted.acknowledge();
                 case IN_PROGRESS -> submitted.startWork();
                 case RESOLVED -> submitted.resolve(ClosedBy.REPORTER);

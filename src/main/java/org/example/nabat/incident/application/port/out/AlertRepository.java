@@ -68,8 +68,15 @@ public interface AlertRepository {
      * points the dependency backwards.
      *
      * @param districtCode null for the whole city
+     * @param overdue      only reports past their answer deadline
      */
-    record RankedSearch(String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int offset, int limit) {
+    record RankedSearch(
+        String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int offset, int limit, boolean overdue
+    ) {
+
+        public RankedSearch(String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int offset, int limit) {
+            this(districtCode, statuses, ranking, offset, limit, false);
+        }
 
         /** The status names the native query compares against. */
         public List<String> statusNames() {

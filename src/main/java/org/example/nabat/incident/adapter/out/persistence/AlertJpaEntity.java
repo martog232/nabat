@@ -88,6 +88,10 @@ public class AlertJpaEntity {
     @Column(name = "authority_code", length = 32)
     private String authorityCode;
 
+    /** When the authority has to have answered by (V32); null when nothing is waiting on it. */
+    @Column(name = "answer_due_at")
+    private Instant answerDueAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "closed_by", length = 20)
     private ClosedBy closedBy;
@@ -156,6 +160,7 @@ public class AlertJpaEntity {
         this.photoUrl = alert.photoUrl();
         this.districtCode = alert.districtCode();
         this.authorityCode = alert.authorityCode();
+        this.answerDueAt = alert.answerDueAt();
         this.closedBy = alert.closedBy();
     }
 
@@ -178,7 +183,8 @@ public class AlertJpaEntity {
                 districtCode,
                 closedBy,
                 new FixCheckTally(fixFixedCount, fixPartlyCount, fixNotFixedCount, reporterFixVerdict),
-                authorityCode
+                authorityCode,
+                answerDueAt
         );
     }
 }

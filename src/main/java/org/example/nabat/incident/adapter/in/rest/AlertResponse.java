@@ -31,7 +31,8 @@ public record AlertResponse(
     @Schema(description = "Code of the Sofia district the report is in; null only on reports older than districts", example = "LOZENETS") String districtCode,
     @Schema(description = "Who closed the report — the authority that answers for it, the reporter, or a moderator. Null while open, and on reports closed before this was recorded", example = "AUTHORITY") ClosedBy closedBy,
     @Schema(description = "Whether people say a resolved report is really fixed. All zero and UNCHECKED on reports nobody has checked") FixCheckSummary fixCheck,
-    @Schema(description = "Who answers for the report: its district, or the city-wide institution its category belongs to. See GET /api/v1/authorities for names", example = "LOZENETS") String authorityCode
+    @Schema(description = "Who answers for the report: its district, or the city-wide institution its category belongs to. See GET /api/v1/authorities for names", example = "LOZENETS") String authorityCode,
+    @Schema(description = "When its authority has to have answered by; null when nothing is waiting on it. Past this, the report is overdue") Instant answerDueAt
 ) {
     public static AlertResponse from(Alert alert) {
         return new AlertResponse(
@@ -53,7 +54,8 @@ public record AlertResponse(
             alert.districtCode(),
             alert.closedBy(),
             FixCheckSummary.from(alert.fixCheck()),
-            alert.authorityCode()
+            alert.authorityCode(),
+            alert.answerDueAt()
         );
     }
 }
