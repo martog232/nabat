@@ -15,6 +15,12 @@ package org.example.nabat.incident.domain;
  *                      for a rejection {@link Alert#closedBy()} says by whom
  * @param authorityName the report's authority by name, carried so the notification needs no
  *                      way to look authorities up
+ * @param reason        why, for a rejection (V31); null otherwise, and on events stored before
  */
-public record ReportProgressed(Alert alert, String authorityName) {
+public record ReportProgressed(Alert alert, String authorityName, String reason) {
+
+    /** Acknowledged or started: nothing to explain. */
+    public ReportProgressed(Alert alert, String authorityName) {
+        this(alert, authorityName, null);
+    }
 }

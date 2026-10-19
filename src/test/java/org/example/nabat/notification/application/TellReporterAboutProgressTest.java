@@ -5,7 +5,9 @@ import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.ClosedBy;
+import org.example.nabat.incident.domain.RejectionDecided;
 import org.example.nabat.incident.domain.ReportProgressed;
+import org.example.nabat.incident.domain.ReportRejection;
 import org.example.nabat.notification.application.port.in.SendNotificationUseCase;
 import org.example.nabat.notification.application.port.in.SendNotificationUseCase.Progress;
 import org.example.nabat.notification.application.port.in.SendNotificationUseCase.ProgressNotificationCommand;
@@ -32,7 +34,7 @@ class TellReporterAboutProgressTest {
         listener.on(new ReportProgressed(report(AlertStatus.ACKNOWLEDGED, null), "Район Лозенец"));
 
         verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
-            UserId.of(reporterId), alertId, "Дупка", Progress.ACKNOWLEDGED, "Район Лозенец", false));
+            UserId.of(reporterId), alertId, "Дупка", Progress.ACKNOWLEDGED, "Район Лозенец", false, null));
     }
 
     @Test
@@ -40,19 +42,31 @@ class TellReporterAboutProgressTest {
         listener.on(new ReportProgressed(report(AlertStatus.IN_PROGRESS, null), "Район Лозенец"));
 
         verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
-            UserId.of(reporterId), alertId, "Дупка", Progress.IN_PROGRESS, "Район Лозенец", false));
+            UserId.of(reporterId), alertId, "Дупка", Progress.IN_PROGRESS, "Район Лозенец", false, null));
     }
 
-    /** A moderator's rejection is not the authority's word, and the message says whose it was. */
+    /** A moderator's rejection is not the authority's word: the message says whose it was, and why. */
     @Test
-    void saysWhoRejectedIt() {
-        listener.on(new ReportProgressed(report(AlertStatus.REJECTED, ClosedBy.AUTHORITY), "Район Лозенец"));
-        listener.on(new ReportProgressed(report(AlertStatus.REJECTED, ClosedBy.MODERATOR), "Район Лозенец"));
+    void saysWhoRejectedItAndWhy() {
+        listener.on(new ReportProgressed(report(AlertStatus.REJECTED, ClosedBy.AUTHORITY), "Район Лозенец", "Дублира"));
+        listener.on(new ReportProgressed(report(AlertStatus.REJECTED, ClosedBy.MODERATOR), "Район Лозенец", "Дублира"));
 
         verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
-            UserId.of(reporterId), alertId, "Дупка", Progress.REJECTED, "Район Лозенец", false));
+            UserId.of(reporterId), alertId, "Дупка", Progress.REJECTED, "Район Лозенец", false, "Дублира"));
         verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
-            UserId.of(reporterId), alertId, "Дупка", Progress.REJECTED, "Район Лозенец", true));
+            UserId.of(reporterId), alertId, "Дупка", Progress.REJECTED, "Район Лозенец", true, "Дублира"));
+    }
+
+    /** The answer to their dispute: the report is open again with its authority, or the rejection stands. */
+    @Test
+    void tellsTheReporterWhatCameOfTheirDispute() {
+        listener.on(new RejectionDecided(report(AlertStatus.SENT, null), ReportRejection.Decision.REOPENED, "Район Лозенец"));
+        listener.on(new RejectionDecided(report(AlertStatus.REJECTED, ClosedBy.AUTHORITY), ReportRejection.Decision.UPHELD, "Район Лозенец"));
+
+        verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
+            UserId.of(reporterId), alertId, "Дупка", Progress.REOPENED, "Район Лозенец", false, null));
+        verify(notifications).sendProgressNotification(new ProgressNotificationCommand(
+            UserId.of(reporterId), alertId, "Дупка", Progress.REJECTION_UPHELD, "Район Лозенец", false, null));
     }
 
     /** Resolving has its own notification, which also asks whether it is really fixed. */

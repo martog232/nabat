@@ -62,7 +62,7 @@ public class AlertLifecycleService
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert resolve(AlertId id, User actor) {
-        Alert resolved = transition(id, alert -> alert.resolve(closerOf(alert, actor, true)));
+        Alert resolved = transition(id, alert -> alert.resolve(closerOf(alert, actor)));
         // Through the Event Publication Registry, like AlertCreated: the reporter is asked
         // whether it is really fixed after this commits, and asked again if that fails.
         events.publishEvent(new AlertResolved(resolved));
@@ -81,13 +81,6 @@ public class AlertLifecycleService
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert startWork(AlertId id, User actor) {
         return announced(transition(id, alert -> requireAuthority(alert, actor).startWork()));
-    }
-
-    @Override
-    @Transactional
-    @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
-    public Alert reject(AlertId id, User actor) {
-        return announced(transition(id, alert -> alert.reject(closerOf(alert, actor, false))));
     }
 
     /**
@@ -139,22 +132,20 @@ public class AlertLifecycleService
      * Security's {@code AccessDeniedException} — AGENTS.md keeps framework exceptions out of
      * this layer, and the handler maps it to the same 403.
      *
-     * @param reporterMay whether the reporter may make this closing: they may resolve their
-     *                    own report, but not reject it as not a real problem
+     * <p>Resolving only. Rejecting is {@code RejectionService}'s, which also wants a reason,
+     * and is not the reporter's to do.
      */
-    private static ClosedBy closerOf(Alert alert, User actor, boolean reporterMay) {
+    private static ClosedBy closerOf(Alert alert, User actor) {
         if (actor.actsFor(alert.authorityCode())) {
             return ClosedBy.AUTHORITY;
         }
-        if (reporterMay && alert.reportedBy().equals(actor.id().value())) {
+        if (alert.reportedBy().equals(actor.id().value())) {
             return ClosedBy.REPORTER;
         }
         if (actor.role().canModerateContent()) {
             return ClosedBy.MODERATOR;
         }
-        throw new NotAuthorizedException(reporterMay
-            ? "Only the reporter, the report's authority or a moderator can close this report"
-            : "Only the report's authority or a moderator can reject this report");
+        throw new NotAuthorizedException("Only the reporter, the report's authority or a moderator can close this report");
     }
 
     /** Only an official of the report's authority may speak for the authority about it. */

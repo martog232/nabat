@@ -58,16 +58,20 @@ public interface SendNotificationUseCase {
     Notification sendProgressNotification(ProgressNotificationCommand command);
 
     /** The moves a reporter hears about through {@link #sendProgressNotification}. */
-    enum Progress { ACKNOWLEDGED, IN_PROGRESS, REJECTED }
+    enum Progress { ACKNOWLEDGED, IN_PROGRESS, REJECTED, REJECTION_UPHELD, REOPENED }
 
-    /** @param byModerator a rejection by a moderator rather than by the authority */
+    /**
+     * @param byModerator a rejection by a moderator rather than by the authority
+     * @param reason      why, for a rejection; null otherwise
+     */
     record ProgressNotificationCommand(
             UserId reporterId,
             AlertId alertId,
             String alertTitle,
             Progress progress,
             String authorityName,
-            boolean byModerator
+            boolean byModerator,
+            String reason
     ) {
     }
 

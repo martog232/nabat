@@ -169,16 +169,6 @@ public class AlertController {
         return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.startWork(AlertId.of(id), currentUser)));
     }
 
-    /** Closed without a fix. The report's authority or a moderator — not the reporter. */
-    @PatchMapping("/{id}/reject")
-    @Operation(summary = "Close a report without a fix: a duplicate, not a real problem, not anyone's to fix")
-    public ResponseEntity<AlertResponse> reject(
-            @PathVariable UUID id,
-            @AuthenticationPrincipal User currentUser
-    ) {
-        return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.reject(AlertId.of(id), currentUser)));
-    }
-
     /**
      * The public list of reports — anyone may read it, signed in or not.
      *

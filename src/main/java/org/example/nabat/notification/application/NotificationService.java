@@ -158,7 +158,7 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
         );
         String message = messageSource.getMessage(
                 "notification.progress.message." + key + (command.byModerator() ? ".moderator" : ""),
-                new Object[]{command.alertTitle(), command.authorityName()},
+                new Object[]{command.alertTitle(), command.authorityName(), command.reason()},
                 LocaleContextHolder.getLocale()
         );
 

@@ -187,6 +187,27 @@ public record Alert(
         );
     }
 
+    /**
+     * Back to its authority after a moderator found a rejection wrong (V31).
+     *
+     * <p>{@code SENT}, not {@code SUBMITTED}: the authority has the report already — it is the
+     * one that rejected it — so there is nothing to deliver. The second way back, beside
+     * {@link #forwardTo}; it does not go through {@link AlertStatus#canMoveTo} either.
+     *
+     * @throws IllegalStateException if the report is not rejected
+     */
+    public Alert reopen() {
+        if (status != AlertStatus.REJECTED) {
+            throw new IllegalStateException("Only a rejected report is reopened, not a " + status + " one");
+        }
+        return new Alert(
+                id, title, description, categoryCode, location,
+                createdAt, AlertStatus.SENT, reportedBy,
+                upvoteCount, downvoteCount, confirmationCount, credibilityScore,
+                null, photoUrl, districtCode, null, fixCheck, authorityCode
+        );
+    }
+
     private static ClosedBy requireCloser(ClosedBy by) {
         if (by == null) {
             throw new IllegalArgumentException("A closed report records who closed it");

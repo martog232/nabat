@@ -179,7 +179,6 @@ class AlertLifecycleServiceTest {
 
         assertThrows(NotAuthorizedException.class, () -> service.acknowledge(alertId, triaditsa));
         assertThrows(NotAuthorizedException.class, () -> service.startWork(alertId, triaditsa));
-        assertThrows(NotAuthorizedException.class, () -> service.reject(alertId, triaditsa));
         assertThrows(NotAuthorizedException.class, () -> service.resolve(alertId, triaditsa));
         verify(alertRepository, never()).save(any());
         verifyNoInteractions(alertNotificationPort);
@@ -205,14 +204,12 @@ class AlertLifecycleServiceTest {
 
         service.acknowledge(alertId, lozenets);
         service.startWork(alertId, lozenets);
-        service.reject(alertId, user(UUID.randomUUID(), Role.MODERATOR));
 
         ArgumentCaptor<ReportProgressed> event = ArgumentCaptor.forClass(ReportProgressed.class);
-        verify(events, times(3)).publishEvent(event.capture());
-        assertEquals(List.of(AlertStatus.ACKNOWLEDGED, AlertStatus.IN_PROGRESS, AlertStatus.REJECTED),
+        verify(events, times(2)).publishEvent(event.capture());
+        assertEquals(List.of(AlertStatus.ACKNOWLEDGED, AlertStatus.IN_PROGRESS),
             event.getAllValues().stream().map(e -> e.alert().status()).toList());
         assertEquals("Район Лозенец", event.getAllValues().getFirst().authorityName());
-        assertEquals(ClosedBy.MODERATOR, event.getAllValues().get(2).alert().closedBy());
     }
 
     /** A refused move is not news. */
@@ -230,21 +227,6 @@ class AlertLifecycleServiceTest {
         assertEquals(ClosedBy.AUTHORITY, service.resolve(alertId, official("LOZENETS")).closedBy());
         assertEquals(ClosedBy.REPORTER, service.resolve(alertId, user(ownerId, Role.USER)).closedBy());
         assertEquals(ClosedBy.MODERATOR, service.resolve(alertId, user(UUID.randomUUID(), Role.MODERATOR)).closedBy());
-    }
-
-    /** "Not a real problem" is not the reporter's call about their own report. */
-    @Test
-    void theReporterCannotRejectTheirOwnReport() {
-        when(alertRepository.findById(alertId)).thenReturn(Optional.of(active()));
-
-        assertThrows(NotAuthorizedException.class, () -> service.reject(alertId, user(ownerId, Role.USER)));
-    }
-
-    @Test
-    void theDistrictOrAModeratorMayReject() {
-        saves();
-        assertEquals(ClosedBy.AUTHORITY, service.reject(alertId, official("LOZENETS")).closedBy());
-        assertEquals(ClosedBy.MODERATOR, service.reject(alertId, user(UUID.randomUUID(), Role.MODERATOR)).closedBy());
     }
 
     @Test

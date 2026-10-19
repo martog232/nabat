@@ -95,7 +95,7 @@ class OfficialIntegrationTest extends PostgresTestSupport {
     @Test
     void anotherDistrictIsRefusedAndChangesNothing() throws Exception {
         perform(patch("/api/v1/alerts/{id}/acknowledge", report), lozenets).andExpect(status().isForbidden());
-        perform(patch("/api/v1/alerts/{id}/reject", report), lozenets).andExpect(status().isForbidden());
+        perform(patch("/api/v1/alerts/{id}/reject", report).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Не е наш\"}"), lozenets).andExpect(status().isForbidden());
         perform(patch("/api/v1/alerts/{id}/resolve", report), lozenets).andExpect(status().isForbidden());
 
         awaitStatus(report, "SENT");
@@ -103,7 +103,7 @@ class OfficialIntegrationTest extends PostgresTestSupport {
 
     @Test
     void theReporterMayResolveButNotReject() throws Exception {
-        perform(patch("/api/v1/alerts/{id}/reject", report), reporter).andExpect(status().isForbidden());
+        perform(patch("/api/v1/alerts/{id}/reject", report).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Не е наш\"}"), reporter).andExpect(status().isForbidden());
         perform(patch("/api/v1/alerts/{id}/resolve", report), reporter)
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.closedBy").value("REPORTER"));

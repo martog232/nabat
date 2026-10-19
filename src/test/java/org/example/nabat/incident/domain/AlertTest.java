@@ -128,6 +128,18 @@ class AlertTest {
             assertEquals("LOZENETS", forwarded.districtCode());
         }
 
+        /** Back to the authority that rejected it, which has it already: SENT, not SUBMITTED. */
+        @Test
+        void aReopenedRejectionGoesBackToSentWithItsAuthority() {
+            Alert reopened = submitted.markSent().reject(ClosedBy.AUTHORITY).reopen();
+
+            assertEquals(AlertStatus.SENT, reopened.status());
+            assertEquals("LOZENETS", reopened.authorityCode());
+            assertNull(reopened.closedBy());
+            assertThrows(IllegalStateException.class, submitted::reopen);
+            assertThrows(IllegalStateException.class, () -> submitted.resolve(ClosedBy.REPORTER).reopen());
+        }
+
         @Test
         void isNotForwardedWhenClosedOrToTheAuthorityItHas() {
             assertThrows(IllegalStateException.class, () -> submitted.resolve(ClosedBy.REPORTER).forwardTo("CGM"));

@@ -8,8 +8,8 @@ import org.example.nabat.incident.domain.AlertId;
  * What the authority responsible for a report says about it.
  *
  * <p>Acknowledging and starting work are the authority's alone — they are statements by the
- * body that will do the fixing, and nobody else can make them. Rejecting is the authority's or
- * a moderator's: "not a real problem" is a judgement about content as much as about the city.
+ * body that will do the fixing, and nobody else can make them. Rejecting is
+ * {@link RejectReportUseCase}'s, which also asks why.
  *
  * <p>Each method throws {@code AlertNotFoundException} for an unknown report,
  * {@code NotAuthorizedException} when {@code actor} may not make this statement about this
@@ -21,6 +21,4 @@ public interface ProgressReportUseCase {
     Alert acknowledge(AlertId id, User actor);
 
     Alert startWork(AlertId id, User actor);
-
-    Alert reject(AlertId id, User actor);
 }

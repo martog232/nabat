@@ -3,7 +3,9 @@ package org.example.nabat.notification.application;
 import org.example.nabat.identity.domain.UserId;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.ClosedBy;
+import org.example.nabat.incident.domain.RejectionDecided;
 import org.example.nabat.incident.domain.ReportProgressed;
+import org.example.nabat.incident.domain.ReportRejection;
 import org.example.nabat.notification.application.port.in.SendNotificationUseCase;
 import org.example.nabat.notification.application.port.in.SendNotificationUseCase.Progress;
 import org.example.nabat.notification.application.port.in.SendNotificationUseCase.ProgressNotificationCommand;
@@ -47,6 +49,21 @@ public class TellReporterAboutProgress {
             alert.title(),
             progress,
             event.authorityName(),
-            alert.closedBy() == ClosedBy.MODERATOR));
+            alert.closedBy() == ClosedBy.MODERATOR,
+            event.reason()));
+    }
+
+    /** The answer to the reporter's dispute of a rejection: it stands, or the report is open again. */
+    @ApplicationModuleListener
+    public void on(RejectionDecided event) {
+        Alert alert = event.alert();
+        notifications.sendProgressNotification(new ProgressNotificationCommand(
+            UserId.of(alert.reportedBy()),
+            alert.id(),
+            alert.title(),
+            event.decision() == ReportRejection.Decision.REOPENED ? Progress.REOPENED : Progress.REJECTION_UPHELD,
+            event.authorityName(),
+            false,
+            null));
     }
 }

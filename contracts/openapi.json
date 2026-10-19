@@ -425,6 +425,82 @@
         }
       }
     },
+    "/api/v1/alerts/{id}/rejections/dispute" : {
+      "post" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "The reporter contests the rejection of their report, once, saying why",
+        "operationId" : "dispute",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReasonRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RejectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/rejections/decision" : {
+      "post" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "A moderator upholds a disputed rejection or reopens the report",
+        "operationId" : "decide",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/{id}/forward" : {
       "post" : {
         "tags" : [ "forward-controller" ],
@@ -649,8 +725,8 @@
     },
     "/api/v1/alerts/{id}/reject" : {
       "patch" : {
-        "tags" : [ "alert-controller" ],
-        "summary" : "Close a report without a fix: a duplicate, not a real problem, not anyone's to fix",
+        "tags" : [ "rejection-controller" ],
+        "summary" : "Close a report without a fix — a duplicate, not a real problem — saying why",
         "operationId" : "reject",
         "parameters" : [ {
           "name" : "id",
@@ -661,6 +737,16 @@
             "format" : "uuid"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReasonRequest"
+              }
+            }
+          },
+          "required" : true
+        },
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -1019,6 +1105,37 @@
         }
       }
     },
+    "/api/v1/alerts/{id}/rejections" : {
+      "get" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "The report's rejections, oldest first, with their disputes and decisions",
+        "operationId" : "rejections",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/RejectionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/{id}/forwards" : {
       "get" : {
         "tags" : [ "forward-controller" ],
@@ -1295,6 +1412,28 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/NearbyAlertsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/disputed" : {
+      "get" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "Reports whose rejection the reporter disputes, waiting for a moderator, oldest dispute first",
+        "operationId" : "disputed",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AlertResponse"
+                  }
                 }
               }
             }
@@ -1852,6 +1991,72 @@
             "example" : "LOZENETS"
           }
         }
+      },
+      "ReasonRequest" : {
+        "type" : "object",
+        "description" : "Why",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "description" : "1 to 1000 characters",
+            "example" : "Дублира сигнал от вчера на същото място.",
+            "maxLength" : 1000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "reason" ]
+      },
+      "RejectionResponse" : {
+        "type" : "object",
+        "description" : "A rejection of a report, and what came of it",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "description" : "Why it was rejected"
+          },
+          "byModerator" : {
+            "type" : "boolean",
+            "description" : "Rejected by a moderator rather than by the report's authority"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "The authority the report was with",
+            "example" : "LOZENETS"
+          },
+          "rejectedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "disputeReason" : {
+            "type" : "string",
+            "description" : "The reporter's dispute; null if they did not dispute it"
+          },
+          "disputedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "decision" : {
+            "type" : "string",
+            "description" : "A moderator's decision on the dispute; null until there is one",
+            "enum" : [ "UPHELD", "REOPENED" ]
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "DecisionRequest" : {
+        "type" : "object",
+        "description" : "A moderator's answer to a disputed rejection",
+        "properties" : {
+          "decision" : {
+            "type" : "string",
+            "description" : "UPHELD — the rejection stands; REOPENED — the report goes back to its authority",
+            "enum" : [ "UPHELD", "REOPENED" ]
+          }
+        },
+        "required" : [ "decision" ]
       },
       "ForwardRequest" : {
         "type" : "object",
