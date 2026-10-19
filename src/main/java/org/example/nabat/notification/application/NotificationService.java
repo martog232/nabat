@@ -149,6 +149,31 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
 
     @Override
     @Transactional
+    public Notification sendForwardedNotification(ForwardedNotificationCommand command) {
+        String title = messageSource.getMessage(
+                "notification.forwarded.title",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                "notification.forwarded.message",
+                new Object[]{command.alertTitle(), command.toAuthorityName(), command.reason()},
+                LocaleContextHolder.getLocale()
+        );
+
+        Notification n = Notification.createForwardedNotification(
+                command.reporterId(),
+                command.alertId(),
+                title,
+                message
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.reporterId(), saved);
+        return saved;
+    }
+
+    @Override
+    @Transactional
     public Notification sendCommentNotification(CommentNotificationCommand command) {
         String title = messageSource.getMessage(
                 "notification.comment.title",

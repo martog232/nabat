@@ -52,7 +52,7 @@ public record Alert(
         /**
          * Who answers for the report: its district, or the city-wide institution its category
          * belongs to (V29). Officials of this authority, and only they, speak for it. Decided
-         * once at creation, like the district.
+         * at creation, and changed only by a forward ({@link #forwardTo}, V30).
          */
         String authorityCode
 ) {
@@ -155,6 +155,36 @@ public record Alert(
     /** The institution reports that work has started. */
     public Alert startWork() {
         return moveTo(AlertStatus.IN_PROGRESS, null, null);
+    }
+
+    /**
+     * Handed on to another authority: "not ours, it is {@code authority}'s".
+     *
+     * <p>The one move that goes back. The report returns to {@code SUBMITTED}, because the
+     * new authority has received nothing yet, and becomes {@code SENT} again when the mail to
+     * it leaves; whatever the old authority acknowledged or started was its own word, not the
+     * new one's. It does not go through {@link AlertStatus#canMoveTo}, which only knows
+     * forward, so this is the only way to make it.
+     *
+     * @throws IllegalStateException    if the report is closed — a closed report goes nowhere
+     * @throws IllegalArgumentException if {@code authority} is the one it already has
+     */
+    public Alert forwardTo(String authority) {
+        if (!status.isOpen()) {
+            throw new IllegalStateException("A " + status + " report cannot be forwarded");
+        }
+        if (authority == null || authority.isBlank()) {
+            throw new IllegalArgumentException("Forwarding needs an authority to forward to");
+        }
+        if (authority.equals(authorityCode)) {
+            throw new IllegalArgumentException("The report is already " + authority + "'s");
+        }
+        return new Alert(
+                id, title, description, categoryCode, location,
+                createdAt, AlertStatus.SUBMITTED, reportedBy,
+                upvoteCount, downvoteCount, confirmationCount, credibilityScore,
+                null, photoUrl, districtCode, null, fixCheck, authority
+        );
     }
 
     private static ClosedBy requireCloser(ClosedBy by) {

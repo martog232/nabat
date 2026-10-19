@@ -75,7 +75,18 @@ public class SmtpSignalMailer implements SignalMailer {
     }
 
     static String subject(SignalMail mail) {
-        return "Сигнал: " + mail.categoryLabel() + " — " + mail.title();
+        String kind = mail.forwardNote() == null ? "Сигнал: " : "Препратен сигнал: ";
+        return kind + mail.categoryLabel() + " — " + mail.title();
+    }
+
+    /**
+     * What the mail is: a new report, or one forwarded by another authority — then who and why
+     * come first, because they are what the recipient has to judge.
+     */
+    private static String intro(SignalMail mail) {
+        return mail.forwardNote() == null
+            ? "Чрез nabat е подаден сигнал за проблем, за който отговаряте."
+            : mail.forwardNote();
     }
 
     /**
@@ -101,7 +112,7 @@ public class SmtpSignalMailer implements SignalMailer {
         return """
             Уважаеми служители на %s,
 
-            Чрез nabat е подаден сигнал за проблем, за който отговаряте.
+            %s
 
             Вид:       %s
             Заглавие:  %s
@@ -122,6 +133,7 @@ public class SmtpSignalMailer implements SignalMailer {
             Номер на сигнала: %s
             """.formatted(
                 mail.recipientName(),
+                intro(mail),
                 mail.categoryLabel(),
                 mail.title(),
                 mail.description(),
@@ -148,7 +160,7 @@ public class SmtpSignalMailer implements SignalMailer {
         return """
             <div style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;line-height:1.5">
             <p>Уважаеми служители на %s,</p>
-            <p>Чрез nabat е подаден сигнал за проблем, за който отговаряте.</p>
+            <p>%s</p>
             <table style="border-collapse:collapse;margin:12px 0">
             <tr><td style="padding:2px 12px 2px 0;color:#64748b">Вид</td><td>%s</td></tr>
             <tr><td style="padding:2px 12px 2px 0;color:#64748b">Заглавие</td><td><b>%s</b></td></tr>
@@ -167,6 +179,7 @@ public class SmtpSignalMailer implements SignalMailer {
             </div>
             """.formatted(
                 esc(mail.recipientName()),
+                esc(intro(mail)),
                 esc(mail.categoryLabel()),
                 esc(mail.title()),
                 esc(mail.description()),

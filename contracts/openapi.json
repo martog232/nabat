@@ -425,6 +425,44 @@
         }
       }
     },
+    "/api/v1/alerts/{id}/forward" : {
+      "post" : {
+        "tags" : [ "forward-controller" ],
+        "summary" : "Hand the report to the authority it belongs to, saying why",
+        "operationId" : "forward",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ForwardRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/{id}/comments" : {
       "get" : {
         "tags" : [ "comment-controller" ],
@@ -981,6 +1019,37 @@
         }
       }
     },
+    "/api/v1/alerts/{id}/forwards" : {
+      "get" : {
+        "tags" : [ "forward-controller" ],
+        "summary" : "Where the report has been forwarded, oldest first",
+        "operationId" : "forwards",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ForwardResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/{alertId}/votes/stats" : {
       "get" : {
         "tags" : [ "alert-vote-controller" ],
@@ -1433,7 +1502,7 @@
           "type" : {
             "type" : "string",
             "description" : "What triggered the notification",
-            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED", "COMMENT_ADDED" ],
+            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED", "COMMENT_ADDED", "REPORT_FORWARDED" ],
             "example" : "VOTE"
           },
           "title" : {
@@ -1784,6 +1853,26 @@
           }
         }
       },
+      "ForwardRequest" : {
+        "type" : "object",
+        "description" : "Where to forward a report, and why",
+        "properties" : {
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "The authority it belongs to, as listed by GET /api/v1/authorities",
+            "example" : "CGM",
+            "minLength" : 1
+          },
+          "reason" : {
+            "type" : "string",
+            "description" : "Why it is that authority's, 1 to 1000 characters",
+            "example" : "Шахтата е на водопровода.",
+            "maxLength" : 1000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "authorityCode", "reason" ]
+      },
       "CommentRequest" : {
         "type" : "object",
         "description" : "A comment to add",
@@ -2127,6 +2216,39 @@
             "type" : "string",
             "description" : "A district administration, or an institution that takes some categories city-wide",
             "enum" : [ "DISTRICT", "INSTITUTION" ]
+          }
+        }
+      },
+      "ForwardResponse" : {
+        "type" : "object",
+        "description" : "One forward of a report",
+        "properties" : {
+          "sequence" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "1 for the first forward, then 2, 3..."
+          },
+          "fromAuthority" : {
+            "type" : "string",
+            "description" : "The authority that had it",
+            "example" : "LOZENETS"
+          },
+          "toAuthority" : {
+            "type" : "string",
+            "description" : "The authority it went to",
+            "example" : "CGM"
+          },
+          "byModerator" : {
+            "type" : "boolean",
+            "description" : "Made by a moderator rather than by the authority that had it"
+          },
+          "reason" : {
+            "type" : "string",
+            "description" : "Why"
+          },
+          "forwardedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },

@@ -100,11 +100,11 @@ public class AlertLifecycleService
     @Override
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
-    public void recordDelivered(AlertId id) {
+    public void recordDelivered(AlertId id, String authorityCode) {
         Alert alert = alertRepository.findById(id)
                 .orElseThrow(() -> new AlertNotFoundException(id));
 
-        if (alert.status() != AlertStatus.SUBMITTED) {
+        if (alert.status() != AlertStatus.SUBMITTED || !alert.authorityCode().equals(authorityCode)) {
             return;
         }
 

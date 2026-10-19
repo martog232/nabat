@@ -95,6 +95,25 @@ public record Notification(
         );
     }
 
+    public static Notification createForwardedNotification(
+            UserId reporterId,
+            AlertId alertId,
+            String title,
+            String message
+    ) {
+        return new Notification(
+                NotificationId.generate(),
+                reporterId,
+                NotificationType.REPORT_FORWARDED,
+                title,
+                message,
+                alertId,
+                null,
+                false,
+                Instant.now()
+        );
+    }
+
     /** Returns a copy of this notification with isRead = true. Notification is immutable. */
     public Notification markAsRead() {
         return new Notification(

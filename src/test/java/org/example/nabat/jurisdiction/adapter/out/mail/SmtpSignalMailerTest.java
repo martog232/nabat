@@ -39,7 +39,7 @@ class SmtpSignalMailerTest {
             "Дупка на Черни връх", "Дълбока дупка в дясното платно",
             42.671234, 23.318765,
             Instant.parse("2026-09-28T16:42:00Z"),
-            "Иван Петров", "ivan@example.com"
+            "Иван Петров", "ivan@example.com", null
         );
     }
 
@@ -118,7 +118,7 @@ class SmtpSignalMailerTest {
             ALERT_ID, "cgm@institution.nabat.test", "Център за градска мобилност", "Район Лозенец",
             "Градски транспорт — Спирки", "Счупен заслон", "Спирка пред номер 5",
             42.671234, 23.318765, Instant.parse("2026-09-28T16:42:00Z"),
-            "Иван Петров", "ivan@example.com"
+            "Иван Петров", "ivan@example.com", null
         );
 
         assertThat(SmtpSignalMailer.body(busStop, LINK))
@@ -136,7 +136,7 @@ class SmtpSignalMailerTest {
             ALERT_ID, "lozenets@rayon.nabat.test", "Район Лозенец", "Район Лозенец", "Пътища и шахти — Улично платно",
             "<a href=\"https://evil.example\">Натиснете</a>", "<script>x</script> & още",
             42.671234, 23.318765, Instant.parse("2026-09-28T16:42:00Z"),
-            "Иван Петров", "ivan@example.com"
+            "Иван Петров", "ivan@example.com", null
         );
 
         assertThat(SmtpSignalMailer.html(hostile, LINK))

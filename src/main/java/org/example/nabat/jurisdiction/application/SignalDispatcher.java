@@ -3,10 +3,13 @@ package org.example.nabat.jurisdiction.application;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.identity.domain.UserId;
+import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.ListReportCategoriesUseCase;
 import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
+import org.example.nabat.incident.domain.ReportForward;
+import org.example.nabat.incident.domain.ReportForwarded;
 import org.example.nabat.jurisdiction.application.port.in.ListAuthoritiesUseCase;
 import org.example.nabat.jurisdiction.application.port.out.DistrictRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalDispatchRepository;
@@ -21,10 +24,12 @@ import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * Sends each new report to the authority that answers for it — its district, or the
- * institution its category belongs to — and records that it went.
+ * institution its category belongs to — and each forwarded one to the authority it was
+ * forwarded to, and records that it went.
  *
  * <h2>Durability</h2>
  * An {@link ApplicationModuleListener}, so the Event Publication Registry writes a row for
@@ -54,6 +59,7 @@ public class SignalDispatcher {
     private final UserRepository users;
     private final RecordDeliveryUseCase recordDelivery;
     private final ListReportCategoriesUseCase categories;
+    private final GetAlertByIdUseCase reports;
 
     public SignalDispatcher(
         DistrictRepository districts,
@@ -62,7 +68,8 @@ public class SignalDispatcher {
         SignalMailer mailer,
         UserRepository users,
         RecordDeliveryUseCase recordDelivery,
-        ListReportCategoriesUseCase categories
+        ListReportCategoriesUseCase categories,
+        GetAlertByIdUseCase reports
     ) {
         this.districts = districts;
         this.authorities = authorities;
@@ -71,40 +78,73 @@ public class SignalDispatcher {
         this.users = users;
         this.recordDelivery = recordDelivery;
         this.categories = categories;
+        this.reports = reports;
     }
 
     @ApplicationModuleListener
     public void on(AlertCreated event) {
-        Alert alert = event.alert();
+        deliver(event.alert(), 0, null);
+    }
 
-        if (dispatches.existsForAlert(alert.id().value())) {
+    /**
+     * The report went to another authority: the same delivery, to the new one, with a note of
+     * who sent it on and why. Its own registry rows and its own dispatch record (the forward's
+     * sequence), so it is retried and deduplicated apart from the creation mail.
+     */
+    @ApplicationModuleListener
+    public void on(ReportForwarded event) {
+        ReportForward forward = event.forward();
+        String from = authorities.findAuthority(forward.fromAuthority())
+            .map(Authority::name)
+            .orElse(forward.fromAuthority());
+        deliver(event.alert(), forward.sequence(), "Препратен към вас от " + from + ": " + forward.reason());
+    }
+
+    /**
+     * @param sequence    which delivery this is: 0 for the creation mail, n for the n-th forward
+     * @param forwardNote said at the top of a forwarded report's mail; null otherwise
+     */
+    private void deliver(Alert alert, int sequence, String forwardNote) {
+        UUID id = alert.id().value();
+
+        if (dispatches.exists(id, sequence)) {
             // Sent on an earlier attempt that did not get to complete. The status may still
             // be behind; recording is idempotent, so catch it up and stop.
-            recordDelivery.recordDelivered(alert.id());
+            recordDelivery.recordDelivered(alert.id(), alert.authorityCode());
             return;
         }
 
         if (alert.districtCode() == null) {
             // Cannot happen for a report created since V18 — creation refuses one outside
             // every district. Logged rather than thrown: a retry would not give it one.
-            log.warn("Report {} has no district and cannot be sent", alert.id().value());
+            log.warn("Report {} has no district and cannot be sent", id);
+            return;
+        }
+
+        // The event carries the report as it was. If it has been forwarded since, this mail
+        // would go to an authority it is no longer waiting on — the forward's own delivery
+        // reaches the right one.
+        String current = reports.getById(alert.id()).authorityCode();
+        if (!current.equals(alert.authorityCode())) {
+            log.info("Report {} was forwarded to {} before its mail to {} left; not sent",
+                id, current, alert.authorityCode());
             return;
         }
 
         District district = districts.findByCode(alert.districtCode())
             .orElseThrow(() -> new IllegalStateException(
-                "Report " + alert.id().value() + " names unknown district " + alert.districtCode()));
+                "Report " + id + " names unknown district " + alert.districtCode()));
 
         Authority authority = authorities.findAuthority(alert.authorityCode())
             .orElseThrow(() -> new IllegalStateException(
-                "Report " + alert.id().value() + " names unknown authority " + alert.authorityCode()));
+                "Report " + id + " names unknown authority " + alert.authorityCode()));
 
         User reporter = users.findById(UserId.of(alert.reportedBy()))
             .orElseThrow(() -> new IllegalStateException(
-                "Report " + alert.id().value() + " has no reporter account"));
+                "Report " + id + " has no reporter account"));
 
         mailer.send(new SignalMail(
-            alert.id().value(),
+            id,
             authority.mailbox(),
             authority.name(),
             district.name(),
@@ -115,14 +155,15 @@ public class SignalDispatcher {
             alert.location().longitude(),
             alert.createdAt(),
             reporter.displayName(),
-            reporter.email()
+            reporter.email(),
+            forwardNote
         ));
 
         dispatches.save(new SignalDispatch(
-            alert.id().value(), district.code(), authority.code(), authority.mailbox(), Instant.now()));
-        recordDelivery.recordDelivered(alert.id());
+            id, sequence, district.code(), authority.code(), authority.mailbox(), Instant.now()));
+        recordDelivery.recordDelivered(alert.id(), authority.code());
 
-        log.info("Sent report {} to {}", alert.id().value(), authority.code());
+        log.info("Sent report {} to {} (delivery {})", id, authority.code(), sequence);
     }
 
     /**

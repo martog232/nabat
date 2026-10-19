@@ -115,6 +115,26 @@ class AlertTest {
             assertThrows(IllegalStateException.class, inProgress::markSent);
         }
 
+        /**
+         * The one move back: the new authority has received nothing, and what the old one
+         * acknowledged or started was its own word. The district stays — the report has not moved.
+         */
+        @Test
+        void aForwardGoesBackToSubmittedWithTheNewAuthority() {
+            Alert forwarded = submitted.markSent().startWork().forwardTo("CGM");
+
+            assertEquals(AlertStatus.SUBMITTED, forwarded.status());
+            assertEquals("CGM", forwarded.authorityCode());
+            assertEquals("LOZENETS", forwarded.districtCode());
+        }
+
+        @Test
+        void isNotForwardedWhenClosedOrToTheAuthorityItHas() {
+            assertThrows(IllegalStateException.class, () -> submitted.resolve(ClosedBy.REPORTER).forwardTo("CGM"));
+            assertThrows(IllegalArgumentException.class, () -> submitted.forwardTo("LOZENETS"));
+            assertThrows(IllegalArgumentException.class, () -> submitted.forwardTo(" "));
+        }
+
         @Test
         void doesNotRepeatAStep() {
             assertThrows(IllegalStateException.class, submitted.markSent()::markSent);

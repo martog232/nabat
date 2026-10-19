@@ -51,6 +51,12 @@ public interface SendNotificationUseCase {
     ) {
     }
 
+    /** Tells a reporter their report went to another authority, and why. */
+    Notification sendForwardedNotification(ForwardedNotificationCommand command);
+
+    record ForwardedNotificationCommand(UserId reporterId, AlertId alertId, String alertTitle, String toAuthorityName, String reason) {
+    }
+
     record MilestoneNotificationCommand(
             UserId alertOwnerId,           // owner of the alert
             AlertId alertId,               // alert that reached the milestone

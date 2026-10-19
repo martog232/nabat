@@ -31,6 +31,8 @@ public interface SignalMailer {
      *                      following the report can see the answer
      * @param categoryLabel the category in words, group and subcategory:
      *                      „Пътища и шахти — Улично платно“
+     * @param forwardNote   for a forwarded report, who sent it on and why, said first; null for
+     *                      a report mailed when it was made
      */
     record SignalMail(
         UUID alertId,
@@ -44,7 +46,8 @@ public interface SignalMailer {
         double longitude,
         Instant reportedAt,
         String reporterName,
-        String reporterEmail
+        String reporterEmail,
+        String forwardNote
     ) {
     }
 }

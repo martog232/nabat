@@ -11,7 +11,9 @@ import org.example.nabat.incident.domain.AlertId;
 public interface RecordDeliveryUseCase {
 
     /**
-     * Moves the report from {@code SUBMITTED} to {@code SENT}.
+     * Moves the report from {@code SUBMITTED} to {@code SENT}, if {@code authorityCode} is still
+     * the authority it is waiting on. A delivery to an authority the report has since been
+     * forwarded away from (V30) says nothing about whether the new one has it.
      *
      * <p>Idempotent, unlike the other transitions, and on purpose. Delivery is retried, so the
      * same report can be recorded twice; and a report can move on before delivery is recorded
@@ -21,5 +23,5 @@ public interface RecordDeliveryUseCase {
      *
      * @throws org.example.nabat.incident.domain.AlertNotFoundException if no such report
      */
-    void recordDelivered(AlertId id);
+    void recordDelivered(AlertId id, String authorityCode);
 }

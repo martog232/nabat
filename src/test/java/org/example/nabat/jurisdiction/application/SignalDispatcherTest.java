@@ -2,10 +2,13 @@ package org.example.nabat.jurisdiction.application;
 
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.User;
+import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.ListReportCategoriesUseCase;
 import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
+import org.example.nabat.incident.domain.ReportForward;
+import org.example.nabat.incident.domain.ReportForwarded;
 import org.example.nabat.jurisdiction.application.port.in.ListAuthoritiesUseCase;
 import org.example.nabat.jurisdiction.application.port.out.DistrictRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalDispatchRepository;
@@ -25,7 +28,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
 
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -50,6 +55,7 @@ class SignalDispatcherTest {
     @Mock private UserRepository users;
     @Mock private RecordDeliveryUseCase recordDelivery;
     @Mock private ListReportCategoriesUseCase categories;
+    @Mock private GetAlertByIdUseCase reports;
 
     private SignalDispatcher dispatcher;
     private User reporter;
@@ -57,7 +63,7 @@ class SignalDispatcherTest {
 
     @BeforeEach
     void setUp() {
-        dispatcher = new SignalDispatcher(districts, authorities, dispatches, mailer, users, recordDelivery, categories);
+        dispatcher = new SignalDispatcher(districts, authorities, dispatches, mailer, users, recordDelivery, categories, reports);
         reporter = User.create("ivan@example.com", "hash", "Иван Петров");
         alert = Alert.create("Дупка", "Пред номер 12", 1007,
             Location.of(42.6750, 23.3200), reporter.id().value(), null, "LOZENETS", "LOZENETS");
@@ -67,6 +73,7 @@ class SignalDispatcherTest {
         when(districts.findByCode("LOZENETS")).thenReturn(Optional.of(LOZENETS));
         when(authorities.findAuthority("LOZENETS")).thenReturn(Optional.of(Authority.of(LOZENETS)));
         when(users.findById(reporter.id())).thenReturn(Optional.of(reporter));
+        when(reports.getById(alert.id())).thenReturn(alert);
     }
 
     @Test
@@ -96,7 +103,7 @@ class SignalDispatcherTest {
         order.verify(mailer).send(any());
         ArgumentCaptor<SignalDispatch> dispatch = ArgumentCaptor.forClass(SignalDispatch.class);
         order.verify(dispatches).save(dispatch.capture());
-        order.verify(recordDelivery).recordDelivered(alert.id());
+        order.verify(recordDelivery).recordDelivered(alert.id(), "LOZENETS");
         assertEquals("LOZENETS", dispatch.getValue().districtCode());
         assertEquals("LOZENETS", dispatch.getValue().authorityCode());
         assertEquals("lozenets@rayon.nabat.test", dispatch.getValue().recipient());
@@ -114,6 +121,7 @@ class SignalDispatcherTest {
         when(districts.findByCode("LOZENETS")).thenReturn(Optional.of(LOZENETS));
         when(authorities.findAuthority("CGM")).thenReturn(Optional.of(Authority.of(cgm)));
         when(users.findById(reporter.id())).thenReturn(Optional.of(reporter));
+        when(reports.getById(busStop.id())).thenReturn(busStop);
 
         dispatcher.on(new AlertCreated(busStop));
 
@@ -147,13 +155,55 @@ class SignalDispatcherTest {
     /** A replay after a crash between the send and the completion must not mail the district twice. */
     @Test
     void doesNotSendAgainWhatWasAlreadySent() {
-        when(dispatches.existsForAlert(alert.id().value())).thenReturn(true);
+        when(dispatches.exists(alert.id().value(), 0)).thenReturn(true);
 
         dispatcher.on(new AlertCreated(alert));
 
         verifyNoInteractions(mailer);
         verify(dispatches, never()).save(any());
         // The status may be what did not get committed last time.
-        verify(recordDelivery).recordDelivered(alert.id());
+        verify(recordDelivery).recordDelivered(alert.id(), "LOZENETS");
+    }
+    /**
+     * A forward is delivered like a new report, to the new authority, with who sent it on and
+     * why at the top; recorded as its own delivery, so it is deduplicated apart from the first.
+     */
+    @Test
+    void mailsAForwardedReportToTheAuthorityItWentTo() {
+        Institution cgm = new Institution("CGM", "Център за градска мобилност", "cgm@institution.nabat.test");
+        Alert moved = alert.forwardTo("CGM");
+        ReportForward forward = new ReportForward(UUID.randomUUID(), alert.id(), 1, "LOZENETS", "CGM",
+            UUID.randomUUID(), false, "Спирката е на градския транспорт", Instant.now());
+        when(districts.findByCode("LOZENETS")).thenReturn(Optional.of(LOZENETS));
+        when(authorities.findAuthority("LOZENETS")).thenReturn(Optional.of(Authority.of(LOZENETS)));
+        when(authorities.findAuthority("CGM")).thenReturn(Optional.of(Authority.of(cgm)));
+        when(users.findById(reporter.id())).thenReturn(Optional.of(reporter));
+        when(reports.getById(alert.id())).thenReturn(moved);
+
+        dispatcher.on(new ReportForwarded(moved, forward, "Център за градска мобилност"));
+
+        ArgumentCaptor<SignalMail> mail = ArgumentCaptor.forClass(SignalMail.class);
+        verify(mailer).send(mail.capture());
+        assertEquals("cgm@institution.nabat.test", mail.getValue().to());
+        assertEquals("Препратен към вас от Район Лозенец: Спирката е на градския транспорт", mail.getValue().forwardNote());
+        ArgumentCaptor<SignalDispatch> dispatch = ArgumentCaptor.forClass(SignalDispatch.class);
+        verify(dispatches).save(dispatch.capture());
+        assertEquals(1, dispatch.getValue().sequence());
+        assertEquals("CGM", dispatch.getValue().authorityCode());
+        verify(recordDelivery).recordDelivered(alert.id(), "CGM");
+    }
+
+    /**
+     * The creation mail had not left when the report was forwarded. Sending it now would tell
+     * the old authority about a report that is no longer theirs, and mark it SENT for them.
+     */
+    @Test
+    void doesNotMailAnAuthorityTheReportHasSinceBeenForwardedFrom() {
+        when(reports.getById(alert.id())).thenReturn(alert.forwardTo("CGM"));
+
+        dispatcher.on(new AlertCreated(alert));
+
+        verifyNoInteractions(mailer, recordDelivery);
+        verify(dispatches, never()).save(any());
     }
 }
