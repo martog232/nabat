@@ -6,11 +6,14 @@ import org.example.nabat.incident.application.port.in.ListReportCategoriesUseCas
 import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
+import org.example.nabat.jurisdiction.application.port.in.ListAuthoritiesUseCase;
 import org.example.nabat.jurisdiction.application.port.out.DistrictRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalDispatchRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer.SignalMail;
+import org.example.nabat.jurisdiction.domain.Authority;
 import org.example.nabat.jurisdiction.domain.District;
+import org.example.nabat.jurisdiction.domain.Institution;
 import org.example.nabat.jurisdiction.domain.SignalDispatch;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +44,7 @@ class SignalDispatcherTest {
         new District("LOZENETS", "Район Лозенец", "lozenets@rayon.nabat.test");
 
     @Mock private DistrictRepository districts;
+    @Mock private ListAuthoritiesUseCase authorities;
     @Mock private SignalDispatchRepository dispatches;
     @Mock private SignalMailer mailer;
     @Mock private UserRepository users;
@@ -53,7 +57,7 @@ class SignalDispatcherTest {
 
     @BeforeEach
     void setUp() {
-        dispatcher = new SignalDispatcher(districts, dispatches, mailer, users, recordDelivery, categories);
+        dispatcher = new SignalDispatcher(districts, authorities, dispatches, mailer, users, recordDelivery, categories);
         reporter = User.create("ivan@example.com", "hash", "Иван Петров");
         alert = Alert.create("Дупка", "Пред номер 12", 1007,
             Location.of(42.6750, 23.3200), reporter.id().value(), null, "LOZENETS", "LOZENETS");
@@ -61,6 +65,7 @@ class SignalDispatcherTest {
 
     private void knownDistrictAndReporter() {
         when(districts.findByCode("LOZENETS")).thenReturn(Optional.of(LOZENETS));
+        when(authorities.findAuthority("LOZENETS")).thenReturn(Optional.of(Authority.of(LOZENETS)));
         when(users.findById(reporter.id())).thenReturn(Optional.of(reporter));
     }
 
@@ -73,6 +78,7 @@ class SignalDispatcherTest {
         ArgumentCaptor<SignalMail> mail = ArgumentCaptor.forClass(SignalMail.class);
         verify(mailer).send(mail.capture());
         assertEquals("lozenets@rayon.nabat.test", mail.getValue().to());
+        assertEquals("Район Лозенец", mail.getValue().recipientName());
         assertEquals("Район Лозенец", mail.getValue().districtName());
         assertEquals("Иван Петров", mail.getValue().reporterName());
         assertEquals("ivan@example.com", mail.getValue().reporterEmail());
@@ -92,7 +98,35 @@ class SignalDispatcherTest {
         order.verify(dispatches).save(dispatch.capture());
         order.verify(recordDelivery).recordDelivered(alert.id());
         assertEquals("LOZENETS", dispatch.getValue().districtCode());
+        assertEquals("LOZENETS", dispatch.getValue().authorityCode());
         assertEquals("lozenets@rayon.nabat.test", dispatch.getValue().recipient());
+    }
+
+    /**
+     * A category an institution takes goes to the institution, which is told the district so it
+     * knows where; the dispatch keeps both.
+     */
+    @Test
+    void sendsAReportToTheInstitutionItsCategoryBelongsTo() {
+        Institution cgm = new Institution("CGM", "Център за градска мобилност", "cgm@institution.nabat.test");
+        Alert busStop = Alert.create("Счупен заслон", "Спирка Лозенец", 1024,
+            Location.of(42.6750, 23.3200), reporter.id().value(), null, "LOZENETS", "CGM");
+        when(districts.findByCode("LOZENETS")).thenReturn(Optional.of(LOZENETS));
+        when(authorities.findAuthority("CGM")).thenReturn(Optional.of(Authority.of(cgm)));
+        when(users.findById(reporter.id())).thenReturn(Optional.of(reporter));
+
+        dispatcher.on(new AlertCreated(busStop));
+
+        ArgumentCaptor<SignalMail> mail = ArgumentCaptor.forClass(SignalMail.class);
+        verify(mailer).send(mail.capture());
+        assertEquals("cgm@institution.nabat.test", mail.getValue().to());
+        assertEquals("Център за градска мобилност", mail.getValue().recipientName());
+        assertEquals("Район Лозенец", mail.getValue().districtName());
+        ArgumentCaptor<SignalDispatch> dispatch = ArgumentCaptor.forClass(SignalDispatch.class);
+        verify(dispatches).save(dispatch.capture());
+        assertEquals("LOZENETS", dispatch.getValue().districtCode());
+        assertEquals("CGM", dispatch.getValue().authorityCode());
+        assertEquals("cgm@institution.nabat.test", dispatch.getValue().recipient());
     }
 
     /**

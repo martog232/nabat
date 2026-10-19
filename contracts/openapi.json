@@ -913,6 +913,29 @@
         "security" : [ ]
       }
     },
+    "/api/v1/authorities" : {
+      "get" : {
+        "tags" : [ "authority-controller" ],
+        "summary" : "The districts and city-wide institutions that reports go to",
+        "operationId" : "list_3",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AuthorityResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
     "/api/v1/auth/me" : {
       "get" : {
         "tags" : [ "auth-controller" ],
@@ -2083,6 +2106,27 @@
             "type" : "integer",
             "format" : "int32",
             "description" : "No final answer when the archive was taken"
+          }
+        }
+      },
+      "AuthorityResponse" : {
+        "type" : "object",
+        "description" : "Someone a report can go to: a district administration, or a city-wide institution",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "description" : "Stable code, as carried by a report's authorityCode",
+            "example" : "CGM"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name",
+            "example" : "Център за градска мобилност"
+          },
+          "kind" : {
+            "type" : "string",
+            "description" : "A district administration, or an institution that takes some categories city-wide",
+            "enum" : [ "DISTRICT", "INSTITUTION" ]
           }
         }
       },

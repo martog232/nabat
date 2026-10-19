@@ -4,6 +4,7 @@ import org.example.nabat.incident.application.port.in.CreateAlertUseCase.CreateA
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.DistrictLookupPort;
 import org.example.nabat.incident.application.port.out.ReportCategoryRepository;
+import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.AlertId;
@@ -28,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -55,6 +58,9 @@ class CreateAlertServiceTest {
     private DistrictLookupPort districts;
 
     @Mock
+    private ResponsibleAuthorityPort authorities;
+
+    @Mock
     private ApplicationEventPublisher events;
 
     @Mock
@@ -67,7 +73,9 @@ class CreateAlertServiceTest {
 
     @BeforeEach
     void setUp() {
-        createAlertService = new CreateAlertService(alertRepository, districts, categories, events);
+        createAlertService = new CreateAlertService(alertRepository, districts, authorities, categories, events);
+        // The district answers unless a test says otherwise.
+        lenient().when(authorities.authorityFor(anyString(), anyInt())).thenAnswer(i -> i.getArgument(0));
         lenient().when(categories.findByCode(1007)).thenReturn(Optional.of(ROADWAY));
         lenient().when(categories.findByCode(1006)).thenReturn(Optional.of(ROADS));
     }
@@ -163,6 +171,22 @@ class CreateAlertServiceTest {
         assertEquals(Location.of(LAT, LON), proposed.location());
         assertEquals(reportedBy, proposed.reportedBy());
         assertEquals("LOZENETS", proposed.districtCode());
+        assertEquals("LOZENETS", proposed.authorityCode());
+    }
+
+    /** A category an institution takes goes to it, and the report stays where it is. */
+    @Test
+    void givesTheReportToTheAuthorityItsCategoryBelongsTo() {
+        insideLozenets();
+        when(authorities.authorityFor("LOZENETS", 1007)).thenReturn("CGM");
+        when(alertRepository.save(any(Alert.class))).thenAnswer(i -> i.getArgument(0));
+
+        createAlertService.createAlert(command(UUID.randomUUID()));
+
+        ArgumentCaptor<Alert> captor = ArgumentCaptor.forClass(Alert.class);
+        verify(alertRepository).save(captor.capture());
+        assertEquals("CGM", captor.getValue().authorityCode());
+        assertEquals("LOZENETS", captor.getValue().districtCode());
     }
 
     /**

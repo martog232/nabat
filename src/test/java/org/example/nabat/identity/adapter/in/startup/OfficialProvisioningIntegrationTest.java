@@ -20,10 +20,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The district accounts against the real districts and the real {@code users} table.
+ * The official accounts against the real authorities and the real {@code users} table.
  *
- * <p>What a mocked repository cannot show: that all 24 rows pass the V20 constraint pairing
- * the role with a district, and that the account can actually sign in with its mailbox.
+ * <p>What a mocked repository cannot show: that all 27 rows — 24 districts and 3 institutions —
+ * pass the V28 constraint pairing the role with an authority, and that an account can actually
+ * sign in with its mailbox.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -46,8 +47,8 @@ class OfficialProvisioningIntegrationTest extends PostgresTestSupport {
     }
 
     @Test
-    void everyDistrictGetsOneOfficialWhoCanSignInWithItsMailbox() throws Exception {
-        assertEquals(new Result(24, 0, List.of()), provisioning.provision(PASSWORD));
+    void everyAuthorityGetsOneOfficialWhoCanSignInWithItsMailbox() throws Exception {
+        assertEquals(new Result(27, 0, List.of()), provisioning.provision(PASSWORD));
 
         mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -55,13 +56,19 @@ class OfficialProvisioningIntegrationTest extends PostgresTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.user.role").value("OFFICIAL"))
             .andExpect(jsonPath("$.user.authorityCode").value("LOZENETS"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"cgm@institution.nabat.test\",\"password\":\"" + PASSWORD + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.user.authorityCode").value("CGM"));
     }
 
     @Test
     void aSecondRunCreatesNothing() {
         provisioning.provision(PASSWORD);
 
-        assertEquals(new Result(0, 24, List.of()), provisioning.provision("Another2026pass"));
-        assertEquals(24, userJpaRepository.count());
+        assertEquals(new Result(0, 27, List.of()), provisioning.provision("Another2026pass"));
+        assertEquals(27, userJpaRepository.count());
     }
 }

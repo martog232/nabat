@@ -17,8 +17,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 /**
- * Writes a report as an email, in Bulgarian, for a district administration: plain text, and
- * the same in HTML with a button that opens the report in nabat, where the district answers.
+ * Writes a report as an email, in Bulgarian, for the authority that answers for it: plain text,
+ * and the same in HTML with a button that opens the report in nabat, where the authority
+ * answers.
  *
  * <p>Nothing is caught. Any {@link MailException} propagates to {@code SignalDispatcher},
  * whose publication then stays outstanding — see {@link SignalMailer} for why that matters.
@@ -30,7 +31,7 @@ import java.util.Locale;
 @Component
 public class SmtpSignalMailer implements SignalMailer {
 
-    /** The district administrations are in Sofia, and so are the people reading this. */
+    /** The authorities are in Sofia, and so are the people reading this. */
     private static final DateTimeFormatter REPORTED_AT = DateTimeFormatter
         .ofPattern("dd.MM.yyyy HH:mm", Locale.forLanguageTag("bg"))
         .withZone(ZoneId.of("Europe/Sofia"));
@@ -60,7 +61,7 @@ public class SmtpSignalMailer implements SignalMailer {
             helper.setFrom(from);
             helper.setTo(mail.to());
             // No Reply-To. An answer by mail would reach one person and leave nabat at SENT;
-            // the button takes the district to the report, where the answer is public and
+            // the button takes the authority to the report, where the answer is public and
             // moves the status. A reply goes to the From address, which nobody reads.
             helper.setSubject(subject(mail));
             String link = reportLink(mail);
@@ -78,9 +79,9 @@ public class SmtpSignalMailer implements SignalMailer {
     }
 
     /**
-     * The report on nabat's map. The district answers there, signed in with the account that
+     * The report on nabat's map. The authority answers there, signed in with the account that
      * acts for it: acknowledge, start work, resolve or reject, and a comment marked as the
-     * district's. A session is needed, and the login page brings the official back here.
+     * authority's. A session is needed, and the login page brings the official back here.
      */
     String reportLink(SignalMail mail) {
         return frontendBaseUrl + "/map?alert=" + mail.alertId();
@@ -100,12 +101,13 @@ public class SmtpSignalMailer implements SignalMailer {
         return """
             Уважаеми служители на %s,
 
-            Чрез nabat е подаден сигнал за проблем на територията на района.
+            Чрез nabat е подаден сигнал за проблем, за който отговаряте.
 
             Вид:       %s
             Заглавие:  %s
             Описание:  %s
 
+            Район:     %s
             Място:     %s
             Карта:     %s
             Подаден:   %s
@@ -119,10 +121,11 @@ public class SmtpSignalMailer implements SignalMailer {
 
             Номер на сигнала: %s
             """.formatted(
-                mail.districtName(),
+                mail.recipientName(),
                 mail.categoryLabel(),
                 mail.title(),
                 mail.description(),
+                mail.districtName(),
                 coordinates(mail),
                 mapLink(mail),
                 REPORTED_AT.format(mail.reportedAt()),
@@ -145,11 +148,12 @@ public class SmtpSignalMailer implements SignalMailer {
         return """
             <div style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;line-height:1.5">
             <p>Уважаеми служители на %s,</p>
-            <p>Чрез nabat е подаден сигнал за проблем на територията на района.</p>
+            <p>Чрез nabat е подаден сигнал за проблем, за който отговаряте.</p>
             <table style="border-collapse:collapse;margin:12px 0">
             <tr><td style="padding:2px 12px 2px 0;color:#64748b">Вид</td><td>%s</td></tr>
             <tr><td style="padding:2px 12px 2px 0;color:#64748b">Заглавие</td><td><b>%s</b></td></tr>
             <tr><td style="padding:2px 12px 2px 0;color:#64748b;vertical-align:top">Описание</td><td style="white-space:pre-wrap">%s</td></tr>
+            <tr><td style="padding:2px 12px 2px 0;color:#64748b">Район</td><td>%s</td></tr>
             <tr><td style="padding:2px 12px 2px 0;color:#64748b">Място</td><td><a href="%s">%s</a></td></tr>
             <tr><td style="padding:2px 12px 2px 0;color:#64748b">Подаден</td><td>%s</td></tr>
             <tr><td style="padding:2px 12px 2px 0;color:#64748b">Подател</td><td>%s &lt;%s&gt;</td></tr>
@@ -159,13 +163,14 @@ public class SmtpSignalMailer implements SignalMailer {
             <a href="%s" style="display:inline-block;padding:12px 28px;color:#ffffff;text-decoration:none;font-weight:bold">Отговори</a>
             </td></tr>
             </table>
-            <p style="color:#64748b;font-size:12px">Бутонът отваря сигнала в nabat, където районът отговаря и сменя статуса му. Моля, не отговаряйте на този имейл: отговорът няма да бъде прочетен.<br>Номер на сигнала: %s</p>
+            <p style="color:#64748b;font-size:12px">Бутонът отваря сигнала в nabat, където отговаряте и сменяте статуса му. Моля, не отговаряйте на този имейл: отговорът няма да бъде прочетен.<br>Номер на сигнала: %s</p>
             </div>
             """.formatted(
-                esc(mail.districtName()),
+                esc(mail.recipientName()),
                 esc(mail.categoryLabel()),
                 esc(mail.title()),
                 esc(mail.description()),
+                esc(mail.districtName()),
                 esc(mapLink(mail)),
                 esc(coordinates(mail)),
                 esc(REPORTED_AT.format(mail.reportedAt())),

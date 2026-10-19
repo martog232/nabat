@@ -24,6 +24,9 @@ public class SignalDispatchJpaEntity implements Persistable<UUID> {
     @Column(name = "district_code", nullable = false, length = 32)
     private String districtCode;
 
+    @Column(name = "authority_code", nullable = false, length = 32)
+    private String authorityCode;
+
     @Column(nullable = false, length = 254)
     private String recipient;
 
@@ -53,6 +56,7 @@ public class SignalDispatchJpaEntity implements Persistable<UUID> {
         SignalDispatchJpaEntity entity = new SignalDispatchJpaEntity();
         entity.alertId = dispatch.alertId();
         entity.districtCode = dispatch.districtCode();
+        entity.authorityCode = dispatch.authorityCode();
         entity.recipient = dispatch.recipient();
         entity.sentAt = dispatch.sentAt();
         return entity;

@@ -7,10 +7,12 @@ import org.example.nabat.incident.application.port.in.ListReportCategoriesUseCas
 import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
+import org.example.nabat.jurisdiction.application.port.in.ListAuthoritiesUseCase;
 import org.example.nabat.jurisdiction.application.port.out.DistrictRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalDispatchRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer.SignalMail;
+import org.example.nabat.jurisdiction.domain.Authority;
 import org.example.nabat.jurisdiction.domain.District;
 import org.example.nabat.jurisdiction.domain.SignalDispatch;
 import org.slf4j.Logger;
@@ -21,7 +23,8 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Sends each new report to the district it is in, and records that it went.
+ * Sends each new report to the authority that answers for it — its district, or the
+ * institution its category belongs to — and records that it went.
  *
  * <h2>Durability</h2>
  * An {@link ApplicationModuleListener}, so the Event Publication Registry writes a row for
@@ -32,7 +35,7 @@ import java.time.Instant;
  * already is one.
  *
  * <h2>At least once, so not twice</h2>
- * A replay would send the district a second copy. So a {@link SignalDispatch} is written in
+ * A replay would send the authority a second copy. So a {@link SignalDispatch} is written in
  * the same transaction as the move to {@code SENT}, and a replay that finds one skips the
  * mail and only makes sure the status caught up. What that leaves is the one window no
  * outbox closes: the mail has left, and the transaction then fails to commit. The next
@@ -45,6 +48,7 @@ public class SignalDispatcher {
     private static final Logger log = LoggerFactory.getLogger(SignalDispatcher.class);
 
     private final DistrictRepository districts;
+    private final ListAuthoritiesUseCase authorities;
     private final SignalDispatchRepository dispatches;
     private final SignalMailer mailer;
     private final UserRepository users;
@@ -53,6 +57,7 @@ public class SignalDispatcher {
 
     public SignalDispatcher(
         DistrictRepository districts,
+        ListAuthoritiesUseCase authorities,
         SignalDispatchRepository dispatches,
         SignalMailer mailer,
         UserRepository users,
@@ -60,6 +65,7 @@ public class SignalDispatcher {
         ListReportCategoriesUseCase categories
     ) {
         this.districts = districts;
+        this.authorities = authorities;
         this.dispatches = dispatches;
         this.mailer = mailer;
         this.users = users;
@@ -89,13 +95,18 @@ public class SignalDispatcher {
             .orElseThrow(() -> new IllegalStateException(
                 "Report " + alert.id().value() + " names unknown district " + alert.districtCode()));
 
+        Authority authority = authorities.findAuthority(alert.authorityCode())
+            .orElseThrow(() -> new IllegalStateException(
+                "Report " + alert.id().value() + " names unknown authority " + alert.authorityCode()));
+
         User reporter = users.findById(UserId.of(alert.reportedBy()))
             .orElseThrow(() -> new IllegalStateException(
                 "Report " + alert.id().value() + " has no reporter account"));
 
         mailer.send(new SignalMail(
             alert.id().value(),
-            district.signalEmail(),
+            authority.mailbox(),
+            authority.name(),
             district.name(),
             categoryLabel(alert.categoryCode()),
             alert.title(),
@@ -108,10 +119,10 @@ public class SignalDispatcher {
         ));
 
         dispatches.save(new SignalDispatch(
-            alert.id().value(), district.code(), district.signalEmail(), Instant.now()));
+            alert.id().value(), district.code(), authority.code(), authority.mailbox(), Instant.now()));
         recordDelivery.recordDelivered(alert.id());
 
-        log.info("Sent report {} to {}", alert.id().value(), district.code());
+        log.info("Sent report {} to {}", alert.id().value(), authority.code());
     }
 
     /**
