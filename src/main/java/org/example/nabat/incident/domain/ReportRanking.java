@@ -13,7 +13,7 @@ public enum ReportRanking {
      *
      * <pre>
      *   score = (support + 1) / (ageInDays + 2) ^ 1.5
-     *   support = max(confirmations + upvotes - downvotes, 0)
+     *   support = confirmations + upvotes
      * </pre>
      *
      * <p>Ranking by raw support would put the oldest reports on top for good — they have had
@@ -26,6 +26,11 @@ public enum ReportRanking {
      *
      * <p>Support is the votes nabat-voting counts, not its credibility score: this is a
      * formula a reader of the page can check, and that one belongs to another service.
+     *
+     * <p>Support is the people who say they see it. A report is seen, not voted on: since the
+     * public API takes only a confirmation, the upvotes here are older ones, which meant much
+     * the same and still count; downvotes no longer subtract — a report that is not real is
+     * for its authority or a moderator to reject, with a reason, not for a tally to sink.
      */
     HOT,
 

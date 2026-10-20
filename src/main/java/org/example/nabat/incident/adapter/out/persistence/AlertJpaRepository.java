@@ -37,7 +37,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         AND (NOT :overdue OR a.answer_due_at < now())
         ORDER BY
           CASE WHEN :ranking = 'HOT' THEN
-            (GREATEST(a.confirmation_count + a.upvote_count - a.downvote_count, 0) + 1)
+            (a.confirmation_count + a.upvote_count + 1)
             / power(GREATEST(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - a.created_at)) / 86400.0, 0) + 2, 1.5)
           END DESC,
           CASE WHEN :ranking = 'LONGEST_WAITING' THEN a.created_at END ASC,

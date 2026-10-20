@@ -51,8 +51,18 @@ public class ExternalVoteService implements VoteAlertUseCase {
     private final AlertRepository alertRepository;
     private final SendNotificationUseCase sendNotificationUseCase;
 
+    /**
+     * Only {@link VoteType#CONFIRM} — "I see it too". The up/down votes were the safety feed's
+     * "is this credible?"; for a pothole "support" and "confirm" are the same thing and
+     * "dispute" means nothing a citizen can act on — a report that is not real is rejected by
+     * its authority or a moderator, saying why. nabat-voting still takes all three, and the
+     * tallies keep the old ones; this is the public API that no longer offers them.
+     */
     @Override
     public VoteReceipt vote(VoteCommand command) {
+        if (command.voteType() != VoteType.CONFIRM) {
+            throw new IllegalArgumentException("A report is confirmed, not voted on: only CONFIRM is taken");
+        }
         ExternalVotingPort.VoteResult result = externalVotingPort.vote(
                 command.alertId(),
                 command.userId(),

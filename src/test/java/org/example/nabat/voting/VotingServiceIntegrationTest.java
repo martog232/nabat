@@ -515,7 +515,7 @@ class VotingServiceIntegrationTest extends PostgresTestSupport {
         mockMvc.perform(post("/api/v1/alerts/{id}/votes", alertId)
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"voteType\":\"UPVOTE\"}"))
+                        .content("{\"voteType\":\"CONFIRM\"}"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"));
     }

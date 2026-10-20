@@ -94,7 +94,7 @@ public class AlertVoteController {
 
     @Schema(description = "Request body for casting a vote on an alert")
     public record VoteRequest(
-            @Schema(description = "Type of vote to cast", example = "UPVOTE")
+            @Schema(description = "CONFIRM — \"I see it too\". The only one taken: UPVOTE and DOWNVOTE are refused with 400", example = "CONFIRM")
             @NotNull(message = "voteType is required")
             VoteType voteType) {
     }

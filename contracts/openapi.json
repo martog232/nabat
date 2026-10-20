@@ -2190,9 +2190,9 @@
         "properties" : {
           "voteType" : {
             "type" : "string",
-            "description" : "Type of vote to cast",
+            "description" : "CONFIRM — \"I see it too\". The only one taken: UPVOTE and DOWNVOTE are refused with 400",
             "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ],
-            "example" : "UPVOTE"
+            "example" : "CONFIRM"
           }
         },
         "required" : [ "voteType" ]

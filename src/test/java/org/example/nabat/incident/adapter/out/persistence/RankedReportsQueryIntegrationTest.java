@@ -84,19 +84,24 @@ class RankedReportsQueryIntegrationTest extends PostgresTestSupport {
             .containsExactly("today", "two days", "a month");
     }
 
-    /** Downvotes subtract, but support never goes negative and sinks a report below zero. */
+    /**
+     * Support is the people who see it: older upvotes count with confirmations, and downvotes
+     * — no longer taken — do not sink a report. One that is not real is rejected, with a reason.
+     */
     @Test
-    void downvotesCountAgainstSupportButNotBelowNothing() {
-        Alert disputed = save("disputed yesterday", "LOZENETS", 1, 0, AlertStatus.SENT)
-            .withVoteCounts(1, 20, 0, 0);
-        alerts.save(disputed);
-        save("unvoted three days ago", "LOZENETS", 3, 0, AlertStatus.SENT);
+    void supportIsWhoSeesItAndDownvotesNoLongerSubtract() {
+        Alert downvoted = save("five old downvotes, two days", "LOZENETS", 2, 0, AlertStatus.SENT)
+            .withVoteCounts(0, 5, 2, 0);
+        alerts.save(downvoted);
+        Alert upvoted = save("two old upvotes, two days", "LOZENETS", 2, 0, AlertStatus.SENT)
+            .withVoteCounts(2, 0, 1, 0);
+        alerts.save(upvoted);
+        save("three confirmations, two days", "LOZENETS", 2, 3, AlertStatus.SENT);
 
-        // Support floors at zero, so the disputed report is simply an unsupported one from
-        // yesterday, and yesterday beats three days ago. Were it allowed to go to -19, it
-        // would sink below every report nobody voted on at all.
-        assertThat(titles(ReportRanking.HOT, null, OPEN))
-            .containsExactly("disputed yesterday", "unvoted three days ago");
+        // Support 2, 3 and 3. The downvotes would have put the first one at the bottom; they
+        // are ignored, and two confirmations rank as two confirmations.
+        assertThat(titles(ReportRanking.HOT, null, OPEN).getLast()).isEqualTo("five old downvotes, two days");
+        assertThat(titles(ReportRanking.HOT, null, OPEN)).hasSize(3);
     }
 
     @Test

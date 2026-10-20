@@ -82,13 +82,13 @@ class AlertVoteControllerTest {
         VoteAlertUseCase.VoteReceipt vote = new VoteAlertUseCase.VoteReceipt(
                 UUID.randomUUID(),
                 AlertId.of(ALERT_ID),
-                VoteType.UPVOTE,
+                VoteType.CONFIRM,
                 Instant.now(),
                 new VoteAlertUseCase.VoteStats(4, 1, 2, 7));
         when(voteAlertUseCase.vote(any())).thenReturn(vote);
 
         String requestBody = objectMapper.writeValueAsString(
-                new AlertVoteController.VoteRequest(VoteType.UPVOTE)
+                new AlertVoteController.VoteRequest(VoteType.CONFIRM)
         );
 
         mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", ALERT_ID)
@@ -96,7 +96,7 @@ class AlertVoteControllerTest {
                         .content(requestBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.alertId").value(ALERT_ID.toString()))
-                .andExpect(jsonPath("$.voteType").value("UPVOTE"))
+                .andExpect(jsonPath("$.voteType").value("CONFIRM"))
                 // Tallies come back with the vote, so the client needs no follow-up call
                 // to the eventually-consistent stats endpoint.
                 .andExpect(jsonPath("$.stats.upvotes").value(4))
@@ -137,12 +137,12 @@ class AlertVoteControllerTest {
         User user = buildTestUser();
         authenticateAs(user);
 
-        when(voteAlertUseCase.findUserVote(any(), any())).thenReturn(Optional.of(VoteType.UPVOTE));
+        when(voteAlertUseCase.findUserVote(any(), any())).thenReturn(Optional.of(VoteType.CONFIRM));
 
         mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/me", ALERT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasVoted").value(true))
-                .andExpect(jsonPath("$.voteType").value("UPVOTE"));
+                .andExpect(jsonPath("$.voteType").value("CONFIRM"));
     }
 
     @Test

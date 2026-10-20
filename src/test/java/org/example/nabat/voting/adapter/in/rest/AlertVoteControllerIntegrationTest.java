@@ -71,25 +71,25 @@ class AlertVoteControllerIntegrationTest extends PostgresTestSupport {
         when(externalVotingPort.vote(any(), any(), any())).thenReturn(new ExternalVotingPort.VoteResult(
                 voteId,
                 AlertId.of(alertId),
-                VoteType.UPVOTE,
+                VoteType.CONFIRM,
                 Instant.now(),
                 // Tallies now travel back with the vote rather than being fetched afterwards.
                 new ExternalVotingPort.VoteStats(1, 0, 0, 1)
         ));
         when(externalVotingPort.getVoteStats(any())).thenReturn(new ExternalVotingPort.VoteStats(1, 0, 0, 1));
-        when(externalVotingPort.findUserVote(any(), any())).thenReturn(Optional.of(VoteType.UPVOTE));
+        when(externalVotingPort.findUserVote(any(), any())).thenReturn(Optional.of(VoteType.CONFIRM));
         when(externalVotingPort.removeVote(any(AlertId.class), any(UserId.class)))
                 .thenReturn(new ExternalVotingPort.VoteStats(0, 0, 0, 0))
                 .thenThrow(new IllegalStateException("No existing vote to remove."));
 
-        // 1) create vote (UPVOTE)
+        // 1) create vote (CONFIRM)
         mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", alertId)
                 .header("Authorization", "Bearer " + auth.accessToken())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new AlertVoteController.VoteRequest(VoteType.UPVOTE))))
+                .content(objectMapper.writeValueAsString(new AlertVoteController.VoteRequest(VoteType.CONFIRM))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.alertId").value(alertId.toString()))
-            .andExpect(jsonPath("$.voteType").value("UPVOTE"));
+            .andExpect(jsonPath("$.voteType").value("CONFIRM"));
 
         // 2) stats endpoint still reads from voting service
         mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/stats", alertId)
@@ -104,7 +104,7 @@ class AlertVoteControllerIntegrationTest extends PostgresTestSupport {
                         .header("Authorization", "Bearer " + auth.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasVoted").value(true))
-                .andExpect(jsonPath("$.voteType").value("UPVOTE"));
+                .andExpect(jsonPath("$.voteType").value("CONFIRM"));
 
         // 4) remove vote — 200 with the resulting tallies, not 204
         mockMvc.perform(delete("/api/v1/alerts/{alertId}/votes", alertId)
