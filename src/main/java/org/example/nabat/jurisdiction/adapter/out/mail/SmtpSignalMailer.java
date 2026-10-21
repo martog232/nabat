@@ -80,6 +80,7 @@ public class SmtpSignalMailer implements SignalMailer {
             case FORWARDED -> "Препратен сигнал: ";
             case REMINDER -> "Напомняне — сигнал без отговор: ";
             case ESCALATION -> "Ескалиран сигнал без отговор: ";
+            case WITHDRAWN -> "Оттеглен сигнал: ";
         };
         return kind + mail.categoryLabel() + " — " + mail.title();
     }

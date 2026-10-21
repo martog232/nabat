@@ -197,7 +197,7 @@ class AlertTest {
         }
 
         @ParameterizedTest
-        @EnumSource(value = AlertStatus.class, names = {"RESOLVED", "REJECTED"})
+        @EnumSource(value = AlertStatus.class, names = {"RESOLVED", "REJECTED", "WITHDRAWN"})
         void stopsMovingOnceClosed(AlertStatus closed) {
             Alert alert = inStatus(closed);
 
@@ -221,6 +221,18 @@ class AlertTest {
             assertEquals(ClosedBy.MODERATOR, submitted.reject(ClosedBy.MODERATOR).closedBy());
         }
 
+        /** The reporter's own word, final, and no claim that anything was fixed. */
+        @Test
+        void aWithdrawalIsTheReportersAndResolvesNothing() {
+            Alert withdrawn = submitted.markSent(DUE).withdraw();
+
+            assertEquals(AlertStatus.WITHDRAWN, withdrawn.status());
+            assertEquals(ClosedBy.REPORTER, withdrawn.closedBy());
+            assertNull(withdrawn.resolvedAt());
+            assertNull(withdrawn.answerDueAt());
+            assertFalse(withdrawn.status().isOpen());
+        }
+
         @Test
         void refusesToCloseWithoutSayingWho() {
             assertThrows(IllegalArgumentException.class, () -> submitted.resolve(null));
@@ -235,6 +247,7 @@ class AlertTest {
                 case IN_PROGRESS -> submitted.startWork();
                 case RESOLVED -> submitted.resolve(ClosedBy.REPORTER);
                 case REJECTED -> submitted.reject(ClosedBy.MODERATOR);
+                case WITHDRAWN -> submitted.withdraw();
             };
         }
     }

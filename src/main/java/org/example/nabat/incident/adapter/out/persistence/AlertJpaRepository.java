@@ -72,7 +72,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      * The four spatial queries below share a shape: circle predicate, optional category
      * filter, newest first, LIMIT.
      *
-     * "Open" is spelled out as `NOT IN ('RESOLVED', 'REJECTED')`, the SQL twin of
+     * "Open" is spelled out as `NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')`, the SQL twin of
      * AlertStatus.isOpen(). Naming the closed states rather than the open ones is
      * deliberate: a new open state then appears on the map without touching this file,
      * whereas a list of open states would hide it until someone remembered.
@@ -97,7 +97,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
         AND a.category_code IN (:categories)
         AND ST_DWithin(
             a.location_geog,
@@ -118,7 +118,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     /** PostGIS path — used when the location_geog generated column exists. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
         AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
              OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND ST_DWithin(
@@ -144,7 +144,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
         AND a.created_at >= :since
         AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
              OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
@@ -168,7 +168,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     /** Haversine equivalent of {@link #findActiveAlertsWithinRadiusSince}. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
         AND a.created_at >= :since
         AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
              OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
@@ -192,7 +192,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     /** Haversine fallback — used when PostGIS is not installed on the server. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status NOT IN ('RESOLVED', 'REJECTED')
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
         AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
              OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND (6371 * acos(

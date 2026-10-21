@@ -128,7 +128,15 @@ public class SignalDispatcher {
         // The event carries the report as it was. If it has been forwarded since, this mail
         // would go to an authority it is no longer waiting on — the forward's own delivery
         // reaches the right one.
-        String current = reports.getById(alert.id()).authorityCode();
+        Alert now = reports.getById(alert.id());
+        if (!now.status().isOpen()) {
+            // Closed before its mail left — withdrawn by its reporter, most likely. Nobody has
+            // anything to answer.
+            log.info("Report {} was closed ({}) before its mail to {} left; not sent",
+                id, now.status(), alert.authorityCode());
+            return;
+        }
+        String current = now.authorityCode();
         if (!current.equals(alert.authorityCode())) {
             log.info("Report {} was forwarded to {} before its mail to {} left; not sent",
                 id, current, alert.authorityCode());

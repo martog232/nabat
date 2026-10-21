@@ -8,7 +8,7 @@ package org.example.nabat.incident.domain;
  * A signal only ever moves <em>forward</em> through them, but it may skip — an institution
  * that starts work on something it sees on its own page has not waited for the email.
  *
- * <p>{@code RESOLVED} and {@code REJECTED} are final and can be reached from any open
+ * <p>{@code RESOLVED}, {@code REJECTED} and {@code WITHDRAWN} are final and can be reached from any open
  * state. A pothole that gets filled does not wait for the paperwork to catch up, and an
  * institution that never answers must not be able to keep a signal open forever by
  * saying nothing.
@@ -25,11 +25,18 @@ public enum AlertStatus {
     /** Fixed. */
     RESOLVED,
     /** Closed without a fix — a duplicate, not a real problem, not anyone's to fix. */
-    REJECTED;
+    REJECTED,
+    /**
+     * Taken back by the person who made it (V35): a mistake, a duplicate they noticed, a
+     * problem that turned out to be nothing. Not {@link #REJECTED}, which is the authority's
+     * judgement and counts as its answer; this is the reporter's, and says nothing about the
+     * authority.
+     */
+    WITHDRAWN;
 
     /** True while the signal still describes a problem that is out there. */
     public boolean isOpen() {
-        return this != RESOLVED && this != REJECTED;
+        return this != RESOLVED && this != REJECTED && this != WITHDRAWN;
     }
 
     /**

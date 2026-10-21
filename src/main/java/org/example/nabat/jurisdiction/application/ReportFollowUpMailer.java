@@ -8,6 +8,7 @@ import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.ListReportCategoriesUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AnswerOverdue;
+import org.example.nabat.incident.domain.ReportWithdrawn;
 import org.example.nabat.jurisdiction.application.port.in.ListAuthoritiesUseCase;
 import org.example.nabat.jurisdiction.application.port.out.DistrictRepository;
 import org.example.nabat.jurisdiction.application.port.out.SignalMailer;
@@ -28,19 +29,20 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Mails a report its authority has left past the answer deadline: to the authority itself as a
- * reminder, and — still nothing well after that — to the municipality, which the districts and
- * the city's institutions answer to ({@code nabat.reports.escalate-to}, V34).
+ * The mails about a report after its first: to an authority that has left it past the answer
+ * deadline, as a reminder, and — still nothing well after that — to the municipality, which the
+ * districts and the city's institutions answer to ({@code nabat.reports.escalate-to}, V34); and
+ * to the authority of a report its reporter has withdrawn, so it stops working on it.
  *
- * <p>Each step is published once per deadline (see {@code DeadlineStepStore.take}), so this
+ * <p>Each overdue step is published once per deadline (see {@code DeadlineStepStore.take}), so this
  * keeps no record of its own: a replay after a failed send mails again, which is the outbox's
  * usual bargain. The report is re-read first, so one answered since the step was taken is not
  * chased.
  */
 @Component
-public class OverdueMailer {
+public class ReportFollowUpMailer {
 
-    private static final Logger log = LoggerFactory.getLogger(OverdueMailer.class);
+    private static final Logger log = LoggerFactory.getLogger(ReportFollowUpMailer.class);
 
     private static final DateTimeFormatter DATE = DateTimeFormatter
         .ofPattern("dd.MM.yyyy", Locale.forLanguageTag("bg"))
@@ -55,7 +57,7 @@ public class OverdueMailer {
     private final SignInLinkUseCase signInLinks;
     private final String escalateTo;
 
-    public OverdueMailer(
+    public ReportFollowUpMailer(
         DistrictRepository districts,
         ListAuthoritiesUseCase authorities,
         SignalMailer mailer,
@@ -99,6 +101,20 @@ public class OverdueMailer {
                         + ", а напомнянето след това остана без отговор.");
             }
         }
+    }
+
+    /**
+     * Withdrawn by its reporter: the authority that has it — and only one that has it — is told
+     * it can stop. A report withdrawn before its mail left was never anyone's to stop.
+     */
+    @ApplicationModuleListener
+    public void on(ReportWithdrawn event) {
+        if (!event.delivered()) {
+            return;
+        }
+        Alert alert = event.alert();
+        send(alert, authority(alert.authorityCode()), Kind.WITHDRAWN,
+            "Подателят оттегли този сигнал: „" + event.reason() + "“. Не е нужно да отговаряте повече.");
     }
 
     private void send(Alert alert, Authority to, Kind kind, String note) {

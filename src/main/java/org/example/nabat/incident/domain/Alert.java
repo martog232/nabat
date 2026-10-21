@@ -159,6 +159,14 @@ public record Alert(
         return moveTo(AlertStatus.RESOLVED, Instant.now(), requireCloser(by), null);
     }
 
+    /**
+     * Taken back by its reporter (V35). Final, closed by the reporter, and nothing resolved —
+     * the alternative was marking a mistake "fixed", which put a false fix in the data.
+     */
+    public Alert withdraw() {
+        return moveTo(AlertStatus.WITHDRAWN, null, ClosedBy.REPORTER, null);
+    }
+
     /** Closed without a fix. {@code resolvedAt} stays empty: nothing was resolved. */
     public Alert reject(ClosedBy by) {
         return moveTo(AlertStatus.REJECTED, null, requireCloser(by), null);

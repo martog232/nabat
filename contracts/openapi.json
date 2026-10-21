@@ -408,7 +408,7 @@
           "schema" : {
             "type" : "string",
             "default" : "SUBMITTED",
-            "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED" ]
+            "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED", "WITHDRAWN" ]
           }
         } ],
         "responses" : {
@@ -435,6 +435,44 @@
             "application/json" : {
               "schema" : {
                 "$ref" : "#/components/schemas/CreateAlertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/withdraw" : {
+      "post" : {
+        "tags" : [ "withdrawal-controller" ],
+        "summary" : "The reporter withdraws their open report, saying why",
+        "operationId" : "withdraw_1",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WithdrawRequest"
               }
             }
           },
@@ -1318,7 +1356,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED" ]
+              "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED", "WITHDRAWN" ]
             },
             "uniqueItems" : true
           }
@@ -1492,7 +1530,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED" ]
+              "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED", "WITHDRAWN" ]
             },
             "uniqueItems" : true
           }
@@ -1982,7 +2020,7 @@
           "status" : {
             "type" : "string",
             "description" : "Current lifecycle status",
-            "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED" ]
+            "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED", "WITHDRAWN" ]
           },
           "reportedBy" : {
             "type" : "string",
@@ -2044,6 +2082,20 @@
             "description" : "When its authority has to have answered by; null when nothing is waiting on it. Past this, the report is overdue"
           }
         }
+      },
+      "WithdrawRequest" : {
+        "type" : "object",
+        "description" : "Why the report is withdrawn",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "description" : "1 to 1000 characters",
+            "example" : "Сгреших мястото — подадох го отново на правилното.",
+            "maxLength" : 1000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "reason" ]
       },
       "ReasonRequest" : {
         "type" : "object",

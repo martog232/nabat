@@ -63,7 +63,9 @@ public interface SignalMailer {
             /** Its deadline passed with no answer: the authority is reminded. */
             REMINDER,
             /** Still no answer after the reminder: the municipality is told. */
-            ESCALATION
+            ESCALATION,
+            /** Its reporter took it back: the authority can stop. */
+            WITHDRAWN
         }
 
         /** A new report, or a forwarded one when there is a note — the two the dispatch sends. */

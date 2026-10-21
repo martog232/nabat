@@ -197,6 +197,17 @@ class SignalDispatcherTest {
         verify(recordDelivery).recordDelivered(alert.id(), "CGM");
     }
 
+    /** Withdrawn by its reporter before the mail left: nobody has anything to answer. */
+    @Test
+    void doesNotMailAReportClosedBeforeItsMailLeft() {
+        when(reports.getById(alert.id())).thenReturn(alert.withdraw());
+
+        dispatcher.on(new AlertCreated(alert));
+
+        verifyNoInteractions(mailer, recordDelivery);
+        verify(dispatches, never()).save(any());
+    }
+
     /**
      * The creation mail had not left when the report was forwarded. Sending it now would tell
      * the old authority about a report that is no longer theirs, and mark it SENT for them.
