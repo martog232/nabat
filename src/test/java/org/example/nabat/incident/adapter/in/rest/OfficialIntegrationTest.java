@@ -90,6 +90,16 @@ class OfficialIntegrationTest extends PostgresTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("RESOLVED"))
             .andExpect(jsonPath("$.closedBy").value("AUTHORITY"));
+
+        // Each step on record, and who took it: the delivery is nabat's own, the rest the official's.
+        perform(get("/api/v1/alerts/{id}/history", report), reporter)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].step").value(org.hamcrest.Matchers.contains(
+                "SENT", "ACKNOWLEDGED", "WORK_STARTED", "RESOLVED")))
+            .andExpect(jsonPath("$[0].actorName").doesNotExist())
+            .andExpect(jsonPath("$[1].actorName").value("User studentski@example.com"))
+            .andExpect(jsonPath("$[1].byAuthority").value(true))
+            .andExpect(jsonPath("$[3].authorityCode").value("STUDENTSKI"));
     }
 
     @Test

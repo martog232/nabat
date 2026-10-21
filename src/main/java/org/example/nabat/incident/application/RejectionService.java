@@ -6,6 +6,7 @@ import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.CommentStore;
 import org.example.nabat.incident.application.port.out.RejectionStore;
+import org.example.nabat.incident.application.port.out.ReportHistory;
 import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
@@ -15,6 +16,7 @@ import org.example.nabat.incident.domain.ClosedBy;
 import org.example.nabat.incident.domain.Comment;
 import org.example.nabat.incident.domain.RejectionDecided;
 import org.example.nabat.incident.domain.ReportProgressed;
+import org.example.nabat.incident.domain.ReportStep;
 import org.example.nabat.incident.domain.ReportRejection;
 import org.example.nabat.incident.domain.ReportRejection.Decision;
 import org.example.nabat.shared.UseCase;
@@ -47,6 +49,7 @@ public class RejectionService implements RejectReportUseCase {
     private final AlertNotificationPort broadcast;
     private final ApplicationEventPublisher events;
     private final AnswerDeadline deadline;
+    private final ReportHistory history;
 
     public RejectionService(
         AlertRepository alerts,
@@ -55,9 +58,11 @@ public class RejectionService implements RejectReportUseCase {
         ResponsibleAuthorityPort authorities,
         AlertNotificationPort broadcast,
         ApplicationEventPublisher events,
-        AnswerDeadline deadline
+        AnswerDeadline deadline,
+        ReportHistory history
     ) {
         this.deadline = deadline;
+        this.history = history;
         this.alerts = alerts;
         this.rejections = rejections;
         this.comments = comments;
@@ -81,6 +86,7 @@ public class RejectionService implements RejectReportUseCase {
 
         // Refuses a report that is closed already.
         Alert rejected = alerts.save(alert.reject(byAuthority ? ClosedBy.AUTHORITY : ClosedBy.MODERATOR));
+        history.record(Steps.by(actor, rejected, alert.authorityCode(), ReportStep.Kind.REJECTED));
         broadcast.broadcastAlertUpdate(rejected);
 
         Instant now = now();
@@ -139,6 +145,7 @@ public class RejectionService implements RejectReportUseCase {
         Alert after = alert;
         if (decision == Decision.REOPENED) {
             after = alerts.save(alert.reopen(deadline.fromNow()));
+            history.record(Steps.by(moderator, after, after.authorityCode(), ReportStep.Kind.REOPENED));
             broadcast.broadcastAlertUpdate(after);
         }
         comments.insert(new Comment(UUID.randomUUID(), id, moderatorId, moderator.displayName(), false,

@@ -6,6 +6,7 @@ import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.CommentStore;
 import org.example.nabat.incident.application.port.out.ForwardStore;
+import org.example.nabat.incident.application.port.out.ReportHistory;
 import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
@@ -13,6 +14,7 @@ import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.Comment;
 import org.example.nabat.incident.domain.ReportForward;
 import org.example.nabat.incident.domain.ReportForwarded;
+import org.example.nabat.incident.domain.ReportStep;
 import org.example.nabat.shared.UseCase;
 import org.example.nabat.shared.domain.NotAuthorizedException;
 import org.springframework.cache.annotation.CacheEvict;
@@ -42,6 +44,7 @@ public class ForwardReportService implements ForwardReportUseCase {
     private final ResponsibleAuthorityPort authorities;
     private final AlertNotificationPort broadcast;
     private final ApplicationEventPublisher events;
+    private final ReportHistory history;
 
     public ForwardReportService(
         AlertRepository alerts,
@@ -49,8 +52,10 @@ public class ForwardReportService implements ForwardReportUseCase {
         CommentStore comments,
         ResponsibleAuthorityPort authorities,
         AlertNotificationPort broadcast,
-        ApplicationEventPublisher events
+        ApplicationEventPublisher events,
+        ReportHistory history
     ) {
+        this.history = history;
         this.alerts = alerts;
         this.forwards = forwards;
         this.comments = comments;
@@ -88,6 +93,7 @@ public class ForwardReportService implements ForwardReportUseCase {
 
         // Refuses a closed report and the authority it already has.
         Alert moved = alerts.save(alert.forwardTo(toAuthority));
+        history.record(Steps.by(actor, moved, alert.authorityCode(), ReportStep.Kind.FORWARDED));
         broadcast.broadcastAlertUpdate(moved);
 
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);

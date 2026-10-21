@@ -1203,6 +1203,37 @@
         }
       }
     },
+    "/api/v1/alerts/{id}/history" : {
+      "get" : {
+        "tags" : [ "history-controller" ],
+        "summary" : "Who did what to the report, and when, oldest first",
+        "operationId" : "history",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/StepResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/{id}/forwards" : {
       "get" : {
         "tags" : [ "forward-controller" ],
@@ -2526,6 +2557,33 @@
             "type" : "string",
             "description" : "A district administration, or an institution that takes some categories city-wide",
             "enum" : [ "DISTRICT", "INSTITUTION" ]
+          }
+        }
+      },
+      "StepResponse" : {
+        "type" : "object",
+        "description" : "One step in a report's life",
+        "properties" : {
+          "step" : {
+            "type" : "string",
+            "enum" : [ "CREATED", "SENT", "ACKNOWLEDGED", "WORK_STARTED", "RESOLVED", "REJECTED", "FORWARDED", "REOPENED", "WITHDRAWN" ]
+          },
+          "actorName" : {
+            "type" : "string",
+            "description" : "Who took it, by name when they did; null for what nabat does itself (delivering it)"
+          },
+          "byAuthority" : {
+            "type" : "boolean",
+            "description" : "They spoke for the authority the report was with"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "The authority the report was with",
+            "example" : "LOZENETS"
+          },
+          "happenedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },

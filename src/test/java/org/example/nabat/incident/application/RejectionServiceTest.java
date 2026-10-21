@@ -8,6 +8,7 @@ import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.CommentStore;
 import org.example.nabat.incident.application.port.out.RejectionStore;
 import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
+import org.example.nabat.incident.application.port.out.ReportHistory;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
@@ -49,6 +50,7 @@ class RejectionServiceTest {
     @Mock private ResponsibleAuthorityPort authorities;
     @Mock private AlertNotificationPort broadcast;
     @Mock private ApplicationEventPublisher events;
+    @Mock private ReportHistory history;
 
     private RejectionService service;
 
@@ -58,7 +60,7 @@ class RejectionServiceTest {
     @BeforeEach
     void setUp() {
         service = new RejectionService(alerts, rejections, comments, authorities, broadcast, events,
-            new AnswerDeadline(java.time.Duration.ofDays(30)));
+            new AnswerDeadline(java.time.Duration.ofDays(30)), history);
         lenient().when(authorities.nameOf("LOZENETS")).thenReturn(Optional.of("Район Лозенец"));
         lenient().when(alerts.save(any(Alert.class))).thenAnswer(i -> i.getArgument(0));
     }

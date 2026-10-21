@@ -5,12 +5,14 @@ import org.example.nabat.incident.application.port.in.WithdrawReportUseCase;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.CommentStore;
+import org.example.nabat.incident.application.port.out.ReportHistory;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.incident.domain.Comment;
 import org.example.nabat.incident.domain.ReportWithdrawn;
+import org.example.nabat.incident.domain.ReportStep;
 import org.example.nabat.shared.UseCase;
 import org.example.nabat.shared.domain.NotAuthorizedException;
 import org.springframework.cache.annotation.CacheEvict;
@@ -32,13 +34,16 @@ public class WithdrawalService implements WithdrawReportUseCase {
     private final CommentStore comments;
     private final AlertNotificationPort broadcast;
     private final ApplicationEventPublisher events;
+    private final ReportHistory history;
 
     public WithdrawalService(
         AlertRepository alerts,
         CommentStore comments,
         AlertNotificationPort broadcast,
-        ApplicationEventPublisher events
+        ApplicationEventPublisher events,
+        ReportHistory history
     ) {
+        this.history = history;
         this.alerts = alerts;
         this.comments = comments;
         this.broadcast = broadcast;
@@ -61,6 +66,7 @@ public class WithdrawalService implements WithdrawReportUseCase {
 
         // Refuses a closed report.
         Alert withdrawn = alerts.save(alert.withdraw());
+        history.record(Steps.by(reporter, withdrawn, alert.authorityCode(), ReportStep.Kind.WITHDRAWN));
         broadcast.broadcastAlertUpdate(withdrawn);
 
         // Written to the store directly: the withdrawal closes the thread, and this is the record

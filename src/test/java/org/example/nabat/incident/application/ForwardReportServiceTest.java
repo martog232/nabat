@@ -8,6 +8,7 @@ import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.CommentStore;
 import org.example.nabat.incident.application.port.out.ForwardStore;
 import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
+import org.example.nabat.incident.application.port.out.ReportHistory;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
@@ -48,6 +49,7 @@ class ForwardReportServiceTest {
     @Mock private ResponsibleAuthorityPort authorities;
     @Mock private AlertNotificationPort broadcast;
     @Mock private ApplicationEventPublisher events;
+    @Mock private ReportHistory history;
 
     private ForwardReportService service;
 
@@ -56,7 +58,7 @@ class ForwardReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ForwardReportService(alerts, forwards, comments, authorities, broadcast, events);
+        service = new ForwardReportService(alerts, forwards, comments, authorities, broadcast, events, history);
         lenient().when(alerts.findById(alertId)).thenReturn(Optional.of(report()));
         lenient().when(authorities.nameOf("CGM")).thenReturn(Optional.of("Център за градска мобилност"));
         lenient().when(alerts.save(any(Alert.class))).thenAnswer(i -> i.getArgument(0));

@@ -10,10 +10,12 @@ import org.example.nabat.incident.application.port.in.RecordDeliveryUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
+import org.example.nabat.incident.application.port.out.ReportHistory;
 import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
 import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.AlertResolved;
 import org.example.nabat.incident.domain.ReportProgressed;
+import org.example.nabat.incident.domain.ReportStep;
 import org.example.nabat.shared.domain.NotAuthorizedException;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
@@ -39,6 +41,7 @@ public class AlertLifecycleService
     private final ApplicationEventPublisher events;
     private final ResponsibleAuthorityPort authorities;
     private final AnswerDeadline deadline;
+    private final ReportHistory history;
 
     @Override
     @Transactional(readOnly = true)
@@ -64,6 +67,7 @@ public class AlertLifecycleService
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert resolve(AlertId id, User actor) {
         Alert resolved = transition(id, alert -> alert.resolve(closerOf(alert, actor)));
+        history.record(Steps.by(actor, resolved, resolved.authorityCode(), ReportStep.Kind.RESOLVED));
         // Through the Event Publication Registry, like AlertCreated: the reporter is asked
         // whether it is really fixed after this commits, and asked again if that fails.
         events.publishEvent(new AlertResolved(resolved));
@@ -74,14 +78,18 @@ public class AlertLifecycleService
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert acknowledge(AlertId id, User actor) {
-        return announced(transition(id, alert -> requireAuthority(alert, actor).acknowledge()));
+        Alert acknowledged = transition(id, alert -> requireAuthority(alert, actor).acknowledge());
+        history.record(Steps.by(actor, acknowledged, acknowledged.authorityCode(), ReportStep.Kind.ACKNOWLEDGED));
+        return announced(acknowledged);
     }
 
     @Override
     @Transactional
     @CacheEvict(cacheNames = "nearbyAlerts", allEntries = true)
     public Alert startWork(AlertId id, User actor) {
-        return announced(transition(id, alert -> requireAuthority(alert, actor).startWork()));
+        Alert started = transition(id, alert -> requireAuthority(alert, actor).startWork());
+        history.record(Steps.by(actor, started, started.authorityCode(), ReportStep.Kind.WORK_STARTED));
+        return announced(started);
     }
 
     /**
@@ -116,6 +124,7 @@ public class AlertLifecycleService
         }
 
         Alert sent = alertRepository.save(alert.markSent(deadline.fromNow()));
+        history.record(Steps.bySystem(sent, ReportStep.Kind.SENT));
         alertNotificationPort.broadcastAlertUpdate(sent);
     }
 

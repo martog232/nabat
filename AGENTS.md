@@ -149,6 +149,11 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 - **Past the deadline, the authority is chased** (`DeadlineWatch` → `WatchDeadlinesUseCase`, hourly, `NABAT_DEADLINE_WATCH_ENABLED`, on in compose and Helm). First a reminder to the authority itself; if the report is still waiting on the same deadline `nabat.reports.escalate-after` (P14D) after that, a mail to the municipality (`nabat.reports.escalate-to`, `STOLICHNA_OBSHTINA`, an institution since V34 — and a forward target, since a boulevard is its, not the district's). Each is `AnswerOverdue` through the registry: `jurisdiction`'s `ReportFollowUpMailer` mails (subject „Напомняне — …“ / „Ескалиран …“, with a sign-in key), `notification` tells the reporter (`OVERDUE_REMINDED`, `ESCALATED`).
 - **Once per step and deadline.** `report_deadline_steps` (V33) is keyed by report, deadline and stage; the watch inserts the row `ON CONFLICT DO NOTHING` and publishes only if it went in, so two replicas running at once act once. A new deadline — forwarded, reopened — is chased in its own right. Each report is its own transaction, re-read inside it, so one answered meanwhile is skipped; `ReportFollowUpMailer` re-reads it again before mailing.
 
+### History (`incident`)
+- **Every step of a report is recorded with who took it** (`report_history`, V36; `ReportHistory`): delivered (`SENT`, nabat's own — no actor), acknowledged, work started, resolved, rejected, forwarded, reopened, withdrawn. Written in the transaction that takes the step, by the service that takes it. `actor_name` and `by_authority` are the actor's name and standing at the time, kept like a comment's; `authority_code` is the authority the report was with.
+- **Why.** "Closed by the authority" said which body, never which person, and nothing recorded who acknowledged or started work. With several officials per authority that is the difference between an authority that answers and one where nobody knows who did.
+- `GET /api/v1/alerts/{id}/history`, oldest first. Reports older than V36 have none; none is invented. `CREATED` is in the step list but not recorded: the report itself says when and by whom.
+
 ### Withdrawal (`incident` + `jurisdiction`)
 - **`POST /api/v1/alerts/{id}/withdraw` `{reason}`** (`WithdrawalService`) — the reporter, and only they, takes an open report back: `WITHDRAWN` (V35), final, closed by `REPORTER`, nothing resolved. Before this the only way a reporter could close their own report was "resolved", which put a false fix in the data and then asked the city "is it really fixed?" about something never broken.
 - **Not `REJECTED`.** A rejection is the authority's judgement and its answer; a withdrawal is the reporter's and counts for or against no authority. A moderator or an authority does not withdraw — they reject, saying why.
@@ -344,6 +349,7 @@ Persistence is PostgreSQL with **Flyway**. `spring.jpa.hibernate.ddl-auto=valida
 | V33 | `report_deadline_steps` — reminders and escalations taken, once per report, deadline and stage |
 | V34 | Столична община (`STOLICHNA_OBSHTINA`) as an institution: escalation target and forward target |
 | V35 | `WITHDRAWN` — a report its reporter takes back; final, and no authority's answer |
+| V36 | `report_history` — each step of a report and who took it |
 
 ---
 

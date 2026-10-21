@@ -3,6 +3,7 @@ package org.example.nabat.incident.application;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.ResponsibleAuthorityPort;
+import org.example.nabat.incident.application.port.out.ReportHistory;
 import org.example.nabat.incident.domain.AlertNotFoundException;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
@@ -44,6 +45,8 @@ class AlertLifecycleServiceTest {
     private ApplicationEventPublisher events;
     @Mock
     private ResponsibleAuthorityPort authorities;
+    @Mock
+    private ReportHistory history;
 
     private AlertLifecycleService service;
 
@@ -53,7 +56,7 @@ class AlertLifecycleServiceTest {
     @BeforeEach
     void setUp() {
         service = new AlertLifecycleService(alertRepository, alertNotificationPort, events, authorities,
-            new AnswerDeadline(java.time.Duration.ofDays(30)));
+            new AnswerDeadline(java.time.Duration.ofDays(30)), history);
         lenient().when(authorities.nameOf("LOZENETS")).thenReturn(Optional.of("Район Лозенец"));
     }
 
