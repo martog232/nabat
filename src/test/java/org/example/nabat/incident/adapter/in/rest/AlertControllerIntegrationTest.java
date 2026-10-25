@@ -3,18 +3,16 @@ package org.example.nabat.incident.adapter.in.rest;
 import org.example.nabat.identity.adapter.in.rest.RegisterRequest;
 import org.example.nabat.PostgresTestSupport;
 import org.example.nabat.identity.adapter.in.rest.AuthResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.application.port.out.EmailSender;
-import org.example.nabat.incident.domain.AlertSeverity;
-import org.example.nabat.incident.domain.AlertType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -40,7 +38,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
     private ObjectMapper objectMapper;
 
     /** Prevent real SMTP during integration tests. */
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
     @Autowired
@@ -51,7 +49,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
 
     @BeforeEach
     void setUp() {
-        alertRepository.deleteAll();
+        alertRepository.deleteAllInBatch();
         userRepository.deleteAll();
     }
 
@@ -83,8 +81,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Integration Test Alert",
                 "A test alert from integration test",
-                AlertType.FIRE,
-                AlertSeverity.HIGH,
+                1007,
                 42.695,
                 23.329,
                 null
@@ -97,7 +94,8 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(notNullValue()))
                 .andExpect(jsonPath("$.title").value("Integration Test Alert"))
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.districtCode").value(notNullValue()))
                 .andReturn();
 
         // Verify the alert was created with the authenticated user's ID
@@ -108,6 +106,48 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         org.junit.jupiter.api.Assertions.assertEquals(userId, response.reportedBy());
     }
 
+    /** The public list and the district names it is shown with need no session. */
+    @Test
+    void thePublicListIsReadableWithoutSigningIn() throws Exception {
+        mockMvc.perform(get("/api/v1/alerts/ranked").param("ranking", "LONGEST_WAITING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ranking").value("LONGEST_WAITING"))
+                .andExpect(jsonPath("$.total").value(0));
+        mockMvc.perform(get("/api/v1/districts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(24)));
+    }
+
+    /** Public means readable, not open: nothing else became reachable without a token. */
+    @Test
+    void theRestOfTheReportApiStillNeedsASession() throws Exception {
+        mockMvc.perform(get("/api/v1/alerts/nearby").param("latitude", "42.69").param("longitude", "23.32"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Plovdiv: well-formed, and nowhere nabat can send a report. 422 with its own code, so
+     * a client can say "outside Sofia" rather than "invalid request" — and nothing stored.
+     */
+    @Test
+    void refusesAReportOutsideSofia() throws Exception {
+        String token = registerAndGetAuth().accessToken();
+        long before = alertRepository.count();
+
+        CreateAlertRequest request = new CreateAlertRequest(
+                "Pothole in Plovdiv", "Not ours to route", 1007,
+                42.1354, 24.7453, null
+        );
+
+        mockMvc.perform(post("/api/v1/alerts")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("OUTSIDE_SERVICE_AREA"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(before, alertRepository.count());
+    }
     @Test
     void shouldReturnNearbyAlertsAfterCreation() throws Exception {
         AuthResponse auth = registerAndGetAuth();
@@ -116,8 +156,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Nearby Alert",
                 "A nearby alert",
-                AlertType.CRIME,
-                AlertSeverity.MEDIUM,
+                1001,
                 42.695,
                 23.329,
                 null
@@ -145,8 +184,7 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Unauthorized Alert",
                 "Should fail",
-                AlertType.FIRE,
-                AlertSeverity.LOW,
+                1007,
                 42.0,
                 23.0,
                 null
@@ -191,10 +229,9 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         CreateAlertRequest request = new CreateAlertRequest(
                 "Security Test Alert",
                 "Verifying reporter is from token, not request body",
-                AlertType.OTHER,
-                AlertSeverity.LOW,
-                40.0,
-                20.0,
+                1051,
+                42.6515,
+                23.3455,
                 null
         );
 

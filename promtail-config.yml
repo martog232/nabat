@@ -32,19 +32,33 @@ scrape_configs:
       # output) simply do not match and pass through unchanged.
       - json:
           expressions:
-            # Keys containing dots are quoted: these are JMESPath expressions, and an
-            # unquoted log.level would be read as a nested object rather than a flat key.
-            level: '"log.level"'
-            logger: '"log.logger"'
+            # Unquoted, because these are JMESPath expressions and Boot 4 emits ECS as
+            # nested objects: log.level reads the "level" field of the "log" object. Boot 3.4
+            # emitted a single flat key literally named "log.level", which JMESPath only
+            # reaches when quoted — so the quoting that used to be required is now what breaks
+            # it. Getting this wrong does not fail: Promtail ships the lines with no level and
+            # no traceId label, and Loki looks like a system nobody is logging in.
+            level: log.level
+            logger: log.logger
             traceId: traceId
-            service: '"service.name"'
+            service: service.name
             ts: '"@timestamp"'
-      # A label, not just a field: this is what makes "show me every line from this trace"
-      # a label selector. Deliberately only traceId — labels are indexed and high
-      # cardinality is what makes Loki slow, so message and logger stay as content.
+      # A label, not just a field: `level` has a handful of values, so indexing it makes
+      # "show me the errors" a stream selector and costs almost nothing.
+      #
+      # traceId is deliberately NOT a label. Loki indexes label values into separate
+      # streams, and a trace id is unique per request — promoting it meant one stream per
+      # request, and an ordinary hour-long query over this stack already answered
+      # "maximum number of series (500) reached for a single query" instead of logs. The
+      # search it was added for still works, through the field the json stage extracts:
+      #
+      #     {service="nabat-app"} | json | traceId = "<id>"
+      #
+      # That reads the line rather than the index, which is the intended shape for a
+      # high-cardinality value — Loki 3 calls the indexed-but-not-a-stream version of
+      # this structured metadata, if it is ever worth the upgrade.
       - labels:
           level:
-          traceId:
       # Use the application's own timestamp rather than ingestion time, so ordering
       # survives a shipping delay.
       # `source` names a field extracted by the json stage above, not a JMESPath

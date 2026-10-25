@@ -5,9 +5,7 @@ import org.example.nabat.incident.application.port.out.AlertRepository;
 import org.example.nabat.incident.application.port.out.AlertRepository.NearbySearch;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,17 +41,16 @@ class GetNearbyAlertsServiceTest {
                 AlertId.generate(),
                 "Nearby Alert",
                 "Some description",
-                AlertType.FIRE,
-                AlertSeverity.HIGH,
+                1007,
                 Location.of(lat, lon),
                 Instant.now(),
-                AlertStatus.ACTIVE,
+                AlertStatus.SUBMITTED,
                 UUID.randomUUID(),
                 0, 0, 0,
 
                 0,
                 null,
-                null
+                null, "LOZENETS", null
         );
     }
 
@@ -103,7 +100,7 @@ class GetNearbyAlertsServiceTest {
         when(alertRepository.findActiveAlertsWithinRadius(any(NearbySearch.class)))
                 .thenReturn(Collections.emptyList());
 
-        var query = new NearbyAlertsQuery(42.0, 23.0, 5.0, AlertType.FIRE, AlertSeverity.CRITICAL, 25);
+        var query = new NearbyAlertsQuery(42.0, 23.0, 5.0, 1007, 25);
         getNearbyAlertsService.getNearbyAlerts(query);
 
         ArgumentCaptor<NearbySearch> searchCaptor = ArgumentCaptor.forClass(NearbySearch.class);
@@ -111,29 +108,25 @@ class GetNearbyAlertsServiceTest {
 
         NearbySearch search = searchCaptor.getValue();
         // Dropping any of these on the way down would silently widen the query — the
-        // caller asked for 25 critical fires and would get every alert in the circle.
-        assertEquals(AlertType.FIRE, search.type());
-        assertEquals(AlertSeverity.CRITICAL, search.severity());
+        // caller asked for 25 potholes and would get every signal in the circle.
+        assertEquals(1007, search.category());
         assertEquals(25, search.limit());
     }
 
     /**
      * The cached value is keyed on this string, so anything that narrows the result set
-     * has to be part of it. Without the filters in the key, a request for critical fires
+     * has to be part of it. Without the filters in the key, a request for potholes
      * would be served whatever an unfiltered request from the same grid square cached
-     * moments earlier — wrong alerts on a safety map, and only under mixed traffic.
+     * moments earlier — wrong signals on the map, and only under mixed traffic.
      */
     @Test
     void cacheKeyDistinguishesQueriesThatReturnDifferentResults() {
         var unfiltered = NearbyAlertsQuery.of(42.0, 23.0, 5.0);
-        var byType = new NearbyAlertsQuery(42.0, 23.0, 5.0, AlertType.FIRE, null, 100);
-        var bySeverity = new NearbyAlertsQuery(42.0, 23.0, 5.0, null, AlertSeverity.CRITICAL, 100);
-        var smallerLimit = new NearbyAlertsQuery(42.0, 23.0, 5.0, null, null, 10);
+        var byType = new NearbyAlertsQuery(42.0, 23.0, 5.0, 1007, 100);
+        var smallerLimit = new NearbyAlertsQuery(42.0, 23.0, 5.0, null, 10);
 
         assertNotEquals(unfiltered.cacheKey(), byType.cacheKey());
-        assertNotEquals(unfiltered.cacheKey(), bySeverity.cacheKey());
         assertNotEquals(unfiltered.cacheKey(), smallerLimit.cacheKey());
-        assertNotEquals(byType.cacheKey(), bySeverity.cacheKey());
     }
 
     /** The grid rounding is the whole reason the cache has a usable hit rate. */
@@ -149,7 +142,7 @@ class GetNearbyAlertsServiceTest {
     void rejectsALimitAboveTheCeiling() {
         assertThrows(
             IllegalArgumentException.class,
-            () -> new NearbyAlertsQuery(42.0, 23.0, 5.0, null, null, NearbyAlertsQuery.MAX_LIMIT + 1)
+            () -> new NearbyAlertsQuery(42.0, 23.0, 5.0, null, NearbyAlertsQuery.MAX_LIMIT + 1)
         );
     }
 
@@ -157,7 +150,7 @@ class GetNearbyAlertsServiceTest {
     void rejectsANonPositiveLimit() {
         assertThrows(
             IllegalArgumentException.class,
-            () -> new NearbyAlertsQuery(42.0, 23.0, 5.0, null, null, 0)
+            () -> new NearbyAlertsQuery(42.0, 23.0, 5.0, null, 0)
         );
     }
 }

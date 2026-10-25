@@ -32,7 +32,7 @@ public record NearbyAlertsResponse(
 
     @Schema(
         description = "True when the cap was reached and older matches were dropped. "
-                      + "Narrow the radius or filter by type/severity to see them.",
+                      + "Narrow the radius or filter by type to see them.",
         example = "false"
     )
     boolean truncated

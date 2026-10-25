@@ -1,0 +1,2914 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "Nabat API",
+    "description" : "Crowd-sourced safety alerts. All endpoints require a bearer access token except the six POST /api/v1/auth/* routes that issue or reset one.",
+    "version" : "v1"
+  },
+  "servers" : [ {
+    "url" : "http://localhost",
+    "description" : "Generated server url"
+  } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
+  } ],
+  "paths" : {
+    "/api/v1/alerts/{id}/fix-check" : {
+      "get" : {
+        "tags" : [ "fix-check-controller" ],
+        "summary" : "What people say about whether a resolved report is really fixed, and what you said",
+        "operationId" : "view",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FixCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "fix-check-controller" ],
+        "summary" : "Say whether a resolved report is really fixed",
+        "operationId" : "check",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FixCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FixCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "fix-check-controller" ],
+        "summary" : "Take back your answer",
+        "operationId" : "withdraw",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FixCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ws/tickets" : {
+      "post" : {
+        "tags" : [ "web-socket-ticket-controller" ],
+        "operationId" : "issueTicket",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WebSocketTicketResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads" : {
+      "post" : {
+        "tags" : [ "upload-controller" ],
+        "operationId" : "upload",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "file" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/{id}/read" : {
+      "post" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "markRead",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/read-all" : {
+      "post" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "markAll",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/authority/members" : {
+      "get" : {
+        "tags" : [ "authority-members-controller" ],
+        "summary" : "Everyone acting for the caller's authority",
+        "operationId" : "list",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "authority-members-controller" ],
+        "summary" : "Invite a colleague: an official account of their own, and a mail to set its password",
+        "operationId" : "invite",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InviteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "verifyEmail",
+        "parameters" : [ {
+          "name" : "token",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/reset-password" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "resetPassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/register" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/refresh" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "refresh",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RefreshTokenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/login" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/link" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "signInWithLink",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SignInLinkRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/forgot-password" : {
+      "post" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "forgotPassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/alerts" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "operationId" : "listByStatus",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "SUBMITTED",
+            "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED", "WITHDRAWN" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AlertResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "alert-controller" ],
+        "operationId" : "createAlert",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateAlertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/withdraw" : {
+      "post" : {
+        "tags" : [ "withdrawal-controller" ],
+        "summary" : "The reporter withdraws their open report, saying why",
+        "operationId" : "withdraw_1",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WithdrawRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/rejections/dispute" : {
+      "post" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "The reporter contests the rejection of their report, once, saying why",
+        "operationId" : "dispute",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReasonRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RejectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/rejections/decision" : {
+      "post" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "A moderator upholds a disputed rejection or reopens the report",
+        "operationId" : "decide",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/forward" : {
+      "post" : {
+        "tags" : [ "forward-controller" ],
+        "summary" : "Hand the report to the authority it belongs to, saying why",
+        "operationId" : "forward",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ForwardRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/comments" : {
+      "get" : {
+        "tags" : [ "comment-controller" ],
+        "summary" : "A report's comments, oldest first",
+        "operationId" : "thread",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CommentResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "comment-controller" ],
+        "summary" : "Comment on an open report",
+        "operationId" : "add",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CommentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{alertId}/votes" : {
+      "post" : {
+        "tags" : [ "alert-vote-controller" ],
+        "operationId" : "vote",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VoteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VoteResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "alert-vote-controller" ],
+        "operationId" : "removeVote",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VoteStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/start-work" : {
+      "patch" : {
+        "tags" : [ "alert-controller" ],
+        "summary" : "The report's authority says work has started",
+        "operationId" : "startWork",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/resolve" : {
+      "patch" : {
+        "tags" : [ "alert-controller" ],
+        "operationId" : "resolve",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/reject" : {
+      "patch" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "Close a report without a fix — a duplicate, not a real problem — saying why",
+        "operationId" : "reject",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReasonRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/acknowledge" : {
+      "patch" : {
+        "tags" : [ "alert-controller" ],
+        "summary" : "The report's authority confirms it has received it",
+        "operationId" : "acknowledge",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{id}/role" : {
+      "patch" : {
+        "tags" : [ "admin-user-controller" ],
+        "operationId" : "changeRole",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangeRoleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{id}/enabled" : {
+      "patch" : {
+        "tags" : [ "admin-user-controller" ],
+        "operationId" : "setEnabled",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetEnabledRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads/{filename}" : {
+      "get" : {
+        "tags" : [ "upload-controller" ],
+        "operationId" : "serve",
+        "parameters" : [ {
+          "name" : "filename",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "list_1",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/NotificationResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/unread" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "unread",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/NotificationResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/unread/count" : {
+      "get" : {
+        "tags" : [ "notification-controller" ],
+        "operationId" : "unreadCount",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "integer",
+                    "format" : "int32"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/districts" : {
+      "get" : {
+        "tags" : [ "district-controller" ],
+        "summary" : "The districts of Sofia that reports are routed to",
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/DistrictResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/categories" : {
+      "get" : {
+        "tags" : [ "category-controller" ],
+        "summary" : "Report categories — Call Sofia's groups and subcategories, with its codes",
+        "operationId" : "list_3",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CategoryGroupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/call-sofia/district-comparison" : {
+      "get" : {
+        "tags" : [ "district-comparison-controller" ],
+        "summary" : "Sofia's districts compared on how they answered Call Sofia reports, from the archive",
+        "operationId" : "compare",
+        "parameters" : [ {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DistrictComparisonResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/authorities" : {
+      "get" : {
+        "tags" : [ "authority-controller" ],
+        "summary" : "The districts and city-wide institutions that reports go to",
+        "operationId" : "list_4",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AuthorityResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/auth/me" : {
+      "get" : {
+        "tags" : [ "auth-controller" ],
+        "operationId" : "getCurrentUser",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "operationId" : "getById",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/rejections" : {
+      "get" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "The report's rejections, oldest first, with their disputes and decisions",
+        "operationId" : "rejections",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/RejectionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/history" : {
+      "get" : {
+        "tags" : [ "history-controller" ],
+        "summary" : "Who did what to the report, and when, oldest first",
+        "operationId" : "history",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/StepResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/forwards" : {
+      "get" : {
+        "tags" : [ "forward-controller" ],
+        "summary" : "Where the report has been forwarded, oldest first",
+        "operationId" : "forwards",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ForwardResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{alertId}/votes/stats" : {
+      "get" : {
+        "tags" : [ "alert-vote-controller" ],
+        "operationId" : "getStats",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VoteStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{alertId}/votes/me" : {
+      "get" : {
+        "tags" : [ "alert-vote-controller" ],
+        "operationId" : "getMyVote",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserVoteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/similar" : {
+      "get" : {
+        "tags" : [ "similar-reports-controller" ],
+        "summary" : "Open reports near a point in the same category group, in nabat and in Call Sofia",
+        "operationId" : "similar",
+        "parameters" : [ {
+          "name" : "latitude",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 90.0,
+            "minimum" : -90.0
+          }
+        }, {
+          "name" : "longitude",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 180.0,
+            "minimum" : -180.0
+          }
+        }, {
+          "name" : "category",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SimilarReportsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/ranked" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "summary" : "All reports, or one district's, in HOT, LONGEST_WAITING or NEWEST order",
+        "operationId" : "listRanked",
+        "parameters" : [ {
+          "name" : "district",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED", "WITHDRAWN" ]
+            },
+            "uniqueItems" : true
+          }
+        }, {
+          "name" : "ranking",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "HOT",
+            "enum" : [ "HOT", "LONGEST_WAITING", "NEWEST" ]
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0,
+            "minimum" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50,
+            "maximum" : 100,
+            "minimum" : 1
+          }
+        }, {
+          "name" : "overdue",
+          "in" : "query",
+          "description" : "Only reports past the deadline for their authority's answer",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RankedReportsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/api/v1/alerts/nearby" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "summary" : "Active alerts within a radius, optionally filtered and newer than `since`",
+        "operationId" : "getNearbyAlerts",
+        "parameters" : [ {
+          "name" : "latitude",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 90.0,
+            "minimum" : -90.0
+          }
+        }, {
+          "name" : "longitude",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 180.0,
+            "minimum" : -180.0
+          }
+        }, {
+          "name" : "radiusKm",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "number",
+            "format" : "double",
+            "default" : 5.0,
+            "maximum" : 100.0,
+            "minimum" : 0.0
+          }
+        }, {
+          "name" : "since",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "name" : "category",
+          "in" : "query",
+          "description" : "A group code (every subcategory in it) or a subcategory code, from GET /api/v1/categories",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "example" : 1006
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 100,
+            "maximum" : 500,
+            "minimum" : 1
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NearbyAlertsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/disputed" : {
+      "get" : {
+        "tags" : [ "rejection-controller" ],
+        "summary" : "Reports whose rejection the reporter disputes, waiting for a moderator, oldest dispute first",
+        "operationId" : "disputed",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AlertResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/assigned" : {
+      "get" : {
+        "tags" : [ "alert-controller" ],
+        "summary" : "Reports the caller's authority answers for, newest first",
+        "operationId" : "listForOwnAuthority",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED", "WITHDRAWN" ]
+            },
+            "uniqueItems" : true
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AlertResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users" : {
+      "get" : {
+        "tags" : [ "admin-user-controller" ],
+        "operationId" : "listUsers",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 25
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserPageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authority/members/{userId}" : {
+      "delete" : {
+        "tags" : [ "authority-members-controller" ],
+        "summary" : "Take the official role from a colleague who has left",
+        "operationId" : "remove",
+        "parameters" : [ {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{id}/comments/{commentId}" : {
+      "delete" : {
+        "tags" : [ "comment-controller" ],
+        "summary" : "Take a comment down",
+        "operationId" : "remove_1",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "commentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "FixCheckRequest" : {
+        "type" : "object",
+        "description" : "An answer to: is it really fixed?",
+        "properties" : {
+          "verdict" : {
+            "type" : "string",
+            "description" : "FIXED, PARTLY or NOT_FIXED",
+            "enum" : [ "FIXED", "PARTLY", "NOT_FIXED" ],
+            "example" : "NOT_FIXED"
+          }
+        },
+        "required" : [ "verdict" ]
+      },
+      "FixCheckResponse" : {
+        "type" : "object",
+        "description" : "The answers on a report, with the caller's own",
+        "properties" : {
+          "summary" : {
+            "$ref" : "#/components/schemas/FixCheckSummary",
+            "description" : "The tally and what it adds up to"
+          },
+          "mine" : {
+            "type" : "string",
+            "description" : "The caller's own answer; null if they have not given one",
+            "enum" : [ "FIXED", "PARTLY", "NOT_FIXED" ]
+          }
+        }
+      },
+      "FixCheckSummary" : {
+        "type" : "object",
+        "description" : "What people say about whether a resolved report is really fixed",
+        "properties" : {
+          "fixed" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Answers saying it is fixed"
+          },
+          "partly" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Answers saying it is partly fixed"
+          },
+          "notFixed" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Answers saying it is not fixed"
+          },
+          "reporterVerdict" : {
+            "type" : "string",
+            "description" : "The reporter's own answer; null if they have not given one",
+            "enum" : [ "FIXED", "PARTLY", "NOT_FIXED" ]
+          },
+          "outcome" : {
+            "type" : "string",
+            "description" : "What the answers add up to. DISPUTED if the reporter says not fixed, or more say not than say fixed",
+            "enum" : [ "UNCHECKED", "CONFIRMED", "DISPUTED", "MIXED" ],
+            "example" : "CONFIRMED"
+          }
+        }
+      },
+      "WebSocketTicketResponse" : {
+        "type" : "object",
+        "properties" : {
+          "ticket" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "NotificationResponse" : {
+        "type" : "object",
+        "description" : "A user notification (vote event or milestone)",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Notification identifier"
+          },
+          "recipientId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the user who receives this notification"
+          },
+          "type" : {
+            "type" : "string",
+            "description" : "What triggered the notification",
+            "enum" : [ "ALERT_UPVOTED", "ALERT_DOWNVOTED", "ALERT_CONFIRMED", "ALERT_MILESTONE", "ALERT_RESOLVED", "COMMENT_ADDED", "REPORT_FORWARDED", "REPORT_PROGRESSED" ],
+            "example" : "VOTE"
+          },
+          "title" : {
+            "type" : "string",
+            "description" : "Short notification title",
+            "example" : "New vote on your alert"
+          },
+          "message" : {
+            "type" : "string",
+            "description" : "Notification body text"
+          },
+          "relatedAlertId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Alert that triggered the notification; may be null"
+          },
+          "triggeredByUserId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "User who caused the notification; may be null"
+          },
+          "read" : {
+            "type" : "boolean",
+            "description" : "Whether the notification has been read by the recipient"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Timestamp when the notification was created"
+          }
+        }
+      },
+      "InviteRequest" : {
+        "type" : "object",
+        "description" : "A colleague to invite",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "example" : "ivan.petrov@lozenets.example",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "displayName" : {
+            "type" : "string",
+            "example" : "Иван Петров",
+            "maxLength" : 100,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "displayName", "email" ]
+      },
+      "UserResponse" : {
+        "type" : "object",
+        "description" : "Public profile of a user",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Stable user identifier"
+          },
+          "email" : {
+            "type" : "string",
+            "description" : "E-mail address",
+            "example" : "alice@example.com"
+          },
+          "displayName" : {
+            "type" : "string",
+            "description" : "Display name shown to other users",
+            "example" : "Alice"
+          },
+          "role" : {
+            "type" : "string",
+            "description" : "Assigned role",
+            "enum" : [ "USER", "MODERATOR", "ADMIN", "OFFICIAL" ],
+            "example" : "USER"
+          },
+          "emailVerified" : {
+            "type" : "boolean",
+            "description" : "Whether the email address has been verified"
+          },
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "Whether the account may sign in — an admin can switch this off"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "For an official, the authority they act for: a district or an institution; null for every other role",
+            "example" : "LOZENETS"
+          }
+        }
+      },
+      "MessageResponse" : {
+        "type" : "object",
+        "properties" : {
+          "message" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ResetPasswordRequest" : {
+        "type" : "object",
+        "properties" : {
+          "token" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "newPassword" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "newPassword", "token" ]
+      },
+      "RegisterRequest" : {
+        "type" : "object",
+        "description" : "Request body for creating a new user account",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "description" : "E-mail address (used as login)",
+            "example" : "alice@example.com",
+            "minLength" : 1
+          },
+          "password" : {
+            "type" : "string",
+            "description" : "Password — at least 10 characters, including a letter and a digit, and at most 72 UTF-8 bytes",
+            "example" : "s3cr3tP@ssphrase",
+            "minLength" : 10
+          },
+          "displayName" : {
+            "type" : "string",
+            "description" : "Public display name shown to other users",
+            "example" : "Alice",
+            "maxLength" : 50,
+            "minLength" : 2
+          }
+        },
+        "required" : [ "displayName", "email", "password" ]
+      },
+      "AuthResponse" : {
+        "type" : "object",
+        "description" : "Authentication tokens returned after a successful login or registration",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string",
+            "description" : "Short-lived JWT access token — include in Authorization: Bearer header"
+          },
+          "refreshToken" : {
+            "type" : "string",
+            "description" : "Single-use refresh token used to obtain a new pair"
+          },
+          "expiresIn" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Access-token validity in milliseconds",
+            "example" : 86400000
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserResponse",
+            "description" : "Basic profile of the authenticated user"
+          }
+        }
+      },
+      "RefreshTokenRequest" : {
+        "type" : "object",
+        "properties" : {
+          "refreshToken" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "refreshToken" ]
+      },
+      "RefreshTokenResponse" : {
+        "type" : "object",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "refreshToken" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "type" : "object",
+        "description" : "Credentials for logging in",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "description" : "Registered e-mail address",
+            "example" : "alice@example.com",
+            "minLength" : 1
+          },
+          "password" : {
+            "type" : "string",
+            "description" : "Account password",
+            "example" : "s3cr3tP@ss",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "email", "password" ]
+      },
+      "SignInLinkRequest" : {
+        "type" : "object",
+        "properties" : {
+          "token" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "token" ]
+      },
+      "ForgotPasswordRequest" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "email" ]
+      },
+      "CreateAlertRequest" : {
+        "type" : "object",
+        "description" : "Request body for reporting a problem in the city",
+        "properties" : {
+          "title" : {
+            "type" : "string",
+            "description" : "Short title of the alert",
+            "example" : "Дупка на ул. Шипка",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Detailed description of the alert",
+            "example" : "Дълбока дупка в дясното платно, пред номер 12",
+            "maxLength" : 2000,
+            "minLength" : 0
+          },
+          "categoryCode" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Subcategory code from GET /api/v1/categories — Call Sofia's codes. A group code is refused.",
+            "example" : 1007
+          },
+          "latitude" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "WGS-84 latitude of the problem",
+            "example" : 42.6977,
+            "maximum" : 90.0,
+            "minimum" : -90.0
+          },
+          "longitude" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "WGS-84 longitude of the problem",
+            "example" : 23.3219,
+            "maximum" : 180.0,
+            "minimum" : -180.0
+          },
+          "photoUrl" : {
+            "type" : "string",
+            "description" : "URL of an uploaded photo for this alert",
+            "example" : "/api/v1/uploads/uuid.jpg"
+          }
+        },
+        "required" : [ "categoryCode", "description", "latitude", "longitude", "title" ]
+      },
+      "AlertResponse" : {
+        "type" : "object",
+        "description" : "Alert details returned by the API",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Unique identifier of the alert"
+          },
+          "title" : {
+            "type" : "string",
+            "description" : "Short title"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Full description"
+          },
+          "categoryCode" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Subcategory code; resolve the name and group with GET /api/v1/categories",
+            "example" : 1007
+          },
+          "latitude" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Latitude of the incident location",
+            "example" : 40.7128
+          },
+          "longitude" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Longitude of the incident location",
+            "example" : -74.006
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Timestamp when the alert was created"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "Current lifecycle status",
+            "enum" : [ "SUBMITTED", "SENT", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED", "REJECTED", "WITHDRAWN" ]
+          },
+          "reportedBy" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the user who reported the alert"
+          },
+          "upvoteCount" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Number of upvotes"
+          },
+          "downvoteCount" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Number of downvotes"
+          },
+          "confirmationCount" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Number of confirmations"
+          },
+          "credibilityScore" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Credibility score as computed by the voting service"
+          },
+          "resolvedAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Timestamp when the alert was resolved; null if still active"
+          },
+          "photoUrl" : {
+            "type" : "string",
+            "description" : "URL of the uploaded photo, if any"
+          },
+          "districtCode" : {
+            "type" : "string",
+            "description" : "Code of the Sofia district the report is in; null only on reports older than districts",
+            "example" : "LOZENETS"
+          },
+          "closedBy" : {
+            "type" : "string",
+            "description" : "Who closed the report — the authority that answers for it, the reporter, or a moderator. Null while open, and on reports closed before this was recorded",
+            "enum" : [ "AUTHORITY", "REPORTER", "MODERATOR" ],
+            "example" : "AUTHORITY"
+          },
+          "fixCheck" : {
+            "$ref" : "#/components/schemas/FixCheckSummary",
+            "description" : "Whether people say a resolved report is really fixed. All zero and UNCHECKED on reports nobody has checked"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "Who answers for the report: its district, or the city-wide institution its category belongs to. See GET /api/v1/authorities for names",
+            "example" : "LOZENETS"
+          },
+          "answerDueAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "When its authority has to have answered by; null when nothing is waiting on it. Past this, the report is overdue"
+          }
+        }
+      },
+      "WithdrawRequest" : {
+        "type" : "object",
+        "description" : "Why the report is withdrawn",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "description" : "1 to 1000 characters",
+            "example" : "Сгреших мястото — подадох го отново на правилното.",
+            "maxLength" : 1000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "reason" ]
+      },
+      "ReasonRequest" : {
+        "type" : "object",
+        "description" : "Why",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "description" : "1 to 1000 characters",
+            "example" : "Дублира сигнал от вчера на същото място.",
+            "maxLength" : 1000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "reason" ]
+      },
+      "RejectionResponse" : {
+        "type" : "object",
+        "description" : "A rejection of a report, and what came of it",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "description" : "Why it was rejected"
+          },
+          "byModerator" : {
+            "type" : "boolean",
+            "description" : "Rejected by a moderator rather than by the report's authority"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "The authority the report was with",
+            "example" : "LOZENETS"
+          },
+          "rejectedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "disputeReason" : {
+            "type" : "string",
+            "description" : "The reporter's dispute; null if they did not dispute it"
+          },
+          "disputedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "decision" : {
+            "type" : "string",
+            "description" : "A moderator's decision on the dispute; null until there is one",
+            "enum" : [ "UPHELD", "REOPENED" ]
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "DecisionRequest" : {
+        "type" : "object",
+        "description" : "A moderator's answer to a disputed rejection",
+        "properties" : {
+          "decision" : {
+            "type" : "string",
+            "description" : "UPHELD — the rejection stands; REOPENED — the report goes back to its authority",
+            "enum" : [ "UPHELD", "REOPENED" ]
+          }
+        },
+        "required" : [ "decision" ]
+      },
+      "ForwardRequest" : {
+        "type" : "object",
+        "description" : "Where to forward a report, and why",
+        "properties" : {
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "The authority it belongs to, as listed by GET /api/v1/authorities",
+            "example" : "CGM",
+            "minLength" : 1
+          },
+          "reason" : {
+            "type" : "string",
+            "description" : "Why it is that authority's, 1 to 1000 characters",
+            "example" : "Шахтата е на водопровода.",
+            "maxLength" : 1000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "authorityCode", "reason" ]
+      },
+      "CommentRequest" : {
+        "type" : "object",
+        "description" : "A comment to add",
+        "properties" : {
+          "body" : {
+            "type" : "string",
+            "description" : "The text, 1 to 2000 characters",
+            "example" : "Още е там, и е по-дълбока след дъжда.",
+            "maxLength" : 2000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "body" ]
+      },
+      "CommentResponse" : {
+        "type" : "object",
+        "description" : "One comment in a report's thread",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "authorName" : {
+            "type" : "string",
+            "description" : "The author's display name when they wrote it"
+          },
+          "byAuthority" : {
+            "type" : "boolean",
+            "description" : "Written by an official of the report's authority"
+          },
+          "byReporter" : {
+            "type" : "boolean",
+            "description" : "Written by the person who reported it"
+          },
+          "mine" : {
+            "type" : "boolean",
+            "description" : "Written by the caller"
+          },
+          "body" : {
+            "type" : "string",
+            "description" : "The text; null once taken down"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "removedBy" : {
+            "type" : "string",
+            "description" : "Who took it down — AUTHOR or MODERATOR; null while it stands",
+            "enum" : [ "AUTHOR", "MODERATOR" ]
+          }
+        }
+      },
+      "VoteRequest" : {
+        "type" : "object",
+        "description" : "Request body for casting a vote on an alert",
+        "properties" : {
+          "voteType" : {
+            "type" : "string",
+            "description" : "CONFIRM — \"I see it too\". The only one taken: UPVOTE and DOWNVOTE are refused with 400",
+            "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ],
+            "example" : "CONFIRM"
+          }
+        },
+        "required" : [ "voteType" ]
+      },
+      "VoteResponse" : {
+        "type" : "object",
+        "description" : "The recorded vote and the resulting tallies",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Vote identifier"
+          },
+          "alertId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the alert that was voted on"
+          },
+          "voteType" : {
+            "type" : "string",
+            "description" : "Type of vote",
+            "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ]
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "When the vote was recorded"
+          },
+          "stats" : {
+            "$ref" : "#/components/schemas/VoteStatsResponse",
+            "description" : "Tallies after this vote"
+          }
+        }
+      },
+      "VoteStatsResponse" : {
+        "type" : "object",
+        "description" : "Aggregate vote statistics for an alert",
+        "properties" : {
+          "upvotes" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Number of upvotes"
+          },
+          "downvotes" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Number of downvotes"
+          },
+          "confirmations" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Number of confirmations"
+          },
+          "credibilityScore" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Credibility score as computed by the voting service"
+          }
+        }
+      },
+      "ChangeRoleRequest" : {
+        "type" : "object",
+        "description" : "Assigns a role to an account",
+        "properties" : {
+          "role" : {
+            "type" : "string",
+            "description" : "The role to assign",
+            "enum" : [ "USER", "MODERATOR", "ADMIN", "OFFICIAL" ],
+            "example" : "MODERATOR"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "Required for OFFICIAL, and only for it: the authority the account acts for, a district or an institution",
+            "example" : "LOZENETS"
+          }
+        },
+        "required" : [ "role" ]
+      },
+      "SetEnabledRequest" : {
+        "type" : "object",
+        "description" : "Enables or disables an account",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "False disables the account and invalidates its sessions immediately",
+            "example" : false
+          }
+        },
+        "required" : [ "enabled" ]
+      },
+      "DistrictResponse" : {
+        "type" : "object",
+        "description" : "A district of Sofia",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "description" : "Stable code, as carried by a report's districtCode",
+            "example" : "LOZENETS"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name of the district",
+            "example" : "Район Лозенец"
+          },
+          "population" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Estimated residents, from Yurukov's Call Sofia archive (2022) — for per-resident ratios, not a census",
+            "example" : 53110
+          }
+        }
+      },
+      "CategoryGroupResponse" : {
+        "type" : "object",
+        "description" : "A group of report categories",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Group code; usable as the nearby `category` filter",
+            "example" : 1006
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name of the group",
+            "example" : "Пътища и шахти"
+          },
+          "color" : {
+            "type" : "string",
+            "description" : "Call Sofia's colour for the group",
+            "example" : "#1E3A8A"
+          },
+          "categories" : {
+            "type" : "array",
+            "description" : "The subcategories a report can be filed under, in display order",
+            "items" : {
+              "$ref" : "#/components/schemas/CategoryResponse"
+            }
+          }
+        }
+      },
+      "CategoryResponse" : {
+        "type" : "object",
+        "description" : "A category a report can be filed under",
+        "properties" : {
+          "code" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Code, as sent in categoryCode",
+            "example" : 1007
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name, as Call Sofia has it",
+            "example" : "Улично платно"
+          },
+          "hint" : {
+            "type" : "string",
+            "description" : "What it covers, in everyday words",
+            "example" : "дупки, пропаднала настилка, шахти без капак"
+          }
+        }
+      },
+      "DistrictComparisonResponse" : {
+        "type" : "object",
+        "description" : "Districts compared over a period of Call Sofia's archive",
+        "properties" : {
+          "archiveFrom" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "First filing date in the archive; null if no archive is imported",
+            "example" : "2021-12-14"
+          },
+          "archiveTo" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "Last filing date in the archive — everything is as of this day",
+            "example" : "2026-08-01"
+          },
+          "from" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "Start of the period, inclusive",
+            "example" : "2025-08-02"
+          },
+          "to" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "End of the period, exclusive",
+            "example" : "2026-08-02"
+          },
+          "districts" : {
+            "type" : "array",
+            "description" : "One entry per district with reports in the period",
+            "items" : {
+              "$ref" : "#/components/schemas/DistrictOutcomesResponse"
+            }
+          }
+        }
+      },
+      "DistrictOutcomesResponse" : {
+        "type" : "object",
+        "description" : "How one district handled its reports. \"Answered\" is the first final word to the citizen — a reply, a closure or a rejection — not a fix.",
+        "properties" : {
+          "districtCode" : {
+            "type" : "string",
+            "description" : "District code, as in GET /api/v1/districts",
+            "example" : "LOZENETS"
+          },
+          "signals" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Reports filed in the period"
+          },
+          "answered" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Of those, answered at all"
+          },
+          "medianDaysToAnswer" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Median days to the first answer, over answered reports; null if none",
+            "example" : 12.4
+          },
+          "p90DaysToAnswer" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Nine in ten answered reports were answered within this many days",
+            "example" : 41.0
+          },
+          "dueIn30Days" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Reports filed at least 30 days before the archive ends — the ones the 30-day deadline can be judged on"
+          },
+          "answeredIn30Days" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Of those, answered within 30 days"
+          },
+          "closed" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Ended as „Приключен“"
+          },
+          "answeredOnly" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Ended as „Получил уведомление“ — a reply, and nothing after it"
+          },
+          "rejected" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Ended as „Отхвърлен“"
+          },
+          "stillOpen" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "No final answer when the archive was taken"
+          }
+        }
+      },
+      "AuthorityResponse" : {
+        "type" : "object",
+        "description" : "Someone a report can go to: a district administration, or a city-wide institution",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "description" : "Stable code, as carried by a report's authorityCode",
+            "example" : "CGM"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name",
+            "example" : "Център за градска мобилност"
+          },
+          "kind" : {
+            "type" : "string",
+            "description" : "A district administration, or an institution that takes some categories city-wide",
+            "enum" : [ "DISTRICT", "INSTITUTION" ]
+          }
+        }
+      },
+      "StepResponse" : {
+        "type" : "object",
+        "description" : "One step in a report's life",
+        "properties" : {
+          "step" : {
+            "type" : "string",
+            "enum" : [ "CREATED", "SENT", "ACKNOWLEDGED", "WORK_STARTED", "RESOLVED", "REJECTED", "FORWARDED", "REOPENED", "WITHDRAWN" ]
+          },
+          "actorName" : {
+            "type" : "string",
+            "description" : "Who took it, by name when they did; null for what nabat does itself (delivering it)"
+          },
+          "byAuthority" : {
+            "type" : "boolean",
+            "description" : "They spoke for the authority the report was with"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "The authority the report was with",
+            "example" : "LOZENETS"
+          },
+          "happenedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ForwardResponse" : {
+        "type" : "object",
+        "description" : "One forward of a report",
+        "properties" : {
+          "sequence" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "1 for the first forward, then 2, 3..."
+          },
+          "fromAuthority" : {
+            "type" : "string",
+            "description" : "The authority that had it",
+            "example" : "LOZENETS"
+          },
+          "toAuthority" : {
+            "type" : "string",
+            "description" : "The authority it went to",
+            "example" : "CGM"
+          },
+          "byModerator" : {
+            "type" : "boolean",
+            "description" : "Made by a moderator rather than by the authority that had it"
+          },
+          "reason" : {
+            "type" : "string",
+            "description" : "Why"
+          },
+          "forwardedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "UserVoteResponse" : {
+        "type" : "object",
+        "description" : "Indicates whether the current user has voted on an alert",
+        "properties" : {
+          "hasVoted" : {
+            "type" : "boolean",
+            "description" : "true if the authenticated user has an active vote"
+          },
+          "voteType" : {
+            "type" : "string",
+            "description" : "The vote type, or null if hasVoted is false",
+            "enum" : [ "UPVOTE", "DOWNVOTE", "CONFIRM" ]
+          }
+        }
+      },
+      "SimilarCallSofiaReport" : {
+        "type" : "object",
+        "description" : "A report open in Call Sofia near the point",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Call Sofia's id",
+            "example" : 788076
+          },
+          "registryNumber" : {
+            "type" : "string",
+            "description" : "The municipality's registry number",
+            "example" : "СОА26-КЦ01-103731/13.09.2026"
+          },
+          "title" : {
+            "type" : "string",
+            "description" : "Title as filed"
+          },
+          "categoryCode" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Category code — the same codes as nabat's",
+            "example" : 1007
+          },
+          "submittedAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "When it was filed"
+          },
+          "meters" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Metres from the point asked about",
+            "example" : 60
+          },
+          "url" : {
+            "type" : "string",
+            "description" : "Its page on call.sofia.bg",
+            "example" : "https://call.sofia.bg/signals/788076"
+          }
+        }
+      },
+      "SimilarReport" : {
+        "type" : "object",
+        "description" : "An open nabat report near the point",
+        "properties" : {
+          "report" : {
+            "$ref" : "#/components/schemas/AlertResponse",
+            "description" : "The report"
+          },
+          "meters" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Metres from the point asked about",
+            "example" : 35
+          }
+        }
+      },
+      "SimilarReportsResponse" : {
+        "type" : "object",
+        "description" : "What might be the same problem, already reported",
+        "properties" : {
+          "radiusMeters" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "How far around the point was searched",
+            "example" : 100
+          },
+          "reports" : {
+            "type" : "array",
+            "description" : "Open nabat reports, nearest first",
+            "items" : {
+              "$ref" : "#/components/schemas/SimilarReport"
+            }
+          },
+          "callSofia" : {
+            "type" : "array",
+            "description" : "Reports open in Call Sofia, nearest first; empty when Call Sofia's map is not being read",
+            "items" : {
+              "$ref" : "#/components/schemas/SimilarCallSofiaReport"
+            }
+          }
+        }
+      },
+      "RankedReportsResponse" : {
+        "type" : "object",
+        "description" : "One page of the public list of reports",
+        "properties" : {
+          "alerts" : {
+            "type" : "array",
+            "description" : "The reports on this page, in order",
+            "items" : {
+              "$ref" : "#/components/schemas/AlertResponse"
+            }
+          },
+          "ranking" : {
+            "type" : "string",
+            "description" : "The order that was applied",
+            "enum" : [ "HOT", "LONGEST_WAITING", "NEWEST" ],
+            "example" : "HOT"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Zero-based page number",
+            "example" : 0
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Page size that was applied",
+            "example" : 50
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "How many reports match in all, across every page",
+            "example" : 137
+          }
+        }
+      },
+      "NearbyAlertsResponse" : {
+        "type" : "object",
+        "description" : "Active alerts near a point, capped at `limit`",
+        "properties" : {
+          "alerts" : {
+            "type" : "array",
+            "description" : "Matching alerts, newest first",
+            "items" : {
+              "$ref" : "#/components/schemas/AlertResponse"
+            }
+          },
+          "count" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Number of alerts in this response",
+            "example" : 42
+          },
+          "limit" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "The cap that was applied",
+            "example" : 100
+          },
+          "truncated" : {
+            "type" : "boolean",
+            "description" : "True when the cap was reached and older matches were dropped. Narrow the radius or filter by type to see them.",
+            "example" : false
+          }
+        }
+      },
+      "UserPageResponse" : {
+        "type" : "object",
+        "description" : "One page of accounts, with the total so a caller knows there are more",
+        "properties" : {
+          "users" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/UserResponse"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "description" : "The access token from POST /api/v1/auth/login or /auth/refresh. Refresh tokens are rejected here: they carry a different token type and are only accepted by /auth/refresh.",
+        "in" : "header",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
+      }
+    }
+  }
+}

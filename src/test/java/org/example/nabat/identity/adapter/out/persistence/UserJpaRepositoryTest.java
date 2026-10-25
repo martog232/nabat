@@ -5,8 +5,8 @@ import org.example.nabat.PostgresTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -39,10 +39,6 @@ class UserJpaRepositoryTest extends PostgresTestSupport {
         user.setEmailVerified(false);
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
-        user.setNotificationRadiusKm(10);
-        user.setLastKnownLat(42.7);
-        user.setLastKnownLng(23.3);
-        user.setLocationUpdatedAt(Instant.now());
 
         userRepository.saveAndFlush(user);
 
@@ -50,10 +46,6 @@ class UserJpaRepositoryTest extends PostgresTestSupport {
 
         assertThat(found).isPresent();
         assertThat(found.get().getEmail()).isEqualTo(email);
-        assertThat(found.get().getNotificationRadiusKm()).isEqualTo(10);
-        assertThat(found.get().getLastKnownLat()).isEqualTo(42.7);
-        assertThat(found.get().getLastKnownLng()).isEqualTo(23.3);
-        assertThat(found.get().getLocationUpdatedAt()).isNotNull();
         assertThat(userRepository.existsByEmail(email)).isTrue();
         assertThat(userRepository.existsByEmail("missing@example.com")).isFalse();
     }

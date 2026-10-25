@@ -1,6 +1,5 @@
 package org.example.nabat.identity.domain;
 
-import org.example.nabat.shared.domain.Location;
 import java.time.Instant;
 
 /**
@@ -9,13 +8,16 @@ import java.time.Instant;
  * <p>Copies are made through {@link #toBuilder()}. The six {@code withX} methods
  * this record used to expose each re-listed all of its components, so every new
  * field meant editing seven places — and a copy that forgot a field would compile
- * silently. {@code UpdateUserPreferencesService} had accumulated a seventh,
- * hand-inlined copy for the same reason.
+ * silently.
  *
  * <p>{@code password} is the bcrypt hash. It is a component of this record because
  * the record doubles as the Spring Security principal; take care never to serialise
  * a {@code User} directly to a client — the REST layer has {@code UserResponse} for
  * that, and the WebSocket layer must use response DTOs too.
+ *
+ * <p>A user used to carry a last known location and a notification radius, so that a
+ * new alert could be pushed to whoever was near it. Reports about the city are not
+ * something a passer-by needs pushed to them, and both went with that fan-out (V17).
  */
 public record User(
     UserId id,
@@ -27,10 +29,6 @@ public record User(
     boolean emailVerified,
     Instant createdAt,
     Instant updatedAt,
-    int notificationRadiusKm,
-    Double lastKnownLat,
-    Double lastKnownLng,
-    Instant locationUpdatedAt,
     /**
      * Incremented to invalidate every token previously issued to this user.
      *
@@ -40,9 +38,21 @@ public record User(
      * sessions — before, a reset left every already-issued token valid for its
      * full lifetime.
      */
-    int tokenVersion
+    int tokenVersion,
+    /**
+     * The authority this account acts for: a district or an institution. Set exactly when
+     * the role is {@link Role#OFFICIAL}, and null otherwise — enforced here and by a CHECK
+     * constraint (V28), because an official with no authority acts nowhere and an authority
+     * on any other role is a grant waiting to be misread.
+     */
+    String authorityCode
 ) {
-    private static final int DEFAULT_NOTIFICATION_RADIUS_KM = 5;
+    public User {
+        if ((role == Role.OFFICIAL) != (authorityCode != null)) {
+            throw new IllegalArgumentException(
+                "An authority is set exactly for OFFICIAL, not for " + role);
+        }
+    }
 
     public static User create(
         String email,
@@ -60,11 +70,8 @@ public record User(
             false,   // emailVerified = false until they click the link
             now,
             now,
-            DEFAULT_NOTIFICATION_RADIUS_KM,
-            null,
-            null,
-            null,
-            0
+            0,
+            null
         );
     }
 
@@ -81,8 +88,32 @@ public record User(
             .build();
     }
 
+    /**
+     * Any role but {@link Role#OFFICIAL}, which needs an authority — see
+     * {@link #appointTo}. Clears the authority, so moving an official to another role takes
+     * their reports away with the role.
+     */
     public User withRole(Role newRole) {
-        return toBuilder().role(newRole).touch().build();
+        if (newRole == Role.OFFICIAL) {
+            throw new IllegalArgumentException("An official needs an authority: use appointTo");
+        }
+        return toBuilder().role(newRole).authorityCode(null).touch().build();
+    }
+
+    /** Makes this account the voice of one authority. */
+    public User appointTo(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Authority code is required");
+        }
+        return toBuilder().role(Role.OFFICIAL).authorityCode(code).touch().build();
+    }
+
+    /**
+     * Whether this account may act on a report that authority {@code code} answers for: the
+     * right role, and that authority.
+     */
+    public boolean actsFor(String code) {
+        return role.canActForAuthority() && code != null && code.equals(authorityCode);
     }
 
     /** Disables the account and invalidates all existing sessions. */
@@ -96,22 +127,6 @@ public record User(
 
     public User verifyEmail() {
         return toBuilder().emailVerified(true).touch().build();
-    }
-
-    public User withNotificationRadius(int radiusKm) {
-        return toBuilder().notificationRadiusKm(radiusKm).touch().build();
-    }
-
-    public User withLocation(double lat, double lng, int radiusKm) {
-        Location validated = Location.of(lat, lng);
-        Instant now = Instant.now();
-        return toBuilder()
-            .notificationRadiusKm(radiusKm)
-            .lastKnownLat(validated.latitude())
-            .lastKnownLng(validated.longitude())
-            .locationUpdatedAt(now)
-            .updatedAt(now)
-            .build();
     }
 
     /** Invalidates every token issued to this user so far. */
@@ -129,11 +144,8 @@ public record User(
         private boolean emailVerified;
         private Instant createdAt;
         private Instant updatedAt;
-        private int notificationRadiusKm;
-        private Double lastKnownLat;
-        private Double lastKnownLng;
-        private Instant locationUpdatedAt;
         private int tokenVersion;
+        private String authorityCode;
 
         private Builder(User source) {
             this.id = source.id;
@@ -145,11 +157,8 @@ public record User(
             this.emailVerified = source.emailVerified;
             this.createdAt = source.createdAt;
             this.updatedAt = source.updatedAt;
-            this.notificationRadiusKm = source.notificationRadiusKm;
-            this.lastKnownLat = source.lastKnownLat;
-            this.lastKnownLng = source.lastKnownLng;
-            this.locationUpdatedAt = source.locationUpdatedAt;
             this.tokenVersion = source.tokenVersion;
+            this.authorityCode = source.authorityCode;
         }
 
         public Builder id(UserId value) { this.id = value; return this; }
@@ -161,11 +170,8 @@ public record User(
         public Builder emailVerified(boolean value) { this.emailVerified = value; return this; }
         public Builder createdAt(Instant value) { this.createdAt = value; return this; }
         public Builder updatedAt(Instant value) { this.updatedAt = value; return this; }
-        public Builder notificationRadiusKm(int value) { this.notificationRadiusKm = value; return this; }
-        public Builder lastKnownLat(Double value) { this.lastKnownLat = value; return this; }
-        public Builder lastKnownLng(Double value) { this.lastKnownLng = value; return this; }
-        public Builder locationUpdatedAt(Instant value) { this.locationUpdatedAt = value; return this; }
         public Builder tokenVersion(int value) { this.tokenVersion = value; return this; }
+        public Builder authorityCode(String value) { this.authorityCode = value; return this; }
 
         /** Sets {@code updatedAt} to now. */
         public Builder touch() { this.updatedAt = Instant.now(); return this; }
@@ -173,8 +179,7 @@ public record User(
         public User build() {
             return new User(
                 id, email, password, displayName, role, enabled, emailVerified,
-                createdAt, updatedAt, notificationRadiusKm,
-                lastKnownLat, lastKnownLng, locationUpdatedAt, tokenVersion
+                createdAt, updatedAt, tokenVersion, authorityCode
             );
         }
     }

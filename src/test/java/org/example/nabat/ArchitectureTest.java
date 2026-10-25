@@ -46,7 +46,13 @@ class ArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage(
                 "org.springframework..",
                 "jakarta.persistence..",
+                // Both Jackson majors. `com.fasterxml.jackson..` alone stopped covering the
+                // application the moment Boot 4 moved it to Jackson 3: the rule kept passing
+                // while the package it guards against was no longer the one in use. Jackson 3
+                // is `tools.jackson..`, except for its annotations, which stayed under
+                // com.fasterxml — so neither prefix is redundant.
                 "com.fasterxml.jackson..",
+                "tools.jackson..",
                 "lombok.."
             );
 

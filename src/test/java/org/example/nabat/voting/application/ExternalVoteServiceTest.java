@@ -19,10 +19,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,18 +53,18 @@ class ExternalVoteServiceTest {
     @Test
     void vote_returnsTheTalliesWithTheReceipt_andNotifiesTheOwner() {
         Instant createdAt = Instant.now();
-        when(externalVotingPort.vote(alertId, voterId, VoteType.UPVOTE))
+        when(externalVotingPort.vote(alertId, voterId, VoteType.CONFIRM))
             .thenReturn(new ExternalVotingPort.VoteResult(
-                UUID.randomUUID(), alertId, VoteType.UPVOTE, createdAt,
+                UUID.randomUUID(), alertId, VoteType.CONFIRM, createdAt,
                 new ExternalVotingPort.VoteStats(5, 2, 1, 5)));
         when(alertRepository.findById(alertId))
             .thenReturn(Optional.of(Fixtures.alert(alertId, ownerId.value())));
 
         VoteAlertUseCase.VoteReceipt receipt =
-            service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.UPVOTE));
+            service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.CONFIRM));
 
         assertEquals(alertId, receipt.alertId());
-        assertEquals(VoteType.UPVOTE, receipt.voteType());
+        assertEquals(VoteType.CONFIRM, receipt.voteType());
         // The tallies travel back with the receipt, so a client needs no second call.
         assertEquals(5, receipt.stats().upvotes());
         assertEquals(5, receipt.stats().credibilityScore());
@@ -80,14 +82,14 @@ class ExternalVoteServiceTest {
      */
     @Test
     void vote_doesNotWriteTheCountsItself() {
-        when(externalVotingPort.vote(alertId, voterId, VoteType.UPVOTE))
+        when(externalVotingPort.vote(alertId, voterId, VoteType.CONFIRM))
             .thenReturn(new ExternalVotingPort.VoteResult(
-                UUID.randomUUID(), alertId, VoteType.UPVOTE, Instant.now(),
+                UUID.randomUUID(), alertId, VoteType.CONFIRM, Instant.now(),
                 new ExternalVotingPort.VoteStats(5, 2, 1, 5)));
         when(alertRepository.findById(alertId))
             .thenReturn(Optional.of(Fixtures.alert(alertId, ownerId.value())));
 
-        service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.UPVOTE));
+        service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.CONFIRM));
 
         verify(alertRepository, never()).applyVoteCounts(any(), anyInt(), anyInt(), anyInt(), anyInt());
     }
@@ -109,18 +111,28 @@ class ExternalVoteServiceTest {
 
     @Test
     void vote_onAlertMissingLocallyStillReturnsAReceipt() {
-        when(externalVotingPort.vote(alertId, voterId, VoteType.UPVOTE))
+        when(externalVotingPort.vote(alertId, voterId, VoteType.CONFIRM))
             .thenReturn(new ExternalVotingPort.VoteResult(
-                UUID.randomUUID(), alertId, VoteType.UPVOTE, Instant.now(),
+                UUID.randomUUID(), alertId, VoteType.CONFIRM, Instant.now(),
                 new ExternalVotingPort.VoteStats(1, 0, 0, 1)));
         when(alertRepository.findById(alertId)).thenReturn(Optional.empty());
 
         VoteAlertUseCase.VoteReceipt receipt =
-            service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.UPVOTE));
+            service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, VoteType.CONFIRM));
 
         assertEquals(1, receipt.stats().upvotes());
         // Nothing to notify about when the alert is gone locally.
         verify(sendNotificationUseCase, never()).sendVoteNotification(any());
+    }
+
+    /** A report is confirmed, not voted on: the old up/down votes are refused before nabat-voting is asked. */
+    @Test
+    void vote_takesOnlyAConfirmation() {
+        for (VoteType type : new VoteType[] {VoteType.UPVOTE, VoteType.DOWNVOTE}) {
+            assertThrows(IllegalArgumentException.class,
+                () -> service.vote(new VoteAlertUseCase.VoteCommand(alertId, voterId, type)));
+        }
+        verifyNoInteractions(externalVotingPort, sendNotificationUseCase);
     }
 
     @Test

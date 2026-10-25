@@ -1,17 +1,18 @@
 package org.example.nabat.incident.adapter.in.rest;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
+import org.example.nabat.incident.application.port.in.ListAssignedReportsUseCase;
+import org.example.nabat.incident.application.port.in.ListRankedReportsUseCase;
+import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -19,8 +20,8 @@ import org.example.nabat.identity.domain.UserId;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -71,6 +72,15 @@ class AlertControllerTest {
     private ListAlertsUseCase listAlertsUseCase;
 
     @MockitoBean
+    private ProgressReportUseCase progressReportUseCase;
+
+    @MockitoBean
+    private ListAssignedReportsUseCase listAssignedReportsUseCase;
+
+    @MockitoBean
+    private ListRankedReportsUseCase listRankedReportsUseCase;
+
+    @MockitoBean
     private AuthenticateSessionUseCase authenticateSessionUseCase;
 
     private Alert buildAlert() {
@@ -78,17 +88,16 @@ class AlertControllerTest {
                 AlertId.of(UUID.fromString("00000000-0000-0000-0000-000000000001")),
                 "Test Alert",
                 "Test description",
-                AlertType.FIRE,
-                AlertSeverity.HIGH,
+                1007,
                 Location.of(42.0, 23.0),
                 Instant.parse("2024-01-01T00:00:00Z"),
-                AlertStatus.ACTIVE,
+                AlertStatus.SUBMITTED,
                 UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 0, 0, 0,
 
                 0,
                 null,
-                null
+                null, "LOZENETS", null
         );
     }
 
@@ -109,19 +118,12 @@ class AlertControllerTest {
                 false,
                 now,
                 now,
-                5,
-                null,
-                null,
-                null
-        ,
-
-                0);
+                0, null);
 
         CreateAlertRequest request = new CreateAlertRequest(
                 "Test Alert",
                 "Test description",
-                AlertType.FIRE,
-                AlertSeverity.HIGH,
+                1007,
                 42.0,
                 23.0,
                 null
@@ -142,9 +144,8 @@ class AlertControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("00000000-0000-0000-0000-000000000001"))
                 .andExpect(jsonPath("$.title").value("Test Alert"))
-                .andExpect(jsonPath("$.type").value("FIRE"))
-                .andExpect(jsonPath("$.severity").value("HIGH"))
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
+                .andExpect(jsonPath("$.categoryCode").value(1007))
+                .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
 
     @Test
@@ -184,8 +185,7 @@ class AlertControllerTest {
         mockMvc.perform(get("/api/v1/alerts/nearby")
                         .param("latitude", "42.0")
                         .param("longitude", "23.0")
-                        .param("type", "FIRE")
-                        .param("severity", "CRITICAL")
+                        .param("category", "1007")
                         .param("limit", "25"))
                 .andExpect(status().isOk());
 
@@ -193,8 +193,7 @@ class AlertControllerTest {
             ArgumentCaptor.forClass(GetNearbyAlertsUseCase.NearbyAlertsQuery.class);
         verify(getNearbyAlertsUseCase).getNearbyAlerts(captor.capture());
 
-        assertEquals(AlertType.FIRE, captor.getValue().type());
-        assertEquals(AlertSeverity.CRITICAL, captor.getValue().severity());
+        assertEquals(1007, captor.getValue().category());
         assertEquals(25, captor.getValue().limit());
     }
 
@@ -212,11 +211,11 @@ class AlertControllerTest {
     }
 
     @Test
-    void shouldRejectAnUnknownAlertType() throws Exception {
+    void shouldRejectACategoryThatIsNotACode() throws Exception {
         mockMvc.perform(get("/api/v1/alerts/nearby")
                         .param("latitude", "42.0")
                         .param("longitude", "23.0")
-                        .param("type", "NOT_A_TYPE"))
+                        .param("category", "POTHOLE"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -236,8 +235,7 @@ class AlertControllerTest {
                 {
                     "title": "",
                     "description": "desc",
-                    "type": "FIRE",
-                    "severity": "HIGH",
+                    "categoryCode": 1007,
                     "latitude": 42.0,
                     "longitude": 23.0
                 }
@@ -278,8 +276,7 @@ class AlertControllerTest {
         User mockUser = new User(
                 UserId.of(UUID.randomUUID()),
                 "test@example.com", "p", "n",
-                Role.USER, true, false, now, now, 5, null, null, null,
-        0);
+                Role.USER, true, false, now, now, 0, null);
         var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                 mockUser, null, java.util.List.of());
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);

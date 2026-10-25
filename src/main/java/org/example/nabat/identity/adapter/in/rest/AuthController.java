@@ -1,5 +1,6 @@
 package org.example.nabat.identity.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.example.nabat.identity.application.port.in.ForgotPasswordUseCase;
@@ -7,6 +8,7 @@ import org.example.nabat.identity.application.port.in.LoginUserUseCase;
 import org.example.nabat.identity.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.identity.application.port.in.RegisterUserUseCase;
 import org.example.nabat.identity.application.port.in.ResetPasswordUseCase;
+import org.example.nabat.identity.application.port.in.SignInLinkUseCase;
 import org.example.nabat.identity.application.port.in.VerifyEmailUseCase;
 import org.example.nabat.identity.domain.User;
 import org.slf4j.Logger;
@@ -33,6 +35,7 @@ public class AuthController {
     private final VerifyEmailUseCase verifyEmailUseCase;
     private final ForgotPasswordUseCase forgotPasswordUseCase;
     private final ResetPasswordUseCase resetPasswordUseCase;
+    private final SignInLinkUseCase signInLinkUseCase;
 
     public AuthController(
         RegisterUserUseCase registerUserUseCase,
@@ -40,7 +43,8 @@ public class AuthController {
         RefreshTokenUseCase refreshTokenUseCase,
         VerifyEmailUseCase verifyEmailUseCase,
         ForgotPasswordUseCase forgotPasswordUseCase,
-        ResetPasswordUseCase resetPasswordUseCase
+        ResetPasswordUseCase resetPasswordUseCase,
+        SignInLinkUseCase signInLinkUseCase
     ) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUserUseCase = loginUserUseCase;
@@ -48,8 +52,10 @@ public class AuthController {
         this.verifyEmailUseCase = verifyEmailUseCase;
         this.forgotPasswordUseCase = forgotPasswordUseCase;
         this.resetPasswordUseCase = resetPasswordUseCase;
+        this.signInLinkUseCase = signInLinkUseCase;
     }
 
+    @SecurityRequirements
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         // Returns the session directly — no second round-trip through login() with the
@@ -72,12 +78,14 @@ public class AuthController {
             .body(AuthResponse.from(result));
     }
 
+    @SecurityRequirements
     @PostMapping("/verify")
     public ResponseEntity<MessageResponse> verifyEmail(@RequestParam String token) {
         verifyEmailUseCase.verifyEmail(token);
         return ResponseEntity.ok(new MessageResponse("Email verified successfully"));
     }
 
+    @SecurityRequirements
     @PostMapping("/forgot-password")
     public ResponseEntity<MessageResponse> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
@@ -87,6 +95,7 @@ public class AuthController {
                 "If that email is registered, a reset link has been sent"));
     }
 
+    @SecurityRequirements
     @PostMapping("/reset-password")
     public ResponseEntity<MessageResponse> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
@@ -95,12 +104,24 @@ public class AuthController {
                 "Password reset successfully. Existing sessions have been signed out."));
     }
 
+    @SecurityRequirements
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginUserUseCase.LoginResult result = loginUserUseCase.login(request.toCommand());
         return ResponseEntity.ok(AuthResponse.from(result));
     }
 
+    /**
+     * Signs an official in from the link behind the "Отговори" button in a report mail. 401 for
+     * an unknown or expired link, with the same message whatever the reason.
+     */
+    @SecurityRequirements
+    @PostMapping("/link")
+    public ResponseEntity<AuthResponse> signInWithLink(@Valid @RequestBody SignInLinkRequest request) {
+        return ResponseEntity.ok(AuthResponse.from(signInLinkUseCase.signIn(request.token())));
+    }
+
+    @SecurityRequirements
     @PostMapping("/refresh")
     public ResponseEntity<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         RefreshTokenUseCase.AuthTokens tokens = refreshTokenUseCase.refresh(request.refreshToken());
@@ -123,6 +144,10 @@ public class AuthController {
     public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(UserResponse.from(user));
     }
+
+    public record SignInLinkRequest(
+        @NotBlank(message = "token is required") String token
+    ) {}
 
     public record RefreshTokenRequest(
         @NotBlank(message = "refreshToken is required") String refreshToken

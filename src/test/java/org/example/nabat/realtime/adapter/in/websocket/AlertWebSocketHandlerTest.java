@@ -2,9 +2,9 @@ package org.example.nabat.realtime.adapter.in.websocket;
 
 import org.example.nabat.realtime.spi.WsFrame;
 import org.example.nabat.realtime.spi.WsClusterRelay;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

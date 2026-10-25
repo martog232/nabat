@@ -7,9 +7,7 @@ import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.example.nabat.notification.domain.NotificationType;
 import org.example.nabat.identity.domain.Role;
@@ -17,8 +15,8 @@ import org.example.nabat.PostgresTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
 import java.time.Instant;
 import java.util.List;
@@ -42,7 +40,7 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
     @BeforeEach
     void setUp() {
         notificationRepository.deleteAll();
-        alertRepository.deleteAll();
+        alertRepository.deleteAllInBatch();
         userRepository.deleteAll();
     }
 
@@ -94,15 +92,14 @@ class NotificationJpaRepositoryTest extends PostgresTestSupport {
                 AlertId.generate(),
                 "Related alert",
                 "desc",
-                AlertType.HAZARD,
-                AlertSeverity.HIGH,
+                1008,
                 Location.of(42.6977, 23.3219),
                 Instant.now(),
-                AlertStatus.ACTIVE,
+                AlertStatus.SUBMITTED,
                 reportedBy,
                 0, 0, 0, 0,
                 null,
-                null
+                null, "LOZENETS", null
         );
         return alertRepository.saveAndFlush(AlertJpaEntity.from(alert)).getId();
     }

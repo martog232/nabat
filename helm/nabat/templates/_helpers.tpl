@@ -42,3 +42,31 @@ app.kubernetes.io/name: {{ include "nabat.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
+
+{{/*
+Container-level hardening applied to every container in this chart.
+
+It says nothing about *which* user the process runs as — that is a property of the image,
+so it lives per component in values.yaml as `podSecurityContext`, next to the `image` it
+was read off. What is here is the part that is true regardless of image: a process that
+cannot gain privileges it did not start with, holds no Linux capabilities at all, and runs
+under the runtime's default seccomp filter.
+
+Dropping ALL capabilities is safe for every workload here because none of them bind a port
+below 1024 (Kong proxies on 8000, the applications on 8080/8081) and none manage devices or
+network interfaces. Promtail is the one exception and does not use this helper — see the
+comment in promtail.yaml.
+
+`readOnlyRootFilesystem` is deliberately absent. Every JVM here writes hsperfdata to /tmp,
+Postgres writes its socket to /var/run/postgresql, and Kong writes its prefix directory;
+turning it on means an emptyDir per writable path, which is worth doing but is a larger
+change than this one and would fail at runtime rather than at render time.
+*/}}
+{{- define "nabat.containerSecurityContext" -}}
+allowPrivilegeEscalation: false
+capabilities:
+  drop:
+  - ALL
+seccompProfile:
+  type: RuntimeDefault
+{{- end }}

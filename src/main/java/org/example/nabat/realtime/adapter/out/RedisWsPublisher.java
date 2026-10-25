@@ -1,7 +1,7 @@
 package org.example.nabat.realtime.adapter.out;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.example.nabat.realtime.spi.WsClusterRelay;
 import org.example.nabat.realtime.spi.WsFrame;
 import org.example.nabat.shared.config.InstanceId;
@@ -54,7 +54,7 @@ public class RedisWsPublisher implements WsClusterRelay {
                 new RedisWsMessage(recipient, frame.withOrigin(instanceId.value()))
             );
             redisTemplate.convertAndSend(CHANNEL, message);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.warn("Failed to serialize {} frame for relay: {}", frame.type(), e.getMessage());
         } catch (RuntimeException e) {
             // A Redis outage must not fail the HTTP request that triggered the push —

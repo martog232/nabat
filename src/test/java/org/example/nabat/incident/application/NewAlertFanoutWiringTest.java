@@ -1,13 +1,10 @@
 package org.example.nabat.incident.application;
 
-import org.example.nabat.incident.application.port.out.AlertAudiencePort;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertCreated;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.platform.AsyncConfig;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +23,6 @@ import org.springframework.transaction.support.AbstractPlatformTransactionManage
 import org.springframework.transaction.support.DefaultTransactionStatus;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -77,7 +73,6 @@ class NewAlertFanoutWiringTest {
         Broadcast broadcast = notificationPort.broadcasts.poll(5, TimeUnit.SECONDS);
         assertNotNull(broadcast, "the fan-out listener never ran: @ApplicationModuleListener is not wired");
         assertEquals(alert, broadcast.alert());
-        assertEquals(List.of(FixedAudience.RECIPIENT), broadcast.recipients());
 
         // Off the publishing thread, which is what makes POST /alerts return without
         // waiting for the fan-out. Fails if @EnableAsync is missing, in which case the
@@ -107,15 +102,14 @@ class NewAlertFanoutWiringTest {
             AlertId.generate(),
             "Wiring check",
             "desc",
-            AlertType.HAZARD,
-            AlertSeverity.HIGH,
+            1008,
             Location.of(42.0, 23.0),
             Instant.now(),
-            AlertStatus.ACTIVE,
+            AlertStatus.SUBMITTED,
             UUID.randomUUID(),
             0, 0, 0, 0,
             null,
-            null
+            null, "LOZENETS", null
         );
     }
 
@@ -130,18 +124,13 @@ class NewAlertFanoutWiringTest {
         }
 
         @Bean
-        AlertAudiencePort audiencePort() {
-            return new FixedAudience();
-        }
-
-        @Bean
         RecordingNotificationPort notificationPort() {
             return new RecordingNotificationPort();
         }
 
         @Bean
-        NewAlertFanout fanout(AlertAudiencePort audiencePort, AlertNotificationPort notificationPort) {
-            return new NewAlertFanout(audiencePort, notificationPort);
+        NewAlertFanout fanout(AlertNotificationPort notificationPort) {
+            return new NewAlertFanout(notificationPort);
         }
 
         @Bean
@@ -171,17 +160,7 @@ class NewAlertFanoutWiringTest {
         }
     }
 
-    static class FixedAudience implements AlertAudiencePort {
-
-        static final UUID RECIPIENT = UUID.randomUUID();
-
-        @Override
-        public List<UUID> recipientsFor(AlertType type, Location location, double broadcastRadiusKm) {
-            return List.of(RECIPIENT);
-        }
-    }
-
-    record Broadcast(Alert alert, List<UUID> recipients, String threadName) {}
+    record Broadcast(Alert alert, String threadName) {}
 
     /** A queue rather than a mock, because the assertion has to wait for another thread. */
     static class RecordingNotificationPort implements AlertNotificationPort {
@@ -189,8 +168,8 @@ class NewAlertFanoutWiringTest {
         final BlockingQueue<Broadcast> broadcasts = new LinkedBlockingQueue<>();
 
         @Override
-        public void broadcastAlert(Alert alert, List<UUID> userIds) {
-            broadcasts.add(new Broadcast(alert, List.copyOf(userIds), Thread.currentThread().getName()));
+        public void broadcastNewAlert(Alert alert) {
+            broadcasts.add(new Broadcast(alert, Thread.currentThread().getName()));
         }
 
         @Override

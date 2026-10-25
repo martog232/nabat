@@ -2,13 +2,14 @@ package org.example.nabat.incident.application.port.out;
 
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
+import org.example.nabat.incident.domain.ReportRanking;
 import org.example.nabat.shared.domain.Location;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 public interface AlertRepository {
@@ -26,7 +27,7 @@ public interface AlertRepository {
      * rather than reusing the in-port's query record — an out-port that imports an in-port
      * would point the dependency backwards.
      *
-     * @param type     null means every type; likewise {@code severity}
+     * @param category a group code or a subcategory code; null means every category
      * @param limit    hard cap on rows returned. Applied in SQL, not afterwards in Java:
      *                 trimming a list still makes the database materialise and ship every
      *                 row inside the radius, which is the cost being avoided.
@@ -34,8 +35,7 @@ public interface AlertRepository {
     record NearbySearch(
         Location center,
         double radiusKm,
-        AlertType type,
-        AlertSeverity severity,
+        Integer category,
         int limit
     ) {
         public NearbySearch {
@@ -43,18 +43,46 @@ public interface AlertRepository {
                 throw new IllegalArgumentException("Limit must be positive");
             }
         }
-
-        /** The enum name the native queries compare against, or null for "no filter". */
-        public String typeName() {
-            return type == null ? null : type.name();
-        }
-
-        public String severityName() {
-            return severity == null ? null : severity.name();
-        }
     }
 
+    /**
+     * Open reports within {@code radiusMeters} of {@code center} filed under any of
+     * {@code categoryCodes}, nearest first, at most {@code limit}.
+     */
+    List<Alert> findOpenNear(Location center, double radiusMeters, Collection<Integer> categoryCodes, int limit);
+
     List<Alert> findByStatus(AlertStatus status);
+
+    /** The reports an authority answers for, in any of {@code statuses}, newest first, at most {@code limit}. */
+    List<Alert> findAssignedTo(String authorityCode, Set<AlertStatus> statuses, int limit);
+
+    /** One page of the public list, in the order {@code search} asks for. */
+    List<Alert> findRanked(RankedSearch search);
+
+    /** How many reports {@code search} matches in all, ignoring its page. */
+    long countRanked(RankedSearch search);
+
+    /**
+     * The public list's filters, order and page. Its own record rather than the in-port's
+     * query, for the same reason as {@link NearbySearch}: an out-port that imports an in-port
+     * points the dependency backwards.
+     *
+     * @param districtCode null for the whole city
+     * @param overdue      only reports past their answer deadline
+     */
+    record RankedSearch(
+        String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int offset, int limit, boolean overdue
+    ) {
+
+        public RankedSearch(String districtCode, Set<AlertStatus> statuses, ReportRanking ranking, int offset, int limit) {
+            this(districtCode, statuses, ranking, offset, limit, false);
+        }
+
+        /** The status names the native query compares against. */
+        public List<String> statusNames() {
+            return statuses.stream().map(Enum::name).sorted().toList();
+        }
+    }
 
     /**
      * Writes the denormalised vote counts and returns the refreshed alert, in one

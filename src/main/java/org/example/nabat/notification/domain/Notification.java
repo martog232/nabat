@@ -56,6 +56,83 @@ public record Notification(
         );
     }
 
+    public static Notification createResolvedNotification(
+            UserId recipientId,
+            AlertId alertId,
+            String title,
+            String message
+    ) {
+        return new Notification(
+                NotificationId.generate(),
+                recipientId,
+                NotificationType.ALERT_RESOLVED,
+                title,
+                message,
+                alertId,
+                null,
+                false,
+                Instant.now()
+        );
+    }
+
+    public static Notification createCommentNotification(
+            UserId recipientId,
+            AlertId alertId,
+            UserId authorId,
+            String title,
+            String message
+    ) {
+        return new Notification(
+                NotificationId.generate(),
+                recipientId,
+                NotificationType.COMMENT_ADDED,
+                title,
+                message,
+                alertId,
+                authorId,
+                false,
+                Instant.now()
+        );
+    }
+
+    public static Notification createProgressNotification(
+            UserId reporterId,
+            AlertId alertId,
+            String title,
+            String message
+    ) {
+        return new Notification(
+                NotificationId.generate(),
+                reporterId,
+                NotificationType.REPORT_PROGRESSED,
+                title,
+                message,
+                alertId,
+                null,
+                false,
+                Instant.now()
+        );
+    }
+
+    public static Notification createForwardedNotification(
+            UserId reporterId,
+            AlertId alertId,
+            String title,
+            String message
+    ) {
+        return new Notification(
+                NotificationId.generate(),
+                reporterId,
+                NotificationType.REPORT_FORWARDED,
+                title,
+                message,
+                alertId,
+                null,
+                false,
+                Instant.now()
+        );
+    }
+
     /** Returns a copy of this notification with isRead = true. Notification is immutable. */
     public Notification markAsRead() {
         return new Notification(

@@ -1,6 +1,6 @@
 package org.example.nabat.voting.adapter.in.rest;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.example.nabat.identity.application.port.in.AuthenticateSessionUseCase;
 import org.example.nabat.voting.application.port.in.VoteAlertUseCase;
 import org.example.nabat.incident.domain.AlertId;
@@ -10,8 +10,8 @@ import org.example.nabat.identity.domain.UserId;
 import org.example.nabat.voting.domain.VoteType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -62,11 +62,7 @@ class AlertVoteControllerTest {
                 false,
                 Instant.now(),
                 Instant.now(),
-                5,
-                null,
-                null,
-                null,
-                                 0
+                0, null
         );
     }
 
@@ -86,13 +82,13 @@ class AlertVoteControllerTest {
         VoteAlertUseCase.VoteReceipt vote = new VoteAlertUseCase.VoteReceipt(
                 UUID.randomUUID(),
                 AlertId.of(ALERT_ID),
-                VoteType.UPVOTE,
+                VoteType.CONFIRM,
                 Instant.now(),
                 new VoteAlertUseCase.VoteStats(4, 1, 2, 7));
         when(voteAlertUseCase.vote(any())).thenReturn(vote);
 
         String requestBody = objectMapper.writeValueAsString(
-                new AlertVoteController.VoteRequest(VoteType.UPVOTE)
+                new AlertVoteController.VoteRequest(VoteType.CONFIRM)
         );
 
         mockMvc.perform(post("/api/v1/alerts/{alertId}/votes", ALERT_ID)
@@ -100,7 +96,7 @@ class AlertVoteControllerTest {
                         .content(requestBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.alertId").value(ALERT_ID.toString()))
-                .andExpect(jsonPath("$.voteType").value("UPVOTE"))
+                .andExpect(jsonPath("$.voteType").value("CONFIRM"))
                 // Tallies come back with the vote, so the client needs no follow-up call
                 // to the eventually-consistent stats endpoint.
                 .andExpect(jsonPath("$.stats.upvotes").value(4))
@@ -141,12 +137,12 @@ class AlertVoteControllerTest {
         User user = buildTestUser();
         authenticateAs(user);
 
-        when(voteAlertUseCase.findUserVote(any(), any())).thenReturn(Optional.of(VoteType.UPVOTE));
+        when(voteAlertUseCase.findUserVote(any(), any())).thenReturn(Optional.of(VoteType.CONFIRM));
 
         mockMvc.perform(get("/api/v1/alerts/{alertId}/votes/me", ALERT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasVoted").value(true))
-                .andExpect(jsonPath("$.voteType").value("UPVOTE"));
+                .andExpect(jsonPath("$.voteType").value("CONFIRM"));
     }
 
     @Test

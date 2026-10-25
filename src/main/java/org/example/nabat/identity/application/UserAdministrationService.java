@@ -1,6 +1,7 @@
 package org.example.nabat.identity.application;
 
 import org.example.nabat.identity.application.port.in.AdministerUsersUseCase;
+import org.example.nabat.identity.application.port.out.AuthorityDirectoryPort;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -14,29 +15,51 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserAdministrationService implements AdministerUsersUseCase {
 
     private final UserRepository userRepository;
+    private final AuthorityDirectoryPort authorities;
 
-    public UserAdministrationService(UserRepository userRepository) {
+    public UserAdministrationService(UserRepository userRepository, AuthorityDirectoryPort authorities) {
         this.userRepository = userRepository;
+        this.authorities = authorities;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserPage listUsers(UserId actorId, int page, int size) {
+        requireActorWhoCanAdminister(actorId);
+
+        UserRepository.UserPage found = userRepository.findAll(page, size);
+        return new UserPage(found.users(), found.total());
     }
 
     @Override
     @Transactional
-    public User changeRole(UserId actorId, UserId targetId, Role newRole) {
+    public User changeRole(UserId actorId, UserId targetId, Role newRole, String authorityCode) {
         if (newRole == null) {
             throw new IllegalArgumentException("Role is required");
+        }
+        boolean official = newRole == Role.OFFICIAL;
+        if (official == (authorityCode == null)) {
+            throw new IllegalArgumentException(official
+                ? "An official needs an authority"
+                : "Only an official has an authority");
+        }
+        if (official && !authorities.exists(authorityCode)) {
+            throw new IllegalArgumentException("No such authority: " + authorityCode);
         }
 
         User actor = requireActorWhoCanAdminister(actorId);
         requireNotSelf(actor, targetId, "change your own role");
 
         User target = requireUser(targetId);
-        if (target.role() == newRole) {
+        if (target.role() == newRole && java.util.Objects.equals(target.authorityCode(), authorityCode)) {
             // Idempotent rather than a conflict: the caller asked for a state that already
             // holds, and a 409 here would make a retry after a timeout look like a failure.
             return target;
         }
 
-        return userRepository.save(target.withRole(newRole));
+        return userRepository.save(official
+            ? target.appointTo(authorityCode)
+            : target.withRole(newRole));
     }
 
     @Override

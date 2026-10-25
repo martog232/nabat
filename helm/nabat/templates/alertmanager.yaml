@@ -71,9 +71,13 @@ spec:
         app.kubernetes.io/component: alertmanager
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.monitoring.alertmanager.podSecurityContext | nindent 8 }}
       containers:
       - name: alertmanager
         image: {{ .Values.monitoring.alertmanager.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         args:
         - --config.file=/etc/alertmanager/alertmanager.yml
         - --storage.path=/alertmanager

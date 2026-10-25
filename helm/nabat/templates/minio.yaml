@@ -35,9 +35,13 @@ spec:
         app.kubernetes.io/component: minio
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.minio.podSecurityContext | nindent 8 }}
       containers:
       - name: minio
         image: {{ .Values.minio.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         args:
         - server
         - /data
@@ -121,10 +125,20 @@ spec:
         app.kubernetes.io/component: minio-init
     spec:
       restartPolicy: OnFailure
+      securityContext:
+        {{- toYaml .Values.minio.podSecurityContext | nindent 8 }}
       containers:
       - name: mc
         image: {{ .Values.minio.clientImage }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         env:
+        # mc writes its alias configuration under $HOME, which the image sets to /root.
+        # Now that this Job runs as uid 1000 rather than root, /root is not writable and
+        # `mc alias set` fails with "Unable to save new mc config" before it ever reaches
+        # MinIO — a bucket that is never created, reported as a Job that backs off.
+        - name: HOME
+          value: /tmp
         - name: MINIO_ACCESS_KEY
           valueFrom:
             secretKeyRef:

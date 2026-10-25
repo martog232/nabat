@@ -1,12 +1,14 @@
 package org.example.nabat.incident.adapter.out.persistence;
 
 import org.example.nabat.incident.domain.AlertStatus;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -17,14 +19,70 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
     List<AlertJpaEntity> findByStatus(AlertStatus status);
 
     /*
-     * The four spatial queries below share a shape: circle predicate, optional type and
-     * severity filters, newest first, LIMIT.
+     * The public list. One query for all three orders: ORDER BY cannot take a bind
+     * parameter, and three copies of the same filters would drift. Each CASE is null for the
+     * orders it does not apply to, so only one of them decides; the id breaks ties so that
+     * paging is stable.
      *
-     * On the filters — `CAST(:type AS text) IS NULL OR ...` rather than the obvious
-     * `:type IS NULL OR ...`. PostgreSQL infers parameter types from context, and in a
+     * The HOT score is ReportRanking.HOT's formula, and the two must be changed together.
+     * Age is LOCALTIMESTAMP - created_at: created_at is a TIMESTAMP without zone, written in
+     * the JVM's zone, and pgjdbc sets the session to that same zone, so both sides are the
+     * same local clock. Comparing against a bound Instant instead would mix a zoned value
+     * with an unzoned one and shift every age by the UTC offset.
+     */
+    @Query(value = """
+        SELECT * FROM alerts a
+        WHERE a.status IN (:statuses)
+        AND (CAST(:district AS text) IS NULL OR a.district_code = CAST(:district AS text))
+        AND (NOT :overdue OR a.answer_due_at < now())
+        ORDER BY
+          CASE WHEN :ranking = 'HOT' THEN
+            (a.confirmation_count + a.upvote_count + 1)
+            / power(GREATEST(EXTRACT(EPOCH FROM (LOCALTIMESTAMP - a.created_at)) / 86400.0, 0) + 2, 1.5)
+          END DESC,
+          CASE WHEN :ranking = 'LONGEST_WAITING' THEN a.created_at END ASC,
+          CASE WHEN :ranking = 'NEWEST' THEN a.created_at END DESC,
+          a.id
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<AlertJpaEntity> findRanked(
+        @Param("statuses") Collection<String> statuses,
+        @Param("district") String districtCode,
+        @Param("overdue") boolean overdue,
+        @Param("ranking") String ranking,
+        @Param("offset") int offset,
+        @Param("limit") int limit
+    );
+
+    @Query(value = """
+        SELECT count(*) FROM alerts a
+        WHERE a.status IN (:statuses)
+        AND (CAST(:district AS text) IS NULL OR a.district_code = CAST(:district AS text))
+        AND (NOT :overdue OR a.answer_due_at < now())
+        """, nativeQuery = true)
+    long countRanked(
+        @Param("statuses") Collection<String> statuses,
+        @Param("district") String districtCode,
+        @Param("overdue") boolean overdue);
+
+    List<AlertJpaEntity> findByAuthorityCodeAndStatusInOrderByCreatedAtDesc(
+        String authorityCode, Collection<AlertStatus> statuses, Limit limit);
+
+    /*
+     * The four spatial queries below share a shape: circle predicate, optional category
+     * filter, newest first, LIMIT.
+     *
+     * "Open" is spelled out as `NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')`, the SQL twin of
+     * AlertStatus.isOpen(). Naming the closed states rather than the open ones is
+     * deliberate: a new open state then appears on the map without touching this file,
+     * whereas a list of open states would hide it until someone remembered.
+     *
+     * On the filters — `CAST(:category AS integer) IS NULL OR ...` rather than the obvious
+     * `:category IS NULL OR ...`. PostgreSQL infers parameter types from context, and in a
      * bare `NULL` comparison there is no context, so it fails the statement with
      * "could not determine data type of parameter". The cast supplies the type.
-     * `a.type` is compared as text because the column is a varchar holding the enum name.
+     * The category may be a group: a report is filed under a subcategory, so a group code
+     * matches through report_categories.group_code rather than directly.
      *
      * On the LIMIT — it belongs here rather than in Java. Trimming the list after the
      * fact would still make the database materialise and ship every row in the radius,
@@ -33,12 +91,36 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      * the right end to lose for a live incident map.
      */
 
+    /**
+     * Open reports close to a point, nearest first — the duplicate check before reporting.
+     * PostGIS only: V18 made it a requirement, and this was written after.
+     */
+    @Query(value = """
+        SELECT * FROM alerts a
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
+        AND a.category_code IN (:categories)
+        AND ST_DWithin(
+            a.location_geog,
+            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+            :meters
+        )
+        ORDER BY ST_Distance(a.location_geog, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography)
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<AlertJpaEntity> findOpenNear(
+        @Param("lat") double latitude,
+        @Param("lon") double longitude,
+        @Param("meters") double meters,
+        @Param("categories") Collection<Integer> categories,
+        @Param("limit") int limit
+    );
+
     /** PostGIS path — used when the location_geog generated column exists. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status = 'ACTIVE'
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
-        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
+        AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
@@ -51,8 +133,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("type") String type,
-        @Param("severity") String severity,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
@@ -63,10 +144,10 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
      */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status = 'ACTIVE'
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
         AND a.created_at >= :since
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
-        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
+        AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND ST_DWithin(
             a.location_geog,
             ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
@@ -80,18 +161,17 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
         @Param("since") Instant since,
-        @Param("type") String type,
-        @Param("severity") String severity,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
     /** Haversine equivalent of {@link #findActiveAlertsWithinRadiusSince}. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status = 'ACTIVE'
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
         AND a.created_at >= :since
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
-        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
+        AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
@@ -105,17 +185,16 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
         @Param("since") Instant since,
-        @Param("type") String type,
-        @Param("severity") String severity,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 
     /** Haversine fallback — used when PostGIS is not installed on the server. */
     @Query(value = """
         SELECT * FROM alerts a
-        WHERE a.status = 'ACTIVE'
-        AND (CAST(:type AS text) IS NULL OR a.type = CAST(:type AS text))
-        AND (CAST(:severity AS text) IS NULL OR a.severity = CAST(:severity AS text))
+        WHERE a.status NOT IN ('RESOLVED', 'REJECTED', 'WITHDRAWN')
+        AND (CAST(:category AS integer) IS NULL OR a.category_code = CAST(:category AS integer)
+             OR a.category_code IN (SELECT c.code FROM report_categories c WHERE c.group_code = CAST(:category AS integer)))
         AND (6371 * acos(
             LEAST(1.0, cos(radians(:lat)) * cos(radians(a.latitude))
             * cos(radians(a.longitude) - radians(:lon))
@@ -128,8 +207,7 @@ public interface AlertJpaRepository extends JpaRepository<AlertJpaEntity, UUID> 
         @Param("lat") double latitude,
         @Param("lon") double longitude,
         @Param("radius") double radiusKm,
-        @Param("type") String type,
-        @Param("severity") String severity,
+        @Param("category") Integer category,
         @Param("limit") int limit
     );
 

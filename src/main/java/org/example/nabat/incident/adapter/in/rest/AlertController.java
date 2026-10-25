@@ -1,6 +1,8 @@
 package org.example.nabat.incident.adapter.in.rest;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -11,12 +13,14 @@ import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
 import org.example.nabat.incident.application.port.in.GetAlertByIdUseCase;
 import org.example.nabat.incident.application.port.in.GetNearbyAlertsUseCase;
 import org.example.nabat.incident.application.port.in.ListAlertsUseCase;
+import org.example.nabat.incident.application.port.in.ListAssignedReportsUseCase;
+import org.example.nabat.incident.application.port.in.ListRankedReportsUseCase;
+import org.example.nabat.incident.application.port.in.ProgressReportUseCase;
 import org.example.nabat.incident.application.port.in.ResolveAlertUseCase;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
+import org.example.nabat.incident.domain.ReportRanking;
 import org.example.nabat.identity.domain.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -46,6 +51,9 @@ public class AlertController {
     private final GetAlertByIdUseCase getAlertByIdUseCase;
     private final ResolveAlertUseCase resolveAlertUseCase;
     private final ListAlertsUseCase listAlertsUseCase;
+    private final ProgressReportUseCase progressReportUseCase;
+    private final ListAssignedReportsUseCase listAssignedReportsUseCase;
+    private final ListRankedReportsUseCase listRankedReportsUseCase;
 
     public AlertController(
         CreateAlertUseCase createAlertUseCase,
@@ -54,13 +62,19 @@ public class AlertController {
         ResolveAlertUseCase resolveAlertUseCase,
         // An in-port, not the AlertRepository out-port this controller used to inject
         // directly — which let the REST layer reach past the application layer entirely.
-        ListAlertsUseCase listAlertsUseCase
+        ListAlertsUseCase listAlertsUseCase,
+        ProgressReportUseCase progressReportUseCase,
+        ListAssignedReportsUseCase listAssignedReportsUseCase,
+        ListRankedReportsUseCase listRankedReportsUseCase
     ) {
         this.createAlertUseCase = createAlertUseCase;
         this.getNearbyAlertsUseCase = getNearbyAlertsUseCase;
         this.getAlertByIdUseCase = getAlertByIdUseCase;
         this.resolveAlertUseCase = resolveAlertUseCase;
         this.listAlertsUseCase = listAlertsUseCase;
+        this.progressReportUseCase = progressReportUseCase;
+        this.listAssignedReportsUseCase = listAssignedReportsUseCase;
+        this.listRankedReportsUseCase = listRankedReportsUseCase;
     }
 
     @PostMapping
@@ -95,13 +109,13 @@ public class AlertController {
         @RequestParam(defaultValue = "5.0")
         @DecimalMin(value = "0.0", inclusive = false) @DecimalMax("100.0") Double radiusKm,
         @RequestParam(required = false) Instant since,
-        @RequestParam(required = false) AlertType type,
-        @RequestParam(required = false) AlertSeverity severity,
+        @Parameter(description = "A group code (every subcategory in it) or a subcategory code, from GET /api/v1/categories", example = "1006")
+        @RequestParam(required = false) Integer category,
         @RequestParam(defaultValue = "100")
         @Min(1) @Max(GetNearbyAlertsUseCase.NearbyAlertsQuery.MAX_LIMIT) Integer limit
     ) {
         var query = new GetNearbyAlertsUseCase.NearbyAlertsQuery(
-            latitude, longitude, radiusKm, type, severity, limit);
+            latitude, longitude, radiusKm, category, limit);
 
         List<Alert> alerts = since == null
             ? getNearbyAlertsUseCase.getNearbyAlerts(query)
@@ -135,8 +149,77 @@ public class AlertController {
         return ResponseEntity.ok(AlertResponse.from(resolved));
     }
 
+    /** The authority that answers for the report has received it. Its own officials only. */
+    @PatchMapping("/{id}/acknowledge")
+    @Operation(summary = "The report's authority confirms it has received it")
+    public ResponseEntity<AlertResponse> acknowledge(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.acknowledge(AlertId.of(id), currentUser)));
+    }
+
+    /** The authority that answers for the report has started work on it. Its own officials only. */
+    @PatchMapping("/{id}/start-work")
+    @Operation(summary = "The report's authority says work has started")
+    public ResponseEntity<AlertResponse> startWork(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(AlertResponse.from(progressReportUseCase.startWork(AlertId.of(id), currentUser)));
+    }
+
     /**
-     * Listing of all alerts by status (defaults to ACTIVE), for moderation rather than for
+     * The public list of reports — anyone may read it, signed in or not.
+     *
+     * <p>Public because that is what it is for: what an authority has been told, and what it has
+     * done about it, visible to the people who told it and to anyone else who wants to look.
+     * It carries nothing the map does not already show a signed-in user; reporters appear as
+     * an id, never a name or an address.
+     */
+    @GetMapping("/ranked")
+    @SecurityRequirements
+    @Operation(summary = "All reports, or one district's, in HOT, LONGEST_WAITING or NEWEST order")
+    public ResponseEntity<RankedReportsResponse> listRanked(
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) Set<AlertStatus> status,
+            @RequestParam(defaultValue = "HOT") ReportRanking ranking,
+            @RequestParam(defaultValue = "0") @Min(0) Integer page,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(ListRankedReportsUseCase.RankedQuery.MAX_SIZE) Integer size,
+            @Parameter(description = "Only reports past the deadline for their authority's answer")
+            @RequestParam(defaultValue = "false") boolean overdue
+    ) {
+        var query = new ListRankedReportsUseCase.RankedQuery(district, status, ranking, page, size, overdue);
+        var result = listRankedReportsUseCase.listRanked(query);
+        return ResponseEntity.ok(new RankedReportsResponse(
+            result.alerts().stream().map(AlertResponse::from).toList(),
+            query.ranking(),
+            page,
+            size,
+            result.total()
+        ));
+    }
+
+    /**
+     * The working list of an official: the reports their authority answers for, open ones
+     * unless {@code status} says otherwise. Which authority comes from the account — there is
+     * no parameter for it, so there is nothing to tamper with.
+     */
+    @GetMapping("/assigned")
+    @PreAuthorize("hasRole('OFFICIAL')")
+    @Operation(summary = "Reports the caller's authority answers for, newest first")
+    public ResponseEntity<List<AlertResponse>> listForOwnAuthority(
+            @RequestParam(required = false) Set<AlertStatus> status,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        List<AlertResponse> response = listAssignedReportsUseCase.listForOwnAuthority(currentUser, status).stream()
+                .map(AlertResponse::from)
+                .toList();
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Listing of all alerts by status (defaults to SUBMITTED), for moderation rather than for
      * the map. Open to moderators as well as admins: triaging reports is the moderator role,
      * and requiring account-administration rights to read a list was the coupling that made
      * one role do two jobs.
@@ -144,7 +227,7 @@ public class AlertController {
     @GetMapping
     @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
     public ResponseEntity<List<AlertResponse>> listByStatus(
-            @RequestParam(defaultValue = "ACTIVE") AlertStatus status
+            @RequestParam(defaultValue = "SUBMITTED") AlertStatus status
     ) {
         List<AlertResponse> response = listAlertsUseCase.listByStatus(status).stream()
                 .map(AlertResponse::from)

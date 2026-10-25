@@ -122,6 +122,108 @@ public class NotificationService implements SendNotificationUseCase, GetNotifica
         return saved;
     }
 
+    @Override
+    @Transactional
+    public Notification sendResolvedNotification(ResolvedNotificationCommand command) {
+        String title = messageSource.getMessage(
+                "notification.resolved.title",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                command.byAuthority() ? "notification.resolved.message.authority" : "notification.resolved.message.moderator",
+                new Object[]{command.alertTitle()},
+                LocaleContextHolder.getLocale()
+        );
+
+        Notification n = Notification.createResolvedNotification(
+                command.reporterId(),
+                command.alertId(),
+                title,
+                message
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.reporterId(), saved);
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public Notification sendProgressNotification(ProgressNotificationCommand command) {
+        String key = command.progress().name().toLowerCase(java.util.Locale.ROOT);
+        String title = messageSource.getMessage(
+                "notification.progress.title." + key,
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                "notification.progress.message." + key + (command.byModerator() ? ".moderator" : ""),
+                new Object[]{command.alertTitle(), command.authorityName(), command.reason()},
+                LocaleContextHolder.getLocale()
+        );
+
+        Notification n = Notification.createProgressNotification(
+                command.reporterId(),
+                command.alertId(),
+                title,
+                message
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.reporterId(), saved);
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public Notification sendForwardedNotification(ForwardedNotificationCommand command) {
+        String title = messageSource.getMessage(
+                "notification.forwarded.title",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                "notification.forwarded.message",
+                new Object[]{command.alertTitle(), command.toAuthorityName(), command.reason()},
+                LocaleContextHolder.getLocale()
+        );
+
+        Notification n = Notification.createForwardedNotification(
+                command.reporterId(),
+                command.alertId(),
+                title,
+                message
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.reporterId(), saved);
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public Notification sendCommentNotification(CommentNotificationCommand command) {
+        String title = messageSource.getMessage(
+                "notification.comment.title",
+                null,
+                LocaleContextHolder.getLocale()
+        );
+        String message = messageSource.getMessage(
+                command.byAuthority() ? "notification.comment.message.authority" : "notification.comment.message",
+                new Object[]{command.alertTitle(), command.authorName()},
+                LocaleContextHolder.getLocale()
+        );
+
+        Notification n = Notification.createCommentNotification(
+                command.recipientId(),
+                command.alertId(),
+                command.authorId(),
+                title,
+                message
+        );
+        Notification saved = notificationRepository.save(n);
+        notificationSender.sendToUser(command.recipientId(), saved);
+        return saved;
+    }
+
     private String voteTitleKey(NotificationType type) {
         return switch (type) {
             case ALERT_UPVOTED -> "notification.vote.title.alert_upvoted";

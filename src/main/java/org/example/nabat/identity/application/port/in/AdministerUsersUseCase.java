@@ -7,8 +7,7 @@ import org.example.nabat.identity.domain.UserId;
 /**
  * Changing what another account may do, and switching one off.
  *
- * <p>Separate from {@link UpdateUserPreferencesUseCase}, which is a user acting on itself.
- * Everything here is one account acting on another, so every method takes the actor as well
+ * <p>Everything here is one account acting on another, so every method takes the actor as well
  * as the target: the authorisation rules are about the relationship between the two, not
  * about the caller alone, and that is not something a {@code @PreAuthorize} expression can
  * express.
@@ -16,14 +15,39 @@ import org.example.nabat.identity.domain.UserId;
 public interface AdministerUsersUseCase {
 
     /**
-     * Assigns a role.
+     * One page of accounts for the admin screen, newest first.
+     *
+     * <p>Takes the actor like everything else here, and for the same reason: the controller's
+     * {@code @PreAuthorize} reads the role in the token, which is as old as the token, while
+     * this re-reads the row. An admin demoted a minute ago still presents {@code ROLE_ADMIN}.
+     *
+     * @param page zero-based; {@code size} is capped by the caller
+     */
+    UserPage listUsers(UserId actorId, int page, int size);
+
+    /**
+     * Deliberately not {@code UserRepository.UserPage}, though the shape is the same.
+     *
+     * <p>{@code ArchitectureTest} forbids a controller from importing an out-port, and a
+     * controller has to name this type to return it. Three lines of mapping in the service is
+     * the price of the rule holding.
+     */
+    record UserPage(java.util.List<User> users, long total) {
+    }
+
+    /**
+     * Assigns a role, and for {@link Role#OFFICIAL} the authority it acts for.
+     *
+     * <p>{@code authorityCode} is required for an official and refused for any other role,
+     * and it must name an authority that exists. An official of an authority no report can go
+     * to would be an account that can do nothing, and look as if it could.
      *
      * <p>Refuses when the actor is the target. An admin demoting themselves is how an
      * installation ends up with no one who can hand the role back — the platform has no
      * break-glass path, so the only safe answer is that the last step must be taken by
      * someone else.
      */
-    User changeRole(UserId actorId, UserId targetId, Role newRole);
+    User changeRole(UserId actorId, UserId targetId, Role newRole, String authorityCode);
 
     /**
      * Enables or disables an account.

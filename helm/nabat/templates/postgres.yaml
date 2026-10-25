@@ -20,6 +20,17 @@ metadata:
     app.kubernetes.io/component: postgres
 spec:
   replicas: 1
+  # Recreate, not the default RollingUpdate: the PVC above is ReadWriteOnce, so a
+  # replacement pod cannot mount the volume while the outgoing one still holds it. A
+  # rolling update deadlocks — new pod Pending on the volume, old pod kept alive waiting
+  # for the new one to become ready — and needs the Deployment scaled to zero by hand to
+  # clear. minio and loki already carried this; the databases did not.
+  #
+  # It costs a moment of downtime on every upgrade that changes the pod spec, which for a
+  # single-replica database is the honest trade: there is no second replica to serve
+  # through it either way.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/component: postgres
@@ -29,9 +40,13 @@ spec:
         app.kubernetes.io/component: postgres
         {{- include "nabat.labels" . | nindent 8 }}
     spec:
+      securityContext:
+        {{- toYaml .Values.postgres.podSecurityContext | nindent 8 }}
       containers:
       - name: postgres
         image: {{ .Values.postgres.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         env:
         - name: POSTGRES_DB
           value: {{ .Values.postgres.database }}

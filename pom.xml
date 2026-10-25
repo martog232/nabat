@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.1</version>
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
 
@@ -20,7 +20,7 @@
     <properties>
         <java.version>21</java.version>
         <jjwt.version>0.12.5</jjwt.version>
-        <spring-modulith.version>1.3.1</spring-modulith.version>
+        <spring-modulith.version>2.0.8</spring-modulith.version>
         <avro.version>1.12.0</avro.version>
         <!--
             The 7.x line targets the Kafka 3.x clients Boot 3.4 brings; nabat-voting is on
@@ -28,7 +28,7 @@
             is the same — a magic byte, a schema id, then Avro — which is the point of a
             registry: the contract is the schema, not the library that wrote it.
         -->
-        <confluent.version>7.9.0</confluent.version>
+        <confluent.version>8.0.0</confluent.version>
         <!--
             Overrides the 1.20.4 that Boot 3.4.1 manages. Its bundled docker-java
             negotiates Docker Engine API 1.32, which Engine 29 (min 1.40) rejects with an
@@ -65,6 +65,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!--
+            RestClient, which NabatVotingRestClientAdapter calls nabat-voting with. Boot 3
+            auto-configured RestClient.Builder as part of the web starter; Boot 4 moved it
+            into a module of its own, so without this the context fails at startup with
+            "No qualifying bean of type RestClient$Builder" — a missing HTTP client for the
+            one service this application talks to, reported as a wiring error.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -88,6 +99,18 @@
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-api</artifactId>
+        </dependency>
+        <!--
+            Compile scope, and declared rather than inherited. Modulith 2 moved
+            @ApplicationModuleListener out of spring-modulith-api into
+            spring-modulith-events-api; the two modules below carry it transitively but are
+            runtime-only, so main/ stopped compiling against a package that is on the
+            classpath at run time. Declaring it is also the honest description: NewAlertFanout
+            imports it directly.
+        -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-events-api</artifactId>
         </dependency>
         <!--
             Event Publication Registry: turns @ApplicationModuleListener into a
@@ -132,6 +155,20 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+            Both Jackson majors are on the classpath, deliberately, exactly as in
+            nabat-voting. Jackson 2 (com.fasterxml.*) is here only because jjwt-jackson has
+            not moved off it; the application itself serialises with Jackson 3
+            (tools.jackson.*), which Boot 4 brings in through spring-boot-starter-web.
+            Neither is version-pinned: the Boot BOM manages both (jackson-2-bom and
+            jackson-bom), and pinning either would silently hold Jackson back across a Boot
+            upgrade.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
         <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -170,8 +207,8 @@
 
         <!-- Flyway Database Migrations -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -205,9 +242,44 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            Boot 4 split the test slices out of spring-boot-starter-test into one module per
+            technology, and moved their packages with them: @WebMvcTest and
+            @AutoConfigureMockMvc are now under org.springframework.boot.webmvc.test.*,
+            @DataJpaTest under ...data.jpa.test.*, @AutoConfigureTestDatabase under
+            ...jdbc.test.*. Without these two the slice annotations simply do not exist —
+            spring-boot-starter-test alone leaves every @WebMvcTest and @DataJpaTest
+            unresolvable. spring-boot-starter-test-classic restores the old aggregate, but it
+            restores the old *shape*, not the old package names, so it buys nothing here.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+            The Boot side of the same thing, and separate from it since Boot 4 split the
+            slices. spring-security-test brings the request post-processors; this brings the
+            @WebMvcTest auto-configuration that registers Spring Security's
+            AuthenticationPrincipalArgumentResolver. Without it every controller taking
+            `@AuthenticationPrincipal User` falls through to ordinary data binding, which
+            tries to bind the principal from request parameters and answers 400 with
+            "Failed to convert value of type 'java.lang.String' to required type UserId" —
+            eighteen tests failing on an argument resolver, not on anything they assert.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -253,7 +325,8 @@
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.7.0</version>
+            <!-- The 3.0.x line is built against Boot 4.0; 3.1.x targets Boot 4.1. -->
+            <version>3.0.3</version>
         </dependency>
 
         <!-- Metrics: Prometheus registry -->
@@ -268,10 +341,15 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-        <!-- AOP: needed for @Around use-case timing aspect -->
+        <!--
+            AOP: needed for the @Around use-case timing aspect. Called
+            spring-boot-starter-aop until Boot 4, which renamed it to name the weaver it
+            actually pulls in; the old id is not merely deprecated, it is absent from the
+            BOM, so the build fails to read the POM rather than failing to compile.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
 
         <!-- Rate limiting removed — will be handled at the API-gateway layer (T-44 reverted). -->
@@ -313,20 +391,23 @@
             <version>${confluent.version}</version>
         </dependency>
 
-        <!-- Tracing: Brave bridge — populates MDC traceId/spanId per request -->
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-tracing-bridge-brave</artifactId>
-        </dependency>
+        <!--
+            Tracing: the Brave bridge that populates MDC traceId/spanId per request, and
+            Zipkin export.
 
-        <!-- Zipkin trace export -->
+            One starter rather than the three artifacts this used to name
+            (micrometer-tracing-bridge-brave, zipkin-sender-okhttp3, zipkin-reporter-brave).
+            Boot 4 moved the auto-configuration out of the core jar into
+            spring-boot-micrometer-tracing-brave and spring-boot-zipkin, which the starter
+            pulls in along with the bridge. Naming only the bridge, as before, puts Brave on
+            the classpath with nothing to configure it: no Tracer bean, so
+            FanoutTracePropagationIntegrationTest cannot even load a context — and in a
+            deployment it would simply export no spans, which looks like a system with no
+            traffic. That failure mode is the one AGENTS.md warns about for ZIPKIN_ENDPOINT.
+        -->
         <dependency>
-            <groupId>io.zipkin.reporter2</groupId>
-            <artifactId>zipkin-sender-okhttp3</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.zipkin.reporter2</groupId>
-            <artifactId>zipkin-reporter-brave</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-zipkin</artifactId>
         </dependency>
     </dependencies>
 
@@ -388,7 +469,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.34</version>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>

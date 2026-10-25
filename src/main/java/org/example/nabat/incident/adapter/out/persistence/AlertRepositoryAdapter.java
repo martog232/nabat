@@ -6,11 +6,14 @@ import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
 import org.example.nabat.incident.domain.AlertStatus;
 import org.example.nabat.shared.domain.Location;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 @Component
@@ -27,8 +30,15 @@ public class AlertRepositoryAdapter implements AlertRepository {
 
     @Override
     public Alert save(Alert alert) {
-        AlertJpaEntity entity = AlertJpaEntity.from(alert);
-        AlertJpaEntity saved = jpaRepository.save(entity);
+        // Existing alerts are written onto the managed entity, which carries the version the
+        // transaction loaded; see AlertJpaEntity.copyStateFrom for what went wrong without it.
+        AlertJpaEntity entity = jpaRepository.findById(alert.id().value())
+            .map(existing -> {
+                existing.copyStateFrom(alert);
+                return existing;
+            })
+            .orElseGet(() -> AlertJpaEntity.from(alert));
+        AlertJpaEntity saved = jpaRepository.saveAndFlush(entity);
         return saved.toDomain();
     }
 
@@ -44,10 +54,10 @@ public class AlertRepositoryAdapter implements AlertRepository {
         List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
                 ? jpaRepository.findActiveAlertsWithinRadius(
                     center.latitude(), center.longitude(), search.radiusKm(),
-                    search.typeName(), search.severityName(), search.limit())
+                    search.category(), search.limit())
                 : jpaRepository.findActiveAlertsWithinRadiusHaversine(
                     center.latitude(), center.longitude(), search.radiusKm(),
-                    search.typeName(), search.severityName(), search.limit());
+                    search.category(), search.limit());
         return toDomain(results);
     }
 
@@ -57,16 +67,31 @@ public class AlertRepositoryAdapter implements AlertRepository {
         List<AlertJpaEntity> results = spatialCapabilityDetector.isPostgisAvailable()
                 ? jpaRepository.findActiveAlertsWithinRadiusSince(
                     center.latitude(), center.longitude(), search.radiusKm(), since,
-                    search.typeName(), search.severityName(), search.limit())
+                    search.category(), search.limit())
                 : jpaRepository.findActiveAlertsWithinRadiusSinceHaversine(
                     center.latitude(), center.longitude(), search.radiusKm(), since,
-                    search.typeName(), search.severityName(), search.limit());
+                    search.category(), search.limit());
         return toDomain(results);
+    }
+
+    @Override
+    public List<Alert> findOpenNear(Location center, double radiusMeters, Collection<Integer> categoryCodes, int limit) {
+        if (categoryCodes.isEmpty()) {
+            return List.of();
+        }
+        return toDomain(jpaRepository.findOpenNear(
+            center.latitude(), center.longitude(), radiusMeters, categoryCodes, limit));
     }
 
     @Override
     public List<Alert> findByStatus(AlertStatus status) {
         return toDomain(jpaRepository.findByStatus(status));
+    }
+
+    @Override
+    public List<Alert> findAssignedTo(String authorityCode, Set<AlertStatus> statuses, int limit) {
+        return toDomain(jpaRepository.findByAuthorityCodeAndStatusInOrderByCreatedAtDesc(
+            authorityCode, statuses, Limit.of(limit)));
     }
 
     /**
@@ -90,6 +115,18 @@ public class AlertRepositoryAdapter implements AlertRepository {
         // The @Modifying query clears the persistence context, so this re-reads the
         // freshly written row rather than a cached copy.
         return findById(alertId);
+    }
+
+    @Override
+    public List<Alert> findRanked(RankedSearch search) {
+        return toDomain(jpaRepository.findRanked(
+            search.statusNames(), search.districtCode(), search.overdue(), search.ranking().name(),
+            search.offset(), search.limit()));
+    }
+
+    @Override
+    public long countRanked(RankedSearch search) {
+        return jpaRepository.countRanked(search.statusNames(), search.districtCode(), search.overdue());
     }
 
     private static List<Alert> toDomain(List<AlertJpaEntity> entities) {

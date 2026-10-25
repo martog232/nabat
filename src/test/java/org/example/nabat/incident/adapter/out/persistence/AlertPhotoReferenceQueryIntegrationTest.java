@@ -6,15 +6,13 @@ import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.domain.User;
 import org.example.nabat.incident.domain.Alert;
 import org.example.nabat.incident.domain.AlertId;
-import org.example.nabat.incident.domain.AlertSeverity;
 import org.example.nabat.incident.domain.AlertStatus;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.shared.domain.Location;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
 import java.time.Instant;
 import java.util.Set;
@@ -45,7 +43,7 @@ class AlertPhotoReferenceQueryIntegrationTest extends PostgresTestSupport {
 
     @BeforeEach
     void setUp() {
-        alerts.deleteAll();
+        alerts.deleteAllInBatch();
         users.deleteAll();
 
         User reporter = User.create("photo-ref@example.com", "hash", "Photo Ref");
@@ -97,15 +95,14 @@ class AlertPhotoReferenceQueryIntegrationTest extends PostgresTestSupport {
             AlertId.generate(),
             "Alert " + UUID.randomUUID(),
             "description",
-            AlertType.HAZARD,
-            AlertSeverity.LOW,
+            1008,
             Location.of(42.695, 23.329),
             Instant.now(),
-            AlertStatus.ACTIVE,
+            AlertStatus.SUBMITTED,
             reporterId,
             0, 0, 0, 0,
             null,
-            photoUrl
+            photoUrl, "LOZENETS", null
         );
         alerts.saveAndFlush(AlertJpaEntity.from(alert));
     }

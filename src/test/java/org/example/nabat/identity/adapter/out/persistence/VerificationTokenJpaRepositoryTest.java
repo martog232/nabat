@@ -8,8 +8,8 @@ import org.example.nabat.identity.domain.VerificationTokenType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -58,7 +58,6 @@ class VerificationTokenJpaRepositoryTest extends PostgresTestSupport {
         user.setEmailVerified(false);
         user.setCreatedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
-        user.setNotificationRadiusKm(5);
         userRepository.save(user);
         userId = UserId.of(user.getId());
     }

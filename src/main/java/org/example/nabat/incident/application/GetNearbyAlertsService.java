@@ -38,8 +38,7 @@ public class GetNearbyAlertsService implements GetNearbyAlertsUseCase {
         return new AlertRepository.NearbySearch(
             query.center(),
             query.radiusKm(),
-            query.type(),
-            query.severity(),
+            query.category(),
             query.limit()
         );
     }

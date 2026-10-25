@@ -1,7 +1,7 @@
 package org.example.nabat.platform;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Span;
@@ -14,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -60,7 +60,7 @@ class StructuredLoggingIntegrationTest extends PostgresTestSupport {
     private ObservationRegistry observations;
 
     /** Prevent real SMTP during integration tests. */
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
     @Test
@@ -84,13 +84,19 @@ class StructuredLoggingIntegrationTest extends PostgresTestSupport {
 
         assertEquals(MARKER, line.path("message").asText());
 
-        // Note the flat keys: ECS field names contain dots, they are not nested objects.
-        // `path("service").path("name")` reads empty here and is the natural thing to write.
+        // Nested objects, not flat dotted keys. This was the other way round until Boot 4:
+        // the formatter used to emit `"service.name"` as a single key and this assertion read
+        // it that way. Boot 4 emits `"service": { "name": ... }`, so `path("service.name")`
+        // now finds nothing and reads as empty — which is why this assertion failed rather
+        // than erroring, and why the same change silently stops Promtail extracting anything.
+        // Its JMESPath expressions had to be quoted to read the flat keys and are unquoted
+        // now; see promtail-config.yml and the chart's ConfigMap.
         //
         // The name falls back to spring.application.name — nabat-test here, nabat in
         // production. Asserted because a nameless service makes every line in a shared Loki
         // instance indistinguishable from every other service's.
-        assertEquals("nabat-test", line.path("service.name").asText(), "line was: " + line);
+        assertEquals("nabat-test", line.path("service").path("name").asText(),
+                     "line was: " + line);
 
         // The point of the whole exercise: the trace id is a field, not prose inside one.
         //

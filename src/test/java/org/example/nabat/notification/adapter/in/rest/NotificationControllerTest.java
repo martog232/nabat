@@ -12,8 +12,8 @@ import org.example.nabat.identity.domain.UserId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -49,8 +49,7 @@ class NotificationControllerTest {
     @BeforeEach
     void setUp() {
         user = new User(UserId.generate(), "u@x.y", "p", "n",
-                Role.USER, true, false, Instant.now(), Instant.now(), 5, null, null, null,
-        0);
+                Role.USER, true, false, Instant.now(), Instant.now(), 0, null);
         var auth = new UsernamePasswordAuthenticationToken(user, null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
         SecurityContextHolder.getContext().setAuthentication(auth);

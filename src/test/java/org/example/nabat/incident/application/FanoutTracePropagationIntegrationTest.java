@@ -10,22 +10,18 @@ import org.example.nabat.identity.adapter.out.persistence.UserJpaRepository;
 import org.example.nabat.identity.application.port.out.EmailSender;
 import org.example.nabat.incident.adapter.out.persistence.AlertJpaRepository;
 import org.example.nabat.incident.application.port.in.CreateAlertUseCase;
-import org.example.nabat.incident.application.port.out.AlertAudiencePort;
 import org.example.nabat.incident.application.port.out.AlertNotificationPort;
 import org.example.nabat.incident.domain.Alert;
-import org.example.nabat.incident.domain.AlertSeverity;
-import org.example.nabat.incident.domain.AlertType;
 import org.example.nabat.testsupport.Fixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -34,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.when;
 
 /**
@@ -62,7 +57,6 @@ import static org.mockito.Mockito.when;
 @Testcontainers(disabledWithoutDocker = true)
 class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
 
-    private static final UUID RECIPIENT = UUID.randomUUID();
 
     @Autowired
     private CreateAlertUseCase createAlert;
@@ -82,11 +76,8 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
     @Autowired
     private AlertJpaRepository alerts;
 
-    @MockBean
-    private AlertAudiencePort audiencePort;
-
     /** Prevent real SMTP during integration tests. */
-    @MockBean
+    @MockitoBean
     private EmailSender emailSender;
 
     /**
@@ -101,11 +92,10 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM event_publication");
-        alerts.deleteAll();
+        alerts.deleteAllInBatch();
         users.deleteAll();
         notificationPort.observed.clear();
 
-        when(audiencePort.recipientsFor(any(), any(), anyDouble())).thenReturn(List.of(RECIPIENT));
 
         var reporter = Fixtures.user("trace-reporter@example.com");
         users.save(UserJpaEntity.from(reporter));
@@ -179,8 +169,7 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
         return new CreateAlertUseCase.CreateAlertCommand(
             "Trace check",
             "raised by " + FanoutTracePropagationIntegrationTest.class.getSimpleName(),
-            AlertType.HAZARD,
-            AlertSeverity.HIGH,
+            1008,
             42.6977,
             23.3219,
             reporterId,
@@ -201,7 +190,7 @@ class FanoutTracePropagationIntegrationTest extends PostgresTestSupport {
         }
 
         @Override
-        public void broadcastAlert(Alert alert, List<UUID> userIds) {
+        public void broadcastNewAlert(Alert alert) {
             Span current = tracer.currentSpan();
             observed.add(new Observed(
                 current == null ? null : current.context().traceId(),

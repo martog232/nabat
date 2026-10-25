@@ -1,5 +1,6 @@
 package org.example.nabat.identity.application;
 
+import org.example.nabat.identity.application.port.out.AuthorityDirectoryPort;
 import org.example.nabat.identity.application.port.out.UserRepository;
 import org.example.nabat.identity.domain.Role;
 import org.example.nabat.identity.domain.User;
@@ -26,13 +27,16 @@ class UserAdministrationServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private AuthorityDirectoryPort districts;
+
     private UserAdministrationService service;
     private User admin;
     private User plainUser;
 
     @BeforeEach
     void setUp() {
-        service = new UserAdministrationService(userRepository);
+        service = new UserAdministrationService(userRepository, districts);
         admin = Fixtures.admin();
         plainUser = Fixtures.user("target@example.com");
     }
@@ -48,7 +52,7 @@ class UserAdministrationServiceTest {
     void adminPromotesAUserToModerator() {
         given(admin, plainUser);
 
-        User updated = service.changeRole(admin.id(), plainUser.id(), Role.MODERATOR);
+        User updated = service.changeRole(admin.id(), plainUser.id(), Role.MODERATOR, null);
 
         assertEquals(Role.MODERATOR, updated.role());
         assertTrue(updated.role().canModerateContent());
@@ -64,7 +68,7 @@ class UserAdministrationServiceTest {
         when(userRepository.findById(admin.id())).thenReturn(Optional.of(admin));
         when(userRepository.findById(plainUser.id())).thenReturn(Optional.of(plainUser));
 
-        User result = service.changeRole(admin.id(), plainUser.id(), Role.USER);
+        User result = service.changeRole(admin.id(), plainUser.id(), Role.USER, null);
 
         assertSame(plainUser, result);
         verify(userRepository, never()).save(any());
@@ -80,7 +84,7 @@ class UserAdministrationServiceTest {
 
         NotAuthorizedException thrown = assertThrows(
             NotAuthorizedException.class,
-            () -> service.changeRole(admin.id(), admin.id(), Role.USER)
+            () -> service.changeRole(admin.id(), admin.id(), Role.USER, null)
         );
 
         assertTrue(thrown.getMessage().contains("your own role"));
@@ -110,7 +114,7 @@ class UserAdministrationServiceTest {
 
         assertThrows(
             NotAuthorizedException.class,
-            () -> service.changeRole(moderator.id(), plainUser.id(), Role.ADMIN)
+            () -> service.changeRole(moderator.id(), plainUser.id(), Role.ADMIN, null)
         );
     }
 
@@ -154,14 +158,83 @@ class UserAdministrationServiceTest {
         UserId ghost = UserId.generate();
         when(userRepository.findById(ghost)).thenReturn(Optional.empty());
 
-        assertThrows(UserNotFoundException.class, () -> service.changeRole(admin.id(), ghost, Role.USER));
+        assertThrows(UserNotFoundException.class, () -> service.changeRole(admin.id(), ghost, Role.USER, null));
+    }
+
+    @Test
+    void anAdminAppointsADistrictOfficial() {
+        given(admin, plainUser);
+        when(districts.exists("LOZENETS")).thenReturn(true);
+
+        User official = service.changeRole(admin.id(), plainUser.id(), Role.OFFICIAL, "LOZENETS");
+
+        assertEquals(Role.OFFICIAL, official.role());
+        assertEquals("LOZENETS", official.authorityCode());
+        assertTrue(official.actsFor("LOZENETS"));
+        assertFalse(official.actsFor("TRIADITSA"));
+        assertFalse(official.role().canModerateContent(), "an official is trusted with a territory, not with content");
+    }
+
+    /** An official with no territory would be an account that can do nothing and looks as if it could. */
+    @Test
+    void anOfficialNeedsADistrict() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> service.changeRole(admin.id(), plainUser.id(), Role.OFFICIAL, null)
+        );
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void onlyAnOfficialHasADistrict() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> service.changeRole(admin.id(), plainUser.id(), Role.MODERATOR, "LOZENETS")
+        );
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void refusesADistrictThatDoesNotExist() {
+        when(districts.exists("ATLANTIS")).thenReturn(false);
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> service.changeRole(admin.id(), plainUser.id(), Role.OFFICIAL, "ATLANTIS")
+        );
+        verifyNoInteractions(userRepository);
+    }
+
+    /** Moving to another district is a change, even though the role stays the same. */
+    @Test
+    void movesAnOfficialToAnotherDistrict() {
+        User official = plainUser.appointTo("LOZENETS");
+        given(admin, official);
+        when(districts.exists("TRIADITSA")).thenReturn(true);
+
+        User moved = service.changeRole(admin.id(), official.id(), Role.OFFICIAL, "TRIADITSA");
+
+        assertEquals("TRIADITSA", moved.authorityCode());
+    }
+
+    /** The territory goes with the role: a former official keeps no district. */
+    @Test
+    void demotingAnOfficialTakesTheDistrictAway() {
+        User official = plainUser.appointTo("LOZENETS");
+        given(admin, official);
+
+        User demoted = service.changeRole(admin.id(), official.id(), Role.USER, null);
+
+        assertEquals(Role.USER, demoted.role());
+        assertNull(demoted.authorityCode());
+        assertFalse(demoted.actsFor("LOZENETS"));
     }
 
     @Test
     void rejectsAnAbsentRole() {
         assertThrows(
             IllegalArgumentException.class,
-            () -> service.changeRole(admin.id(), plainUser.id(), null)
+            () -> service.changeRole(admin.id(), plainUser.id(), null, null)
         );
         verifyNoInteractions(userRepository);
     }

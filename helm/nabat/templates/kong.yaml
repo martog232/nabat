@@ -43,9 +43,13 @@ spec:
         # routes, because DB-less Kong reads the file once at boot.
         checksum/config: {{ .Files.Get "kong/kong.yml" | sha256sum }}
     spec:
+      securityContext:
+        {{- toYaml .Values.kong.podSecurityContext | nindent 8 }}
       containers:
       - name: kong
         image: {{ .Values.kong.image }}
+        securityContext:
+          {{- include "nabat.containerSecurityContext" . | nindent 10 }}
         env:
         - name: KONG_DATABASE
           value: "off"

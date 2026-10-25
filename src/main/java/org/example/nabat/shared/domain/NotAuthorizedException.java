@@ -10,7 +10,7 @@ package org.example.nabat.shared.domain;
  * importing Spring Security. {@code AGENTS.md} states that Spring Security
  * exceptions must never be thrown from the domain or application layers, but
  * {@code AlertLifecycleService} threw {@code AccessDeniedException} and
- * {@code UpdateUserPreferencesService} threw {@code UsernameNotFoundException}.
+ * a user-preferences service, since removed, threw {@code UsernameNotFoundException}.
  *
  * <p>It also replaces the pattern of signalling "not yours" with
  * {@code IllegalArgumentException}, which mapped an authorization failure to a

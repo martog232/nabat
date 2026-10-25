@@ -27,6 +27,60 @@ public interface SendNotificationUseCase {
     ) {
     }
 
+    /**
+     * Tells a reporter their report was closed as resolved by someone else, and asks whether
+     * it really is fixed.
+     */
+    Notification sendResolvedNotification(ResolvedNotificationCommand command);
+
+    /** @param byAuthority true if the report's authority closed it, false if a moderator did */
+    record ResolvedNotificationCommand(UserId reporterId, AlertId alertId, String alertTitle, boolean byAuthority) {
+    }
+
+    /** Tells one person in a report's thread that someone wrote in it. */
+    Notification sendCommentNotification(CommentNotificationCommand command);
+
+    /** @param byAuthority true if the report's authority wrote it, which the message says instead of a name */
+    record CommentNotificationCommand(
+            UserId recipientId,
+            AlertId alertId,
+            String alertTitle,
+            UserId authorId,
+            String authorName,
+            boolean byAuthority
+    ) {
+    }
+
+    /**
+     * Tells a reporter what the authority did with their report: took it, started on it, or
+     * turned it down. Resolving and forwarding have their own.
+     */
+    Notification sendProgressNotification(ProgressNotificationCommand command);
+
+    /** The moves a reporter hears about through {@link #sendProgressNotification}. */
+    enum Progress { ACKNOWLEDGED, IN_PROGRESS, REJECTED, REJECTION_UPHELD, REOPENED, OVERDUE_REMINDED, ESCALATED }
+
+    /**
+     * @param byModerator a rejection by a moderator rather than by the authority
+     * @param reason      why, for a rejection; null otherwise
+     */
+    record ProgressNotificationCommand(
+            UserId reporterId,
+            AlertId alertId,
+            String alertTitle,
+            Progress progress,
+            String authorityName,
+            boolean byModerator,
+            String reason
+    ) {
+    }
+
+    /** Tells a reporter their report went to another authority, and why. */
+    Notification sendForwardedNotification(ForwardedNotificationCommand command);
+
+    record ForwardedNotificationCommand(UserId reporterId, AlertId alertId, String alertTitle, String toAuthorityName, String reason) {
+    }
+
     record MilestoneNotificationCommand(
             UserId alertOwnerId,           // owner of the alert
             AlertId alertId,               // alert that reached the milestone

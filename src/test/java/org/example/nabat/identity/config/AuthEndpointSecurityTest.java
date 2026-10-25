@@ -8,11 +8,12 @@ import org.example.nabat.identity.application.port.in.LoginUserUseCase;
 import org.example.nabat.identity.application.port.in.RefreshTokenUseCase;
 import org.example.nabat.identity.application.port.in.RegisterUserUseCase;
 import org.example.nabat.identity.application.port.in.ResetPasswordUseCase;
+import org.example.nabat.identity.application.port.in.SignInLinkUseCase;
 import org.example.nabat.identity.application.port.in.VerifyEmailUseCase;
 import org.example.nabat.shared.config.AllowedOrigins;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -65,6 +66,8 @@ class AuthEndpointSecurityTest {
     private ForgotPasswordUseCase forgotPasswordUseCase;
     @MockitoBean
     private ResetPasswordUseCase resetPasswordUseCase;
+    @MockitoBean
+    private SignInLinkUseCase signInLinkUseCase;
 
     @Test
     void meRequiresAuthentication() throws Exception {

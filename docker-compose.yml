@@ -126,6 +126,10 @@ services:
       # Reclaim photos whose alert was never submitted. Off by default in the application;
       # switched on here because this stack owns a volume that would otherwise only grow.
       NABAT_ORPHAN_SWEEP_ENABLED: "true"
+      # Remind authorities past the answer deadline, and escalate to the municipality.
+      NABAT_DEADLINE_WATCH_ENABLED: "true"
+      # One account per district, signing in with its mailbox. Set in .env; unset creates none.
+      NABAT_OFFICIAL_ACCOUNTS_PASSWORD: ${NABAT_OFFICIAL_ACCOUNTS_PASSWORD:-}
       # Object storage rather than the container's own disk, so compose runs the same
       # storage path a multi-replica deployment does.
       NABAT_STORAGE_TYPE: s3
@@ -434,6 +438,12 @@ services:
       # turns every vote into a 401 there and a 503 here — the shared-secret weakness and
       # the reason it currently has to be shared, both in one line.
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required and must match nabat-app. Generate with `openssl rand -base64 48` and set it in .env}
+      # Same variable, same reason, as nabat-app above: the application default is the
+      # literal host `nabat-zipkin`, which resolves here only by coincidence with a
+      # container_name. Spans that go nowhere make the backend look like a system with
+      # no traffic, and until this was set Zipkin knew a single service — a vote could
+      # be followed through nabat-app and vanished at the boundary between the two.
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8081:8081"
     restart: unless-stopped

@@ -2,6 +2,10 @@ package org.example.nabat.platform;
 
 import org.example.nabat.shared.exception.ExternalServiceUnavailableException;
 import org.example.nabat.incident.domain.AlertNotFoundException;
+import org.example.nabat.incident.domain.CommentNotFoundException;
+import org.example.nabat.incident.domain.CommentsLockedException;
+import org.example.nabat.incident.domain.OutsideServiceAreaException;
+import org.example.nabat.incident.domain.UnknownCategoryException;
 import org.example.nabat.identity.domain.AuthenticationFailedException;
 import org.example.nabat.identity.domain.EmailAlreadyRegisteredException;
 import org.example.nabat.shared.domain.NotAuthorizedException;
@@ -12,6 +16,7 @@ import org.example.nabat.voting.domain.VoteConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -61,6 +66,9 @@ public class GlobalExceptionHandler {
     static final String MSG_VOTE_CONFLICT   = "You have already cast this vote";
     static final String MSG_PAYLOAD_TOO_LARGE = "File is too large";
     static final String MSG_UNSUPPORTED_MEDIA = "Unsupported file type";
+    static final String MSG_OUTSIDE_AREA    = "nabat only accepts reports inside Sofia";
+    static final String MSG_UNKNOWN_CATEGORY = "Choose a category from the list";
+    static final String MSG_COMMENTS_LOCKED = "This report is closed, and so is its discussion";
     static final String MSG_UNAVAILABLE     = "A required service is temporarily unavailable. Please try again.";
     static final String MSG_INTERNAL        = "Something went wrong. Please try again.";
 
@@ -90,10 +98,44 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, "BAD_CREDENTIALS", MSG_BAD_CREDENTIALS);
     }
 
+
+    /**
+     * A well-formed report somewhere nabat does not cover. 422, not 400: nothing in the
+     * request is malformed, and a client that shows "invalid request" for a place outside
+     * Sofia tells the user the wrong thing to fix.
+     */
+    @ExceptionHandler(OutsideServiceAreaException.class)
+    public ResponseEntity<ErrorResponse> handleOutsideServiceArea(OutsideServiceAreaException ex) {
+        log.info("Rejected report: {}", ex.getMessage());
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, "OUTSIDE_SERVICE_AREA", MSG_OUTSIDE_AREA);
+    }
+    /**
+     * Its own code rather than INVALID_REQUEST: the client can say which field is wrong,
+     * and a stale category list — the tree changed, the client did not reload — is the
+     * likely cause and worth telling apart.
+     */
+    @ExceptionHandler(UnknownCategoryException.class)
+    public ResponseEntity<ErrorResponse> handleUnknownCategory(UnknownCategoryException ex) {
+        log.info("Rejected report: {}", ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "UNKNOWN_CATEGORY", MSG_UNKNOWN_CATEGORY);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("IllegalArgument: {}", ex.getMessage());
         return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", MSG_INVALID_REQUEST);
+    }
+
+    /**
+     * Someone else changed the same row between this request reading it and writing it —
+     * a district acknowledging a report while the dispatcher marks it sent, say. The request
+     * did nothing wrong and a retry will very likely succeed, which is a 409, not the 500 it
+     * used to fall through to.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleConcurrentUpdate(OptimisticLockingFailureException ex) {
+        log.info("Concurrent update: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "CONCURRENT_UPDATE", MSG_CONFLICT);
     }
 
     @ExceptionHandler(IllegalStateException.class)
@@ -142,6 +184,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleEmailTaken(EmailAlreadyRegisteredException ex) {
         log.info("Registration conflict: {}", ex.getMessage());
         return build(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", ex.getMessage());
+    }
+
+    /**
+     * Its own code, so the client can put away the comment box and say why, instead of
+     * showing the conflict every other refused state change shares.
+     */
+    @ExceptionHandler(CommentsLockedException.class)
+    public ResponseEntity<ErrorResponse> handleCommentsLocked(CommentsLockedException ex) {
+        log.debug("CommentsLocked: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "COMMENTS_LOCKED", MSG_COMMENTS_LOCKED);
+    }
+
+    @ExceptionHandler(CommentNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCommentNotFound(CommentNotFoundException ex) {
+        log.warn("CommentNotFound: {}", ex.getMessage());
+        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", MSG_NOT_FOUND);
     }
 
     @ExceptionHandler(AlertNotFoundException.class)
