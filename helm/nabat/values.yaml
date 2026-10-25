@@ -58,23 +58,27 @@ redis:
 # (and give nabatApp.storage.endpoint its address).
 #
 # Single replica with a ReadWriteOnce volume — this is development-grade storage that
-# survives pod restarts, not a distributed MinIO deployment.
-minio:
+# survives pod restarts, not a distributed SeaweedFS cluster. It was MinIO until MinIO
+# removed its images from Docker Hub — see seaweedfs.yaml.
+seaweedfs:
   enabled: true
-  image: minio/minio:RELEASE.2024-08-29T01-40-52Z
+  image: chrislusf/seaweedfs:4.50
   podSecurityContext:
-    # The image declares no USER and would otherwise run as root. MinIO does not care which
-    # uid it is as long as the data directory is writable, which fsGroup arranges. Shared with
-    # the bucket-creation Job below, which additionally needs HOME pointed somewhere writable
-    # — see minio.yaml.
+    # 1000 is the image's own `seaweed` user. Its entrypoint chowns /data and drops to that
+    # user only when started as root; started as 1000 it skips both, and fsGroup makes the
+    # volume writable instead. Shared with the bucket-creation Job, which additionally needs
+    # HOME pointed somewhere writable — see seaweedfs.yaml.
     runAsNonRoot: true
     runAsUser: 1000
     runAsGroup: 1000
     fsGroup: 1000
-  # Same re-pin as docker-compose.yml: the 2024-08-26 tag has been pruned from Docker Hub,
-  # so the bucket-creation Job would have gone straight to ImagePullBackOff — and with
-  # --atomic that surfaces as a timed-out release rather than a missing image.
-  clientImage: minio/mc:RELEASE.2025-08-13T08-35-41Z
+  # Creates the bucket. Pinned: a Job the release waits on is the last place for a silently
+  # changing image, and with --atomic a missing one surfaces as a timed-out release.
+  clientImage: amazon/aws-cli:2.31.20
+  # Only the bucket Job uses this key; the application has its own (nabatApp.storage), which
+  # cannot create buckets. No committed default secret: pass it at install time.
+  adminAccessKey: nabat-admin
+  adminSecretKey: ""
   storage: 5Gi
   resources:
     requests:
@@ -172,8 +176,8 @@ nabatApp:
     # with it. Set to `filesystem` only for a single-replica install.
     type: s3
     bucket: nabat-uploads
-    # Empty means the in-cluster MinIO service below. Point it at a managed bucket to run
-    # without MinIO — then set minio.enabled=false.
+    # Empty means the in-cluster SeaweedFS service above. Point it at a managed bucket to run
+    # without it — then set seaweedfs.enabled=false.
     endpoint: ""
     accessKey: nabat
     # No committed default, same reasoning as postgres.password: pass it at install time.

@@ -24,7 +24,7 @@ spec:
   # replacement pod cannot mount the volume while the outgoing one still holds it. A
   # rolling update deadlocks — new pod Pending on the volume, old pod kept alive waiting
   # for the new one to become ready — and needs the Deployment scaled to zero by hand to
-  # clear. minio and loki already carried this; the databases did not.
+  # clear. seaweedfs and loki already carried this; the databases did not.
   #
   # It costs a moment of downtime on every upgrade that changes the pod spec, which for a
   # single-replica database is the honest trade: there is no second replica to serve

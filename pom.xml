@@ -178,9 +178,10 @@
         <!-- H2 removed (T-43) — all tests use real PostgreSQL via Testcontainers. -->
 
         <!--
-            Object storage for alert photos. The AWS SDK rather than the MinIO client,
-            because the S3 API is what both MinIO and S3 speak — this keeps a local MinIO
-            and a managed bucket on one code path instead of two.
+            Object storage for alert photos. The AWS SDK rather than a vendor's client,
+            because the S3 API is what every object store speaks — this keeps a local
+            SeaweedFS and a managed bucket on one code path instead of two, and let the local
+            server change from MinIO to SeaweedFS without touching the adapter.
 
             apache-client is excluded: the SDK's default HTTP client pulls in httpclient4
             alongside the one Spring Boot already manages. url-connection-client is enough
@@ -307,12 +308,6 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!-- Real MinIO for the S3 adapter tests: mocking an object store proves nothing. -->
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>minio</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

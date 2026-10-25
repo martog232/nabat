@@ -62,14 +62,14 @@ public class StorageConfig {
      * Built only when S3 storage is selected, so a filesystem deployment neither needs
      * credentials nor opens a client it will not use.
      *
-     * <p>{@code pathStyleAccessEnabled} is required for MinIO and for any endpoint reached
+     * <p>{@code pathStyleAccessEnabled} is required for a local S3 server and for any endpoint reached
      * by host or IP: the SDK's default is virtual-host addressing
-     * ({@code bucket.host/key}), which needs wildcard DNS that a local MinIO does not have.
+     * ({@code bucket.host/key}), which needs wildcard DNS that a local SeaweedFS does not have.
      * Real S3 accepts path style too, so this is one setting for both rather than a
-     * MinIO-only branch.
+     * local-only branch.
      *
      * <p>Credentials are static rather than from the default provider chain because the
-     * target is as likely to be MinIO as AWS, and an in-cluster MinIO has no instance
+     * target is as likely to be SeaweedFS as AWS, and an in-cluster one has no instance
      * metadata to fall back on. On AWS, set the same two values from a role's short-lived
      * credentials, or replace this bean.
      */

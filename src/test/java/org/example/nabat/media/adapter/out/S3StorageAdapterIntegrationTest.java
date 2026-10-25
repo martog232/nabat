@@ -5,9 +5,11 @@ import org.example.nabat.media.domain.UnsupportedFileTypeException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.MinIOContainer;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -36,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Exercises the S3 adapter against a real MinIO.
+ * Exercises the S3 adapter against a real S3 server — SeaweedFS, the same one compose runs.
  *
  * <p>Against a mocked {@code S3Client} this would test the mock. The things that actually
  * go wrong here are properties of the protocol and the server: whether path-style
@@ -60,8 +62,21 @@ class S3StorageAdapterIntegrationTest {
         'G', 'I', 'F', '8', '9', 'a', 1, 0, 1, 0, (byte) 0x80, 0
     };
 
+    private static final String ACCESS_KEY = "nabat-test";
+    private static final String SECRET_KEY = "nabat-test-secret";
+    private static final int S3_PORT = 8333;
+
+    // SeaweedFS rather than MinIO: MinIO stopped publishing images and removed minio/minio
+    // from Docker Hub, so the pinned tag this test used could no longer be pulled anywhere.
+    // `weed mini` is the single-node mode; with the keys set it refuses unsigned requests,
+    // like a real bucket, so a client that forgot to sign would fail here too.
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer("minio/minio:RELEASE.2024-08-29T01-40-52Z");
+    static final GenericContainer<?> SEAWEEDFS = new GenericContainer<>(DockerImageName.parse("chrislusf/seaweedfs:4.50"))
+            .withCommand("mini", "-dir=/data")
+            .withEnv("AWS_ACCESS_KEY_ID", ACCESS_KEY)
+            .withEnv("AWS_SECRET_ACCESS_KEY", SECRET_KEY)
+            .withExposedPorts(S3_PORT)
+            .waitingFor(Wait.forHttp("/healthz").forPort(S3_PORT));
 
     private static S3Client s3;
 
@@ -70,10 +85,11 @@ class S3StorageAdapterIntegrationTest {
     @BeforeAll
     static void createBucket() {
         s3 = S3Client.builder()
-                .endpointOverride(URI.create(MINIO.getS3URL()))
+                .endpointOverride(URI.create(
+                        "http://" + SEAWEEDFS.getHost() + ":" + SEAWEEDFS.getMappedPort(S3_PORT)))
                 .region(Region.US_EAST_1)
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(MINIO.getUserName(), MINIO.getPassword())))
+                        AwsBasicCredentials.create(ACCESS_KEY, SECRET_KEY)))
                 .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
                 .httpClient(UrlConnectionHttpClient.create())
                 .build();

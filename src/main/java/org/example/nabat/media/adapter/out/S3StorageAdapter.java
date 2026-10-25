@@ -26,7 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Stores alert photos in an S3-compatible bucket (MinIO locally, S3 in a cloud).
+ * Stores alert photos in an S3-compatible bucket (SeaweedFS locally, S3 in a cloud).
  *
  * <p>The reason this exists is {@code replicas: 2}. {@link FileSystemStorageAdapter} writes
  * to local disk, so a photo written by one pod is simply absent from the other — roughly

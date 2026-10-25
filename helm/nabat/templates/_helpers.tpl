@@ -70,3 +70,19 @@ capabilities:
 seccompProfile:
   type: RuntimeDefault
 {{- end }}
+
+{{/*
+SeaweedFS identities: an admin key for the bucket Job, and the application's key limited to
+its bucket. Rendered once here so the Secret and the Deployment's checksum agree.
+*/}}
+{{- define "nabat.s3Config" -}}
+{{- $bucket := .Values.nabatApp.storage.bucket -}}
+{{- dict "identities" (list
+      (dict "name" "admin"
+            "credentials" (list (dict "accessKey" .Values.seaweedfs.adminAccessKey "secretKey" .Values.seaweedfs.adminSecretKey))
+            "actions" (list "Admin" "Read" "Write" "List" "Tagging"))
+      (dict "name" "nabat-app"
+            "credentials" (list (dict "accessKey" .Values.nabatApp.storage.accessKey "secretKey" .Values.nabatApp.storage.secretKey))
+            "actions" (list (printf "Read:%s" $bucket) (printf "Write:%s" $bucket) (printf "List:%s" $bucket))))
+    | toJson -}}
+{{- end }}
