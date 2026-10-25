@@ -47,6 +47,9 @@ class EmailVerificationServiceTest {
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
         service = new EmailVerificationService(userRepository, tokenRepository, emailSender, passwordEncoder);
+        // Every reset first asks whether the token is an invitation; in these tests none is.
+        lenient().when(tokenRepository.findByIdAndType(any(), eq(VerificationTokenType.INVITATION)))
+            .thenReturn(Optional.empty());
     }
 
     // в”Ђв”Ђ sendVerificationEmail в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ

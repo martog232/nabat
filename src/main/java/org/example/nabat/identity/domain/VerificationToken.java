@@ -35,6 +35,8 @@ public record VerificationToken(
     private static final int PASSWORD_RESET_EXPIRY_HOURS = 1;
     /** As long as an authority may reasonably take to open a report it was sent. */
     private static final int SIGN_IN_LINK_EXPIRY_HOURS = 30 * 24;
+    /** Long enough for someone back from a week off to find it. */
+    private static final int INVITATION_EXPIRY_HOURS = 7 * 24;
 
     /** 256 bits of entropy, matching the digest width. */
     private static final int TOKEN_BYTES = 32;
@@ -47,6 +49,11 @@ public record VerificationToken(
      * @param rawValue the secret — send it to the user, never write it down
      */
     public record Issued(VerificationToken token, String rawValue) {
+    }
+
+    /** Factory: an invitation to set a first password (valid 7 days, single-use). */
+    public static Issued createInvitation(UserId userId) {
+        return create(userId, VerificationTokenType.INVITATION, INVITATION_EXPIRY_HOURS);
     }
 
     /** Factory: create an email-verification token (valid 24 h). */

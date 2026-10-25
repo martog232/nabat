@@ -40,6 +40,13 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public List<User> findByAuthority(String authorityCode) {
+        return jpaRepository.findByAuthorityCodeOrderByCreatedAtAsc(authorityCode).stream()
+            .map(UserJpaEntity::toDomain)
+            .toList();
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         return jpaRepository.existsByEmail(email);
     }

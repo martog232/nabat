@@ -100,7 +100,12 @@ public class EmailVerificationService
     @Override
     @Transactional
     public void resetPassword(String rawToken, String newPassword) {
-        VerificationToken token = consume(rawToken, VerificationTokenType.PASSWORD_RESET);
+        // An invited official sets their first password the same way: the invitation is a reset
+        // for an account that never had a password of its own, and it went to the address the
+        // account signs in with, so following it also verifies that address.
+        boolean invitation = isInvitation(rawToken);
+        VerificationToken token = consume(rawToken,
+            invitation ? VerificationTokenType.INVITATION : VerificationTokenType.PASSWORD_RESET);
 
         User user = userRepository.findById(token.userId())
                 .orElseThrow(() -> new UserNotFoundException(token.userId()));
@@ -109,9 +114,16 @@ public class EmailVerificationService
         // refresh token already issued to this user. Without that, a reset prompted by
         // a suspected compromise left the attacker's existing session working — for up
         // to the refresh-token lifetime.
-        userRepository.save(user.withPassword(passwordEncoder.encode(newPassword)));
+        User withPassword = user.withPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(invitation ? withPassword.verifyEmail() : withPassword);
         tokenRepository.save(token.markUsed());
         log.info("Password reset for user {}; existing sessions invalidated", user.id().value());
+    }
+
+    private boolean isInvitation(String rawToken) {
+        return rawToken != null && !rawToken.isBlank() && tokenRepository
+            .findByIdAndType(VerificationToken.hash(rawToken.trim()), VerificationTokenType.INVITATION)
+            .isPresent();
     }
 
     /**

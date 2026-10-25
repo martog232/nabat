@@ -196,6 +196,55 @@
         }
       }
     },
+    "/api/v1/authority/members" : {
+      "get" : {
+        "tags" : [ "authority-members-controller" ],
+        "summary" : "Everyone acting for the caller's authority",
+        "operationId" : "list",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "authority-members-controller" ],
+        "summary" : "Invite a colleague: an official account of their own, and a mail to set its password",
+        "operationId" : "invite",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InviteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/verify" : {
       "post" : {
         "tags" : [ "auth-controller" ],
@@ -960,7 +1009,7 @@
     "/api/v1/notifications" : {
       "get" : {
         "tags" : [ "notification-controller" ],
-        "operationId" : "list",
+        "operationId" : "list_1",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -1025,7 +1074,7 @@
       "get" : {
         "tags" : [ "district-controller" ],
         "summary" : "The districts of Sofia that reports are routed to",
-        "operationId" : "list_1",
+        "operationId" : "list_2",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -1048,7 +1097,7 @@
       "get" : {
         "tags" : [ "category-controller" ],
         "summary" : "Report categories — Call Sofia's groups and subcategories, with its codes",
-        "operationId" : "list_2",
+        "operationId" : "list_3",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -1108,7 +1157,7 @@
       "get" : {
         "tags" : [ "authority-controller" ],
         "summary" : "The districts and city-wide institutions that reports go to",
-        "operationId" : "list_3",
+        "operationId" : "list_4",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -1620,11 +1669,39 @@
         }
       }
     },
+    "/api/v1/authority/members/{userId}" : {
+      "delete" : {
+        "tags" : [ "authority-members-controller" ],
+        "summary" : "Take the official role from a colleague who has left",
+        "operationId" : "remove",
+        "parameters" : [ {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/alerts/{id}/comments/{commentId}" : {
       "delete" : {
         "tags" : [ "comment-controller" ],
         "summary" : "Take a comment down",
-        "operationId" : "remove",
+        "operationId" : "remove_1",
         "parameters" : [ {
           "name" : "id",
           "in" : "path",
@@ -1781,6 +1858,66 @@
           }
         }
       },
+      "InviteRequest" : {
+        "type" : "object",
+        "description" : "A colleague to invite",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "example" : "ivan.petrov@lozenets.example",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "displayName" : {
+            "type" : "string",
+            "example" : "Иван Петров",
+            "maxLength" : 100,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "displayName", "email" ]
+      },
+      "UserResponse" : {
+        "type" : "object",
+        "description" : "Public profile of a user",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Stable user identifier"
+          },
+          "email" : {
+            "type" : "string",
+            "description" : "E-mail address",
+            "example" : "alice@example.com"
+          },
+          "displayName" : {
+            "type" : "string",
+            "description" : "Display name shown to other users",
+            "example" : "Alice"
+          },
+          "role" : {
+            "type" : "string",
+            "description" : "Assigned role",
+            "enum" : [ "USER", "MODERATOR", "ADMIN", "OFFICIAL" ],
+            "example" : "USER"
+          },
+          "emailVerified" : {
+            "type" : "boolean",
+            "description" : "Whether the email address has been verified"
+          },
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "Whether the account may sign in — an admin can switch this off"
+          },
+          "authorityCode" : {
+            "type" : "string",
+            "description" : "For an official, the authority they act for: a district or an institution; null for every other role",
+            "example" : "LOZENETS"
+          }
+        }
+      },
       "MessageResponse" : {
         "type" : "object",
         "properties" : {
@@ -1851,46 +1988,6 @@
           "user" : {
             "$ref" : "#/components/schemas/UserResponse",
             "description" : "Basic profile of the authenticated user"
-          }
-        }
-      },
-      "UserResponse" : {
-        "type" : "object",
-        "description" : "Public profile of a user",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid",
-            "description" : "Stable user identifier"
-          },
-          "email" : {
-            "type" : "string",
-            "description" : "E-mail address",
-            "example" : "alice@example.com"
-          },
-          "displayName" : {
-            "type" : "string",
-            "description" : "Display name shown to other users",
-            "example" : "Alice"
-          },
-          "role" : {
-            "type" : "string",
-            "description" : "Assigned role",
-            "enum" : [ "USER", "MODERATOR", "ADMIN", "OFFICIAL" ],
-            "example" : "USER"
-          },
-          "emailVerified" : {
-            "type" : "boolean",
-            "description" : "Whether the email address has been verified"
-          },
-          "enabled" : {
-            "type" : "boolean",
-            "description" : "Whether the account may sign in — an admin can switch this off"
-          },
-          "authorityCode" : {
-            "type" : "string",
-            "description" : "For an official, the authority they act for: a district or an institution; null for every other role",
-            "example" : "LOZENETS"
           }
         }
       },

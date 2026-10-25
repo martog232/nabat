@@ -27,15 +27,47 @@ public class SmtpEmailSender implements EmailSender {
     private final JavaMailSender mailSender;
     private final String from;
     private final String baseUrl;
+    private final String frontendBaseUrl;
 
     public SmtpEmailSender(
             JavaMailSender mailSender,
             @Value("${nabat.mail.from:noreply@nabat.local}") String from,
-            @Value("${nabat.mail.base-url:http://localhost:8080}") String baseUrl
+            @Value("${nabat.mail.base-url:http://localhost:8080}") String baseUrl,
+            @Value("${nabat.frontend.base-url:http://localhost:5173}") String frontendBaseUrl
     ) {
         this.mailSender = mailSender;
         this.from = from;
         this.baseUrl = baseUrl;
+        this.frontendBaseUrl = frontendBaseUrl.endsWith("/")
+                ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
+                : frontendBaseUrl;
+    }
+
+    /**
+     * In Bulgarian, unlike the account mails above: it goes to an administration's staff. The
+     * link is nabat-fe's {@code /set-password}, which posts the token and the new password to
+     * {@code /auth/reset-password}.
+     */
+    @Override
+    public void sendInvitationEmail(String toEmail, String displayName, String authorityName, String invitedBy,
+                                    String invitationToken) {
+        String link = frontendBaseUrl + "/set-password?token=" + invitationToken;
+
+        SimpleMailMessage msg = new SimpleMailMessage();
+        msg.setFrom(from);
+        msg.setTo(toEmail);
+        msg.setSubject("nabat — покана за служител на " + authorityName);
+        msg.setText(
+                "Здравейте, " + displayName + ",\n\n"
+                + invitedBy + " ви кани като служител на " + authorityName + " в nabat — "
+                + "мястото, където " + authorityName + " отговаря на сигналите на гражданите.\n\n"
+                + "Задайте си парола тук:\n\n"
+                + link + "\n\n"
+                + "Линкът е валиден 7 дни. Ако не очаквате тази покана, не правете нищо.\n\n"
+                + "— nabat"
+        );
+
+        trySend(msg, "invitation email to " + toEmail);
     }
 
     @Override

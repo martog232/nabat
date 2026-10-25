@@ -12,6 +12,9 @@ public interface UserRepository {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
 
+    /** The officials of one authority, oldest account first. */
+    List<User> findByAuthority(String authorityCode);
+
     /**
      * One page of accounts, newest first, for the admin screen.
      *
