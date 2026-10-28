@@ -1,5 +1,6 @@
 package org.example.nabat.incident.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -41,6 +42,7 @@ public class CommentController {
     }
 
     @GetMapping
+    @SecurityRequirements
     @Operation(summary = "A report's comments, oldest first")
     public ResponseEntity<List<CommentResponse>> thread(@PathVariable UUID id, @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(comments.thread(AlertId.of(id)).stream()

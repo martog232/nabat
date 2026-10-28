@@ -683,7 +683,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       },
       "post" : {
         "tags" : [ "comment-controller" ],
@@ -1003,7 +1004,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/notifications" : {
@@ -1218,7 +1220,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/alerts/{id}/rejections" : {
@@ -1249,7 +1252,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/alerts/{id}/history" : {
@@ -1280,7 +1284,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/alerts/{id}/forwards" : {
@@ -1311,7 +1316,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/alerts/{alertId}/votes/stats" : {
@@ -1338,7 +1344,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/alerts/{alertId}/votes/me" : {
@@ -1572,7 +1579,8 @@
               }
             }
           }
-        }
+        },
+        "security" : [ ]
       }
     },
     "/api/v1/alerts/disputed" : {

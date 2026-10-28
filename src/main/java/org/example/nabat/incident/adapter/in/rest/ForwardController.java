@@ -1,5 +1,6 @@
 package org.example.nabat.incident.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -50,6 +51,7 @@ public class ForwardController {
     }
 
     @GetMapping("/forwards")
+    @SecurityRequirements
     @Operation(summary = "Where the report has been forwarded, oldest first")
     public ResponseEntity<List<ForwardResponse>> forwards(@PathVariable UUID id) {
         return ResponseEntity.ok(forwarding.forwards(AlertId.of(id)).stream()

@@ -102,6 +102,7 @@ public class AlertController {
      *              parameter, and it was being silently ignored.
      */
     @GetMapping("/nearby")
+    @SecurityRequirements
     @Operation(summary = "Active alerts within a radius, optionally filtered and newer than `since`")
     public ResponseEntity<NearbyAlertsResponse> getNearbyAlerts(
         @RequestParam @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") Double latitude,
@@ -128,6 +129,7 @@ public class AlertController {
     }
 
     @GetMapping("/{id}")
+    @SecurityRequirements
     public ResponseEntity<AlertResponse> getById(@PathVariable UUID id) {
         Alert alert = getAlertByIdUseCase.getById(AlertId.of(id));
         return ResponseEntity.ok(AlertResponse.from(alert));

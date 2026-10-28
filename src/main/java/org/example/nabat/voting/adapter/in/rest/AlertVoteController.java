@@ -1,5 +1,6 @@
 package org.example.nabat.voting.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -74,6 +75,7 @@ public class AlertVoteController {
     }
 
     @GetMapping("/stats")
+    @SecurityRequirements
     public ResponseEntity<VoteStatsResponse> getStats(@PathVariable UUID alertId) {
         VoteAlertUseCase.VoteStats stats = voteAlertUseCase.getVoteStats(AlertId.of(alertId));
         return ResponseEntity.ok(VoteStatsResponse.from(stats));

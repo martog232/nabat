@@ -1,5 +1,6 @@
 package org.example.nabat.media.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import org.example.nabat.media.application.port.in.LoadPhotoUseCase;
 import org.example.nabat.media.application.port.in.LoadPhotoUseCase.PhotoContent;
 import org.example.nabat.media.application.port.in.StorePhotoUseCase;
@@ -71,6 +72,7 @@ public class UploadController {
      * re-derived from the filename.
      */
     @GetMapping("/{filename}")
+    @SecurityRequirements
     public ResponseEntity<Resource> serve(@PathVariable String filename) {
         Optional<PhotoContent> stored = loadPhoto.load(filename);
         if (stored.isEmpty()) {

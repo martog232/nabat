@@ -118,10 +118,52 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
                 .andExpect(jsonPath("$", hasSize(24)));
     }
 
-    /** Public means readable, not open: nothing else became reachable without a token. */
+    /**
+     * The map, read-only, needs no session: the reports on it, one report, and everything on
+     * its card. Not the vote endpoint's "mine" and not the official's list — those are about
+     * the caller.
+     */
+    @Test
+    void theMapIsReadableWithoutSigningIn() throws Exception {
+        String token = registerAndGetAuth().accessToken();
+        CreateAlertRequest request = new CreateAlertRequest(
+                "Дупка на ъгъла", "Пред номер 12", 1007, 42.695, 23.329, null);
+        AlertResponse created = objectMapper.readValue(
+                mockMvc.perform(post("/api/v1/alerts")
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isCreated())
+                        .andReturn().getResponse().getContentAsString(),
+                AlertResponse.class);
+        String report = "/api/v1/alerts/" + created.id();
+
+        mockMvc.perform(get("/api/v1/alerts/nearby").param("latitude", "42.695").param("longitude", "23.329"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alerts[0].id").value(created.id().toString()));
+        mockMvc.perform(get(report))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Дупка на ъгъла"));
+        for (String part : new String[] {"/comments", "/history", "/forwards", "/rejections"}) {
+            mockMvc.perform(get(report + part)).andExpect(status().isOk());
+        }
+        mockMvc.perform(get("/api/v1/uploads/" + UUID.randomUUID() + ".jpg"))
+                .andExpect(status().isNotFound());
+    }
+
+    /** Public means readable, not open: writing, and anything about the caller, still needs a token. */
     @Test
     void theRestOfTheReportApiStillNeedsASession() throws Exception {
-        mockMvc.perform(get("/api/v1/alerts/nearby").param("latitude", "42.69").param("longitude", "23.32"))
+        String report = "/api/v1/alerts/" + UUID.randomUUID();
+        mockMvc.perform(get(report + "/votes/me")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(report + "/fix-check")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/alerts/assigned")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/alerts/similar")
+                        .param("latitude", "42.69").param("longitude", "23.32").param("category", "1007"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post(report + "/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"body\":\"анонимно\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -193,14 +235,6 @@ class AlertControllerIntegrationTest extends PostgresTestSupport {
         mockMvc.perform(post("/api/v1/alerts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void shouldReturn401WhenQueryingAlertsWithoutToken() throws Exception {
-        mockMvc.perform(get("/api/v1/alerts/nearby")
-                        .param("latitude", "42.0")
-                        .param("longitude", "23.0"))
                 .andExpect(status().isUnauthorized());
     }
 

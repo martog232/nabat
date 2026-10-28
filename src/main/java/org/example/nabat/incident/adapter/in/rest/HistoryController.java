@@ -1,5 +1,6 @@
 package org.example.nabat.incident.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.example.nabat.incident.application.port.in.ShowReportHistoryUseCase;
@@ -27,6 +28,7 @@ public class HistoryController {
     }
 
     @GetMapping
+    @SecurityRequirements
     @Operation(summary = "Who did what to the report, and when, oldest first")
     public ResponseEntity<List<StepResponse>> history(@PathVariable UUID id) {
         return ResponseEntity.ok(history.history(AlertId.of(id)).stream().map(StepResponse::from).toList());

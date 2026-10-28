@@ -70,6 +70,21 @@ public class SecurityConfig {
                     "/api/v1/authorities",
                     "/api/v1/categories",
                     "/api/v1/call-sofia/district-comparison").permitAll()
+                // The map, read-only: a report and what is on its card — photo, thread, who
+                // took each step, where it was forwarded, why it was rejected, how many see
+                // it. Everyone who files or answers one is already shown there by name to
+                // anyone with an account, and anyone can make one. Writing still needs a
+                // session. `{id}` is held to a UUID's characters so the named lists beside it
+                // (`assigned`, `disputed`, `similar`) are not swept in.
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/alerts/nearby",
+                    "/api/v1/alerts/{id:[0-9a-fA-F-]+}",
+                    "/api/v1/alerts/{id:[0-9a-fA-F-]+}/comments",
+                    "/api/v1/alerts/{id:[0-9a-fA-F-]+}/history",
+                    "/api/v1/alerts/{id:[0-9a-fA-F-]+}/forwards",
+                    "/api/v1/alerts/{id:[0-9a-fA-F-]+}/rejections",
+                    "/api/v1/alerts/{id:[0-9a-fA-F-]+}/votes/stats",
+                    "/api/v1/uploads/{filename}").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 // The probe groups are listed individually rather than as /actuator/health/**:
                 // that wildcard would also expose any future health group, and `anyRequest()`

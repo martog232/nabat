@@ -28,11 +28,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <h2>The list below is the point</h2>
  * It is not a restatement of the spec — it is the second copy that makes disagreement
- * visible. {@code SecurityConfig} permits exactly these six and {@code denyAll()}s the rest;
+ * visible. {@code SecurityConfig} permits exactly these and {@code denyAll()}s the rest;
  * {@code AuthEndpointSecurityTest} pins that the filter chain behaves that way. This pins
  * that the document says the same thing. A new endpoint left undocumented is caught by the
- * global requirement being inherited; a new endpoint wrongly marked public, or one of these
- * six quietly losing its exemption, is caught here.
+ * global requirement being inherited; a new endpoint wrongly marked public, or one listed here
+ * quietly losing its exemption, is caught here.
  */
 class ContractDocumentsAuthenticationTest {
 
@@ -40,7 +40,7 @@ class ContractDocumentsAuthenticationTest {
 
     private static final String SCHEME = "bearerAuth";
 
-    /** The eight the filter chain permits, and the only operations allowed to clear the requirement. */
+    /** What the filter chain permits, and the only operations allowed to clear the requirement. */
     private static final List<String> PUBLIC_OPERATIONS = List.of(
         "POST /api/v1/auth/register",
         "POST /api/v1/auth/verify",
@@ -55,7 +55,16 @@ class ContractDocumentsAuthenticationTest {
         "GET /api/v1/authorities",
         "GET /api/v1/categories",
         // How the districts answered Call Sofia reports - published data, about administrations.
-        "GET /api/v1/call-sofia/district-comparison"
+        "GET /api/v1/call-sofia/district-comparison",
+        // The map, read-only: its reports and what is on a report's card.
+        "GET /api/v1/alerts/nearby",
+        "GET /api/v1/alerts/{id}",
+        "GET /api/v1/alerts/{id}/comments",
+        "GET /api/v1/alerts/{id}/history",
+        "GET /api/v1/alerts/{id}/forwards",
+        "GET /api/v1/alerts/{id}/rejections",
+        "GET /api/v1/alerts/{alertId}/votes/stats",
+        "GET /api/v1/uploads/{filename}"
     );
 
     private static JsonNode spec() throws Exception {

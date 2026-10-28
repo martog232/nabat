@@ -1,5 +1,6 @@
 package org.example.nabat.incident.adapter.in.rest;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -54,6 +55,7 @@ public class RejectionController {
     }
 
     @GetMapping("/{id}/rejections")
+    @SecurityRequirements
     @Operation(summary = "The report's rejections, oldest first, with their disputes and decisions")
     public ResponseEntity<List<RejectionResponse>> rejections(@PathVariable UUID id) {
         return ResponseEntity.ok(rejecting.rejections(AlertId.of(id)).stream().map(RejectionResponse::from).toList());
